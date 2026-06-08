@@ -1,16 +1,59 @@
-import { initializeApp, getApp, getApps } from 'firebase/app';
+import { initializeApp, getApp, getApps, deleteApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
+import defaultFirebaseConfig from '../firebase-applet-config.json';
+
+// Resolves the active firebase configuration
+export function getActiveFirebaseConfig() {
+  try {
+    const saved = localStorage.getItem("ALPHA_FIREBASE_CONFIG_OVERRIDE");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.apiKey) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error("Failed parsing localStorage firebase config override:", e);
+  }
+  return defaultFirebaseConfig;
+}
+
+const activeConfig = getActiveFirebaseConfig();
 
 // Initialize Firebase App
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+const app = getApps().length === 0 ? initializeApp(activeConfig) : getApp();
 
-// Initialize Firestore with Database ID from configuration
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Initialize Firestore
+export let db = getFirestore(app, activeConfig.firestoreDatabaseId || "(default)");
 
 // Initialize Authentication
-export const auth = getAuth(app);
+export let auth = getAuth(app);
+
+// Updates configuration dynamically and reloads the active instances
+export function updateActiveFirebaseConfig(newConfig: any) {
+  if (newConfig) {
+    localStorage.setItem("ALPHA_FIREBASE_CONFIG_OVERRIDE", JSON.stringify(newConfig));
+  } else {
+    localStorage.removeItem("ALPHA_FIREBASE_CONFIG_OVERRIDE");
+  }
+
+  try {
+    const existingApps = getApps();
+    for (const ea of existingApps) {
+      deleteApp(ea);
+    }
+  } catch (e) {
+    console.error("Error clearing existing firebase apps:", e);
+  }
+
+  const updatedConfig = getActiveFirebaseConfig();
+  const newApp = initializeApp(updatedConfig);
+  db = getFirestore(newApp, updatedConfig.firestoreDatabaseId || "(default)");
+  auth = getAuth(newApp);
+
+  window.location.reload();
+}
 
 // Custom context-rich error logger as mandated by Firebase rules guidelines
 export enum OperationType {

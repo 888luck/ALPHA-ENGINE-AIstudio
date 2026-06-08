@@ -37,7 +37,9 @@ import {
   db, 
   testConnection, 
   handleFirestoreError, 
-  OperationType 
+  OperationType,
+  getActiveFirebaseConfig,
+  updateActiveFirebaseConfig
 } from "../firebase";
 import {
   ResponsiveContainer,
@@ -183,6 +185,19 @@ export default function Dashboard() {
     statesCount: number;
   } | null>(null);
   const [isTestingConn, setIsTestingConn] = useState(false);
+
+  // Custom Firebase credentials management
+  const [showFirebaseConfigPanel, setShowFirebaseConfigPanel] = useState(false);
+  const [tempFirebaseConfig, setTempFirebaseConfig] = useState<any>(() => getActiveFirebaseConfig());
+  const isCustomConfigActive = !!localStorage.getItem("ALPHA_FIREBASE_CONFIG_OVERRIDE");
+
+  const saveCustomFirebaseConfig = () => {
+    updateActiveFirebaseConfig(tempFirebaseConfig);
+  };
+
+  const resetCustomFirebaseConfig = () => {
+    updateActiveFirebaseConfig(null);
+  };
 
   useEffect(() => {
     // Setup Firebase Auth State Listener
@@ -665,6 +680,19 @@ export default function Dashboard() {
               </div>
 
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowFirebaseConfigPanel(!showFirebaseConfigPanel)}
+                  className={`p-2 rounded-lg border transition cursor-pointer ${
+                    showFirebaseConfigPanel || isCustomConfigActive
+                      ? "bg-amber-500/20 border-amber-500/40 text-amber-300"
+                      : "bg-white/5 border-white/10 hover:bg-white/10 text-slate-300"
+                  }`}
+                  title="Configure Custom Backend Credentials for Custom Domains"
+                >
+                  <Settings2 className="w-4 h-4" />
+                </button>
+
                 {currentUser ? (
                   <div className="flex items-center gap-2 font-mono">
                     <span className="text-[10px] text-slate-400 hidden sm:inline">{currentUser.email}</span>
@@ -685,6 +713,105 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
+
+            {/* Custom Credentials Configuration Drawer */}
+            {showFirebaseConfigPanel && (
+              <div className="mt-4 mb-4 bg-amber-950/20 border border-amber-500/20 p-4 rounded-lg font-sans text-xs space-y-3">
+                <div className="flex justify-between items-center pb-2 border-b border-white/5 text-amber-200 font-semibold font-mono">
+                  <span>OVERRIDE FIRESTORE CREDENTIALS (CUSTOM DOMAIN PORTABILITY)</span>
+                  {isCustomConfigActive && (
+                    <button
+                      onClick={resetCustomFirebaseConfig}
+                      className="text-[10px] bg-red-500/10 hover:bg-red-500/25 border border-red-500/30 text-red-100 px-2 py-0.5 rounded cursor-pointer transition"
+                    >
+                      Reset Default Sandbox
+                    </button>
+                  )}
+                </div>
+                
+                <p className="text-slate-400 leading-relaxed">
+                  Default developer credentials are key-restricted to the AI Studio preview host. To authenticate on your custom Cloud Run production domain (<code className="text-indigo-300 font-mono text-[10px]">europe-west3.run.app</code>), configure your custom Firebase Project's web client values below.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-300 font-mono text-[11px]">
+                  <div>
+                    <label className="block text-slate-500 mb-1">API KEY (apiKey)</label>
+                    <input
+                      type="text"
+                      value={tempFirebaseConfig.apiKey || ""}
+                      onChange={(e) => setTempFirebaseConfig({ ...tempFirebaseConfig, apiKey: e.target.value })}
+                      className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500/50"
+                      placeholder="AIzaSy..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-500 mb-1">PROJECT ID (projectId)</label>
+                    <input
+                      type="text"
+                      value={tempFirebaseConfig.projectId || ""}
+                      onChange={(e) => setTempFirebaseConfig({ ...tempFirebaseConfig, projectId: e.target.value })}
+                      className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500/50"
+                      placeholder="my-gcp-project-id"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-500 mb-1">AUTH DOMAIN (authDomain)</label>
+                    <input
+                      type="text"
+                      value={tempFirebaseConfig.authDomain || ""}
+                      onChange={(e) => setTempFirebaseConfig({ ...tempFirebaseConfig, authDomain: e.target.value })}
+                      className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500/50"
+                      placeholder="my-gcp-project-id.firebaseapp.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-500 mb-1">FIRESTORE DATABASE ID (defaults to (default))</label>
+                    <input
+                      type="text"
+                      value={tempFirebaseConfig.firestoreDatabaseId || ""}
+                      onChange={(e) => setTempFirebaseConfig({ ...tempFirebaseConfig, firestoreDatabaseId: e.target.value })}
+                      className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500/50"
+                      placeholder="(default)"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-500 mb-1">STORAGE BUCKET (storageBucket)</label>
+                    <input
+                      type="text"
+                      value={tempFirebaseConfig.storageBucket || ""}
+                      onChange={(e) => setTempFirebaseConfig({ ...tempFirebaseConfig, storageBucket: e.target.value })}
+                      className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500/50"
+                      placeholder="my-gcp-project-id.firebasestorage.app"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-500 mb-1">MESSAGING SENDER ID (messagingSenderId)</label>
+                    <input
+                      type="text"
+                      value={tempFirebaseConfig.messagingSenderId || ""}
+                      onChange={(e) => setTempFirebaseConfig({ ...tempFirebaseConfig, messagingSenderId: e.target.value })}
+                      className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500/50"
+                      placeholder="84192..."
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => setShowFirebaseConfigPanel(false)}
+                    className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded cursor-pointer transition font-mono"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveCustomFirebaseConfig}
+                    className="px-4 py-1.5 bg-amber-500/20 hover:bg-amber-500/35 border border-amber-500/40 text-amber-200 rounded cursor-pointer transition font-mono font-medium flex items-center gap-1.5"
+                  >
+                    Save & Initialize Pipeline
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* If authenticated, show details and bidirectional buttons */}
             {firebaseStatus === "authorized" ? (
