@@ -201,6 +201,47 @@ export default function Dashboard() {
     updateActiveFirebaseConfig(null);
   };
 
+  const fallbackCopyToClipboard = (textToCopy: string) => {
+    try {
+      const textArea = document.createElement("textarea");
+      textArea.value = textToCopy;
+      textArea.style.position = "fixed";
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.opacity = "0";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand("copy");
+      document.body.removeChild(textArea);
+      if (successful) {
+        setCopiedRules(true);
+        setTimeout(() => setCopiedRules(false), 2000);
+      } else {
+        console.error("Fallback copy execution returned false");
+      }
+    } catch (err) {
+      console.error("Fallback copy failed: ", err);
+    }
+  };
+
+  const handleClipboardCopy = (textToCopy: string) => {
+    if (!textToCopy) return;
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(textToCopy)
+        .then(() => {
+          setCopiedRules(true);
+          setTimeout(() => setCopiedRules(false), 2000);
+        })
+        .catch((err) => {
+          console.warn("navigator.clipboard.writeText failed, using fallback:", err);
+          fallbackCopyToClipboard(textToCopy);
+        });
+    } else {
+      fallbackCopyToClipboard(textToCopy);
+    }
+  };
+
   useEffect(() => {
     fetch("/api/security-rules")
       .then(r => r.json())
@@ -932,11 +973,7 @@ export default function Dashboard() {
                     </p>
                     
                     <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(securityRulesText);
-                        setCopiedRules(true);
-                        setTimeout(() => setCopiedRules(false), 2000);
-                      }}
+                      onClick={() => handleClipboardCopy(securityRulesText)}
                       className="w-full py-2 bg-amber-500/20 hover:bg-amber-500/35 border border-amber-500/40 text-amber-200 rounded text-xs font-mono font-medium transition cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       {copiedRules ? "✅ Rules Copied!" : "📋 Copy Hardened Rules to Clipboard"}
@@ -958,11 +995,23 @@ export default function Dashboard() {
                     </ol>
 
                     {securityRulesText && (
-                      <div className="mt-2">
-                        <span className="block text-[10px] text-slate-500 mb-1 font-mono uppercase">Rules Preview (First 300 chars):</span>
-                        <pre className="bg-black/45 p-2 rounded text-[10px] text-slate-400 font-mono overflow-x-auto select-all max-h-24">
-                          {securityRulesText.length > 300 ? `${securityRulesText.substring(0, 300)}...` : securityRulesText}
-                        </pre>
+                      <div className="mt-3 space-y-1.5">
+                        <span className="block text-[10px] text-slate-400 font-mono uppercase">Full Hardened Rules (Click to select all):</span>
+                        <textarea
+                          readOnly
+                          value={securityRulesText}
+                          onClick={(e) => {
+                            const elem = e.target as HTMLTextAreaElement;
+                            elem.focus();
+                            elem.select();
+                          }}
+                          rows={12}
+                          className="w-full bg-black/55 border border-white/10 rounded p-2 text-[10px] text-amber-200 font-mono focus:outline-none focus:border-amber-500/50 select-all leading-normal resize-y"
+                          placeholder="Loading security rules..."
+                        />
+                        <span className="text-[9px] text-slate-500 italic block font-mono leading-none">
+                          💡 Alternative: Click inside the box above, press Ctrl+A (Cmd+A) to select all, then copy.
+                        </span>
                       </div>
                     )}
                   </div>
