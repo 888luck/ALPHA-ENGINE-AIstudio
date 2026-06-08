@@ -1,0 +1,105 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Root default deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reuseable, hardened, global validation helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Helper validating trade entity structure (Anti-Update-Gap)
+    function isValidTrade(data) {
+      return data.keys().hasAll(['id', 'symbol', 'quantity', 'direction', 'entryPrice'])
+        && data.id is string && data.id.size() <= 128
+        && data.symbol is string && data.symbol.size() <= 16
+        && data.quantity is number && data.quantity > 0
+        && (data.direction == 'BUY' || data.direction == 'SELL')
+        && data.entryPrice is number && data.entryPrice > 0
+        && (data.stopPrice == null || (data.stopPrice is number && data.stopPrice > 0))
+        && (data.currentPrice == null || (data.currentPrice is number && data.currentPrice > 0))
+        && (data.unrealizedPnL == null || data.unrealizedPnL is number);
+    }
+
+    // Helper validating trade log record structure
+    function isValidTradeLog(data) {
+      return data.keys().hasAll(['id', 'symbol', 'realizedPnL', 'commission'])
+        && data.id is string && data.id.size() <= 128
+        && data.symbol is string && data.symbol.size() <= 16
+        && data.realizedPnL is number
+        && data.commission is number && data.commission >= 0;
+    }
+
+    // Helper validating risk state structure
+    function isValidRiskState(data) {
+      return data.keys().hasAll(['netLiquidation', 'routerLocked'])
+        && data.netLiquidation is number && data.netLiquidation > 0
+        && data.routerLocked is bool
+        && (data.maintenanceMargin == null || data.maintenanceMargin is number)
+        && (data.dailyRealizedPnL == null || data.dailyRealizedPnL is number)
+        && (data.dailyUnrealizedPnL == null || data.dailyUnrealizedPnL is number);
+    }
+
+    // --- COLLECTION PATH MATCH BLOCKS ---
+
+    // 2. Active Trades collection (Session Holdings)
+    match /active_trades/{tradeId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidId(tradeId)
+        && isValidTrade(incoming());
+      allow update: if isSignedIn()
+        && isValidId(tradeId)
+        && isValidTrade(incoming())
+        && incoming().id == existing().id // Immutable fields
+        && incoming().symbol == existing().symbol
+        && incoming().direction == existing().direction
+        && incoming().entryPrice == existing().entryPrice
+        && incoming().diff(existing()).affectedKeys().hasOnly(['stopPrice', 'currentPrice', 'unrealizedPnL', 'quantity']);
+      allow delete: if isSignedIn()
+        && isValidId(tradeId);
+    }
+
+    // 3. Historical logs collection
+    match /historical_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidId(logId)
+        && isValidTradeLog(incoming());
+      // Updates and deletes strictly forbidden to preserve immutable historic transaction trails (MiFIR Audit compliance)
+      allow update, delete: if false;
+    }
+
+    // 4. System Risk State config collection
+    match /system_risk_state/{stateId} {
+      allow read: if isSignedIn();
+      allow create, write: if isSignedIn()
+        && isValidId(stateId)
+        && isValidRiskState(incoming());
+      allow update: if isSignedIn()
+        && isValidId(stateId)
+        && isValidRiskState(incoming())
+        && (
+          // Allow toggle of the lock during drawdown breaches
+          incoming().diff(existing()).affectedKeys().hasOnly(['routerLocked', 'netLiquidation', 'maintenanceMargin', 'dailyRealizedPnL', 'dailyUnrealizedPnL', 'lastUpdated'])
+        );
+      allow delete: if false; // System state cannot be purged
+    }
+  }
+}

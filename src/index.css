@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "Fira Code", "Courier New", monospace;
+}
+
+/* Base custom background with ambient radial glowing lights */
+body {
+  background-color: #05070a !important;
+  color: #ffffff;
+}
+
+.frosted-bg {
+  background-color: #05070a;
+  background-image: 
+    radial-gradient(circle at 5% 5%, rgba(26, 42, 68, 0.55) 0%, transparent 45%),
+    radial-gradient(circle at 95% 95%, rgba(45, 27, 51, 0.55) 0%, transparent 45%);
+}
+
+/* Translucent Frosted Glass Card Utility */
+.frosted-glass {
+  background: rgba(255, 255, 255, 0.035) !important;
+  backdrop-filter: blur(16px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(120%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-radius: 12px;
+}
+
+.frosted-glass-hover {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.03, 1);
+}
+
+.frosted-glass-hover:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.45);
+  transform: translateY(-1px);
+}
+
+/* Active Highlight Statuses */
+.frosted-active-row {
+  background: rgba(0, 255, 136, 0.05) !important;
+  border-left: 3px solid #00ff88 !important;
+}
+
+/* Glass Status Pulsing Micro Indicator */
+.frosted-pulse-green {
+  background: #00ff88;
+  box-shadow: 0 0 12px #00ff88;
+}
+
+.frosted-pulse-red {
+  background: #ff4444;
+  box-shadow: 0 0 12px #ff4444;
+}
+
+.frosted-pulse-warning {
+  background: #ffaa00;
+  box-shadow: 0 0 12px #ffaa00;
+}
+
+/* Customized Scrollbar for seamless integration */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}

@@ -1,0 +1,41 @@
+# ==============================================================================
+#            ALPHA ENGINE - PYTHON EDGE NODE DOCKERFILE (MINIMAL WORKSPACE)
+# ==============================================================================
+# Packs the dynamic scanning and risk routing daemon in a lightweight,
+# security-hardened Alpine container, compatible with GCP Artifact Registry.
+# ==============================================================================
+
+FROM python:3.10-slim
+
+# Prevent python from writing pyc files and buffering stdout/stderr
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Install native compilation dependencies if needed (e.g. for potential packages),
+# clean apt caches in same step to reduce size.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libc-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy script structures
+COPY requirements.txt* ./
+RUN pip install --no-cache-dir python-dotenv urllib3
+
+# Ingest engine resources
+COPY alpha_strategy.py .
+COPY config_loader.py .
+COPY connection.py .
+COPY firebase_sync.py .
+COPY local_edge_node.py .
+COPY main.py .
+COPY risk_engine.py .
+
+# Standard non-root runtime permissions for security hardening
+RUN useradd -u 8888 appuser && chown -R appuser:appuser /app
+USER appuser
+
+# Initialize the main session loop
+CMD ["python", "main.py"]

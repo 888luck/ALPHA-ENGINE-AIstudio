@@ -1,0 +1,6 @@
+{
+  "name": "Alpha Engine",
+  "description": "High-frequency intraday trading workspace with real-time order flow imbalance tracking, pool-equity risk layers, and IBKR compliance simulation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

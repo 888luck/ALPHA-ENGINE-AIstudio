@@ -1,0 +1,69 @@
+{
+  "entities": {
+    "trade": {
+      "title": "Active Trade",
+      "description": "Represents an active physical trade entered by the system in a single active session.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "symbol": { "type": "string" },
+        "quantity": { "type": "number" },
+        "direction": { "type": "string" },
+        "entryPrice": { "type": "number" },
+        "stopPrice": { "type": "number" },
+        "currentPrice": { "type": "number" },
+        "unrealizedPnL": { "type": "number" },
+        "mifidDecisionMaker": { "type": "string" },
+        "mifidExecutionTrader": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "symbol", "quantity", "direction", "entryPrice"]
+    },
+    "tradeLog": {
+      "title": "Trade Log",
+      "description": "Historical log of completed trades with exact commissions and regulation reporting.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "symbol": { "type": "string" },
+        "quantity": { "type": "number" },
+        "direction": { "type": "string" },
+        "entryPrice": { "type": "number" },
+        "exitPrice": { "type": "number" },
+        "realizedPnL": { "type": "number" },
+        "commission": { "type": "number" },
+        "efficiencyRatio": { "type": "number" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "symbol", "realizedPnL", "commission"]
+    },
+    "riskState": {
+      "title": "Risk State",
+      "description": "Durable pool equity markers, locks, and margin metrics.",
+      "type": "object",
+      "properties": {
+        "netLiquidation": { "type": "number" },
+        "maintenanceMargin": { "type": "number" },
+        "dailyRealizedPnL": { "type": "number" },
+        "dailyUnrealizedPnL": { "type": "number" },
+        "routerLocked": { "type": "boolean" },
+        "lastUpdated": { "type": "string" }
+      },
+      "required": ["netLiquidation", "routerLocked"]
+    }
+  },
+  "firestore": {
+    "/active_trades/{tradeId}": {
+      "schema": "trade",
+      "description": "Collection of live holdings in the current trading session."
+    },
+    "/historical_logs/{logId}": {
+      "schema": "tradeLog",
+      "description": "Regulatory historical transactions logs with audited costs."
+    },
+    "/system_risk_state/{stateId}": {
+      "schema": "riskState",
+      "description": "Persisted central system margin metrics & active lock status."
+    }
+  }
+}
