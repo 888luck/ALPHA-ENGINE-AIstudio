@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { pushToGithub } from "./github_sync";
 
@@ -307,6 +308,16 @@ function executeEmergencyFlush(reason: string) {
 // ==========================================
 // REST FULL-STACK ENDPOINTS FOR PORTFOLIO CONTROL
 // ==========================================
+
+app.get("/api/security-rules", (req, res) => {
+  try {
+    const rulesPath = path.join(process.cwd(), "firestore.rules");
+    const rulesContent = fs.readFileSync(rulesPath, "utf8");
+    res.json({ rules: rulesContent });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to read firestore.rules on server: " + err.message });
+  }
+});
 
 app.get("/api/state", (req, res) => {
   res.json({

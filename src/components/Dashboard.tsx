@@ -190,6 +190,8 @@ export default function Dashboard() {
   const [showFirebaseConfigPanel, setShowFirebaseConfigPanel] = useState(false);
   const [tempFirebaseConfig, setTempFirebaseConfig] = useState<any>(() => getActiveFirebaseConfig());
   const isCustomConfigActive = !!localStorage.getItem("ALPHA_FIREBASE_CONFIG_OVERRIDE");
+  const [securityRulesText, setSecurityRulesText] = useState<string>("");
+  const [copiedRules, setCopiedRules] = useState(false);
 
   const saveCustomFirebaseConfig = () => {
     updateActiveFirebaseConfig(tempFirebaseConfig);
@@ -198,6 +200,17 @@ export default function Dashboard() {
   const resetCustomFirebaseConfig = () => {
     updateActiveFirebaseConfig(null);
   };
+
+  useEffect(() => {
+    fetch("/api/security-rules")
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.rules) {
+          setSecurityRulesText(data.rules);
+        }
+      })
+      .catch(err => console.error("Could not load security rules: ", err));
+  }, []);
 
   useEffect(() => {
     // Setup Firebase Auth State Listener
@@ -906,6 +919,52 @@ export default function Dashboard() {
                         Under top tab <strong>Settings</strong> &gt; <strong>Authorized domains</strong>, ensure your production host URL (<code className="text-amber-200 font-mono text-[10px]">alpha-engine-aistudio-138990607360.europe-west3.run.app</code>) is listed.
                       </li>
                     </ol>
+                  </div>
+                )}
+
+                {(firebaseError.toLowerCase().includes("permission") || firebaseError.toLowerCase().includes("insufficient")) && (
+                  <div className="bg-amber-500/5 border border-amber-500/20 p-3.5 rounded text-slate-300 space-y-3 leading-relaxed">
+                    <p className="font-semibold text-amber-200 font-mono text-[11px] uppercase tracking-wider">
+                      🛡️ ACTION REQUIRED: UPDATE FIRESTORE SECURITY RULES
+                    </p>
+                    <p className="text-[11px] text-slate-300">
+                      Your Firestore database is currently blocking read/write requests. Paste our production-ready, security-hardened rules into your Firebase Console to authorize synchronized real-time data flow for your logged-in session.
+                    </p>
+                    
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(securityRulesText);
+                        setCopiedRules(true);
+                        setTimeout(() => setCopiedRules(false), 2000);
+                      }}
+                      className="w-full py-2 bg-amber-500/20 hover:bg-amber-500/35 border border-amber-500/40 text-amber-200 rounded text-xs font-mono font-medium transition cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      {copiedRules ? "✅ Rules Copied!" : "📋 Copy Hardened Rules to Clipboard"}
+                    </button>
+
+                    <ol className="list-decimal list-inside space-y-1.5 text-[11px] text-slate-300 pt-1.5 border-t border-white/5">
+                      <li>
+                        Go to the <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-400 underline hover:text-indigo-300 font-semibold font-mono">Firebase Console</a> and select your project.
+                      </li>
+                      <li>
+                        Under "Build" or the left side rail, click <strong>Firestore Database</strong>.
+                      </li>
+                      <li>
+                        Click the <strong>Rules</strong> tab at the top.
+                      </li>
+                      <li>
+                        Delete any existing code, paste the copied rules, and click <strong>Publish</strong>.
+                      </li>
+                    </ol>
+
+                    {securityRulesText && (
+                      <div className="mt-2">
+                        <span className="block text-[10px] text-slate-500 mb-1 font-mono uppercase">Rules Preview (First 300 chars):</span>
+                        <pre className="bg-black/45 p-2 rounded text-[10px] text-slate-400 font-mono overflow-x-auto select-all max-h-24">
+                          {securityRulesText.length > 300 ? `${securityRulesText.substring(0, 300)}...` : securityRulesText}
+                        </pre>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
