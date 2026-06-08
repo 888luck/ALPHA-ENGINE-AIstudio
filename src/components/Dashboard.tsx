@@ -876,13 +876,38 @@ export default function Dashboard() {
 
             {/* Firebase Error Log Monitor */}
             {firebaseError && (
-              <div className="mt-4 bg-red-500/10 border border-red-500/20 p-3 rounded-lg font-mono text-xs">
-                <div className="text-red-400 font-bold mb-1 uppercase tracking-wider flex items-center gap-1.5">
-                  <AlertOctagon className="w-3.5 h-3.5" /> SECURITY / PERSISTENCE EXCEPTION
+              <div className="mt-4 bg-red-950/35 border border-red-500/30 p-4 rounded-lg font-sans text-xs space-y-3">
+                <div className="text-red-400 font-bold font-mono uppercase tracking-wider flex items-center gap-1.5 border-b border-red-500/15 pb-2">
+                  <AlertOctagon className="w-4 h-4 text-red-400 animate-pulse" /> SECURITY / PERSISTENCE EXCEPTION
                 </div>
-                <pre className="text-[10px] text-red-300 overflow-x-auto whitespace-pre-wrap max-h-24">
+                <div className="bg-black/25 p-2 rounded border border-white/5 font-mono text-[10px] text-red-300 overflow-x-auto whitespace-pre-wrap">
                   {firebaseError}
-                </pre>
+                </div>
+                
+                {firebaseError.includes("configuration-not-found") && (
+                  <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded text-slate-300 space-y-2 leading-relaxed">
+                    <p className="font-semibold text-amber-200 font-mono text-[11px] uppercase tracking-wider">
+                      🛠️ HOW TO RESOLVE IN GOOGLE/FIREBASE CONSOLE:
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1.5 text-[11px] text-slate-300">
+                      <li>
+                        Go to the <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-400 underline hover:text-indigo-300 font-semibold font-mono">Firebase Console</a> and select your project.
+                      </li>
+                      <li>
+                        In the left sidebar, click <strong>Authentication</strong>.
+                      </li>
+                      <li>
+                        Go to the <strong>Sign-in method</strong> tab and click <strong>Add new provider</strong>.
+                      </li>
+                      <li>
+                        Configure and enable the <strong>Google</strong> provider (enter your support email, then click <strong>Save</strong>).
+                      </li>
+                      <li>
+                        Under top tab <strong>Settings</strong> &gt; <strong>Authorized domains</strong>, ensure your production host URL (<code className="text-amber-200 font-mono text-[10px]">alpha-engine-aistudio-138990607360.europe-west3.run.app</code>) is listed.
+                      </li>
+                    </ol>
+                  </div>
+                )}
               </div>
             )}
           </div>
