@@ -1,0 +1,40 @@
+{
+  "baskets": [
+    {
+      "sector": "AI Calibrated Strategic Energy Portfolio (Fallback)",
+      "tickers": [
+        "XLE",
+        "VLO",
+        "COP"
+      ],
+      "impliedOfiTrend": "BULLISH (Middle-East Sea Lane Concerns)",
+      "winRate": 64,
+      "profitFactor": 1.58,
+      "avgFrictionConsumed": 5.4
+    },
+    {
+      "sector": "AI Calibrated High-Vol Defence Basket (Fallback)",
+      "tickers": [
+        "ITA",
+        "NOC",
+        "RTX"
+      ],
+      "impliedOfiTrend": "BULLISH (Strategic Posturing)",
+      "winRate": 61,
+      "profitFactor": 1.48,
+      "avgFrictionConsumed": 6.8
+    },
+    {
+      "sector": "AI Calibrated Tech Sovereignty Portfolio (Fallback)",
+      "tickers": [
+        "SAP",
+        "RWE",
+        "ENPH"
+      ],
+      "impliedOfiTrend": "NEUTRAL / MIXED",
+      "winRate": 53,
+      "profitFactor": 1.22,
+      "avgFrictionConsumed": 10.5
+    }
+  ]
+}

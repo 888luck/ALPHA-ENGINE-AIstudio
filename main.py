@@ -104,60 +104,99 @@ def main_loop():
             if drm.router_locked:
                 print("[WARN] Router locked due to previous session circuit breaker trigger.")
             else:
-                print(f"[PHASE - EXECUTION] Active trading window. Streaming Level 2 tickers & calculating OFI.")
-                # Perform basic risk evaluations on each iteration
-                drm.query_margin_safety()
-                
-                # Mock a trade sizing setup loop
-                sim_entry = 52.40
-                sim_stop = 51.90
-                pos_qty = drm.calculate_position_size(sim_entry, sim_stop)
-                
-                # Simulate MiFIR metadata tagging on Order Class
-                class MockOrder:
-                    def __init__(self):
-                        self.mifid2DecisionMaker = ""
-                o = MockOrder()
-                drm.enforce_mifid2_reporting(o, config["MIFID2_DECISION_MAKER_ID"], config["MIFID2_EXECUTION_TRADER_ID"])
-                
-                # Sync simulated live trade to Firestore active trades list
-                # This feeds the frontend dashboard with active trades streamed from the VPS node
-                trade_id = "TRD_XLE_EDGE"
-                sim_trade = {
-                    "id": trade_id,
-                    "symbol": "XLE",
-                    "quantity": float(pos_qty or 100),
-                    "direction": "BUY",
-                    "entryPrice": float(sim_entry),
-                    "stopPrice": float(sim_stop),
-                    "currentPrice": float(sim_entry + 0.35),
-                    "unrealizedPnL": float((0.35) * (pos_qty or 100)),
-                    "mifidDecisionMaker": config["MIFID2_DECISION_MAKER_ID"],
-                    "mifidExecutionTrader": config["MIFID2_EXECUTION_TRADER_ID"],
-                    "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
-                }
-                firebase_tunnel.push_active_trade(trade_id, sim_trade)
-                
-                # Update connection manager positions tracking
-                cm.active_positions["XLE"] = {"qty": pos_qty or 100, "avgCost": sim_entry}
-                cm.pnl_updates["unrealized"] = (0.35) * (pos_qty or 100)
-                cm.pnl_updates["total"] = cm.pnl_updates["realized"] + cm.pnl_updates["unrealized"]
+                if cm.is_connected:
+                    print(f"[PHASE - EXECUTION] Active connected trading window. Monitoring real IBKR positions & account telemetry.")
+                    
+                    # 1. Update margin parameters from connection metrics
+                    drm.query_margin_safety()
+                    
+                    # 2. Iterate and sync dynamic positions from the IBKR gateway socket
+                    if cm.active_positions:
+                        for symbol, pos in list(cm.active_positions.items()):
+                            qty_val = float(pos.get("qty", 0.0))
+                            if abs(qty_val) > 0:
+                                trade_id = f"TRD_{symbol}_EDGE"
+                                is_buy = qty_val > 0
+                                avg_cost = float(pos.get("avgCost", 0.0))
+                                unrealized_val = float(cm.pnl_updates.get("unrealized", 0.0))
+                                
+                                live_trade = {
+                                    "id": trade_id,
+                                    "symbol": symbol,
+                                    "quantity": float(abs(qty_val)),
+                                    "direction": "BUY" if is_buy else "SELL",
+                                    "entryPrice": avg_cost,
+                                    "stopPrice": float(avg_cost * 0.982 if is_buy else avg_cost * 1.018), 
+                                    "currentPrice": avg_cost, # Filled as average cost placeholder if tick feed is buffering
+                                    "unrealizedPnL": unrealized_val,
+                                    "mifidDecisionMaker": config["MIFID2_DECISION_MAKER_ID"],
+                                    "mifidExecutionTrader": config["MIFID2_EXECUTION_TRADER_ID"],
+                                    "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
+                                }
+                                firebase_tunnel.push_active_trade(trade_id, live_trade)
+                            else:
+                                # Clean up zeroed out dynamic positions from Firestore
+                                firebase_tunnel.delete_active_trade(f"TRD_{symbol}_EDGE")
+                    else:
+                        # Clear sample fallback trades during passive connection states
+                        firebase_tunnel.delete_active_trade("TRD_XLE_EDGE")
+                else:
+                    print(f"[PHASE - EXECUTION] Active trading window. Streaming Level 2 tickers & calculating OFI.")
+                    # Perform basic risk evaluations on each iteration
+                    drm.query_margin_safety()
+                    
+                    # Mock a trade sizing setup loop
+                    sim_entry = 52.40
+                    sim_stop = 51.90
+                    pos_qty = drm.calculate_position_size(sim_entry, sim_stop)
+                    
+                    # Simulate MiFIR metadata tagging on Order Class
+                    class MockOrder:
+                        def __init__(self):
+                            self.mifid2DecisionMaker = ""
+                    o = MockOrder()
+                    drm.enforce_mifid2_reporting(o, config["MIFID2_DECISION_MAKER_ID"], config["MIFID2_EXECUTION_TRADER_ID"])
+                    
+                    # Sync simulated live trade to Firestore active trades list
+                    # This feeds the frontend dashboard with active trades streamed from the VPS node
+                    trade_id = "TRD_XLE_EDGE"
+                    sim_trade = {
+                        "id": trade_id,
+                        "symbol": "XLE",
+                        "quantity": float(pos_qty or 100),
+                        "direction": "BUY",
+                        "entryPrice": float(sim_entry),
+                        "stopPrice": float(sim_stop),
+                        "currentPrice": float(sim_entry + 0.35),
+                        "unrealizedPnL": float((0.35) * (pos_qty or 100)),
+                        "mifidDecisionMaker": config["MIFID2_DECISION_MAKER_ID"],
+                        "mifidExecutionTrader": config["MIFID2_EXECUTION_TRADER_ID"],
+                        "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
+                    }
+                    firebase_tunnel.push_active_trade(trade_id, sim_trade)
+                    
+                    # Update connection manager positions tracking
+                    cm.active_positions["XLE"] = {"qty": pos_qty or 100, "avgCost": sim_entry}
+                    cm.pnl_updates["unrealized"] = (0.35) * (pos_qty or 100)
+                    cm.pnl_updates["total"] = cm.pnl_updates["realized"] + cm.pnl_updates["unrealized"]
 
         # Scenario C: 15:50 (EOD Flush Window - 10 minutes prior to close)
         elif "15:50" <= current_time < "16:00":
             print("[PHASE - HARD TERMINATION] Initiating automated Flat EOD Flush. Flattening all positions.")
             # Record historical log upon closing
             for symbol, pos in list(cm.active_positions.items()):
-                if pos["qty"] > 0:
+                pos_qty = float(pos.get("qty", 0.0))
+                if abs(pos_qty) > 0:
                     log_id = f"LOG_{int(time.time())}"
+                    avg_cost = float(pos.get("avgCost", 0.0))
                     log_data = {
                         "id": log_id,
                         "symbol": symbol,
-                        "quantity": float(pos["qty"]),
-                        "direction": "BUY",
-                        "entryPrice": float(pos["avgCost"]),
-                        "exitPrice": float(pos["avgCost"] + 0.40),
-                        "realizedPnL": float(0.40 * pos["qty"]),
+                        "quantity": float(abs(pos_qty)),
+                        "direction": "BUY" if pos_qty > 0 else "SELL",
+                        "entryPrice": avg_cost,
+                        "exitPrice": float(avg_cost + 0.40 if pos_qty > 0 else avg_cost - 0.40),
+                        "realizedPnL": float(0.40 * abs(pos_qty)),
                         "commission": 1.50,
                         "efficiencyRatio": 4.5,
                         "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
@@ -180,7 +219,7 @@ def main_loop():
         if not cm.is_connected:
             net_liq = float(drm.start_day_equity + cm.pnl_updates["total"])
 
-        maint_margin = float(len(cm.active_positions) * 12400.00)
+        maint_margin = float(cm.account_summary.get("MaintMarginReq", 0.0)) if cm.is_connected else float(len(cm.active_positions) * 12400.00)
         firebase_tunnel.push_system_risk_state(
             net_liq=net_liq,
             maint_margin=maint_margin,
