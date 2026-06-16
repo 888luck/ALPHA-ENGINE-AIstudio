@@ -61,15 +61,19 @@ fi
 # 3. Setup systemd service setup command sequence to push to the virtual machine
 echo "[SSH] Uploading startup services & workspace hooks to the target VM..."
 
+# Package the local workspace files directly from Cloud Shell to bypass VM-level Git cloning
+echo "[WORKSPACE] Compressing local codebase assets into an offline installer bundle..."
+tar -czf alpha-workspace-bundle.tar.gz --exclude='.git' --exclude='node_modules' --exclude='.env' --exclude='alpha-workspace-bundle.tar.gz' .
+
 # Make a temporary startup initialization script to load services on the VM
 cat <<EOF > remote_vm_setup.sh
 #!/bin/bash
 sudo mkdir -p /opt/alpha-engine
 sudo chown -R \$USER:\$USER /opt/alpha-engine
 
-# Clone codebase or copy files
-cd /opt/alpha-engine
-git clone https://github.com/mstouff/alpha-engine.git . 2>/dev/null || git pull
+# Extract the local workspace installer bundle directly
+echo "[VM] Extracting workspace codebase elements to /opt/alpha-engine..."
+tar -xzf ~/alpha-workspace-bundle.tar.gz -C /opt/alpha-engine/
 
 # Dynamic env seeding
 cat <<ENV > /opt/alpha-engine/.env
@@ -112,7 +116,8 @@ echo "Status: Active & monitoring Firestore queues in Frankfurt"
 echo "--------------------------------------------------------"
 EOF
 
-# Copy remote setups to the VM instance
+# Copy remote setups & local workspace archive to the VM instance
+gcloud compute scp alpha-workspace-bundle.tar.gz "$VM_NAME":~/alpha-workspace-bundle.tar.gz --zone="$ZONE" --quiet
 gcloud compute scp remote_vm_setup.sh "$VM_NAME":~/remote_vm_setup.sh --zone="$ZONE" --quiet
 
 # Execute remote initializations
@@ -120,6 +125,7 @@ gcloud compute ssh "$VM_NAME" --zone="$ZONE" --command="chmod +x ~/remote_vm_set
 
 # Teardown local temporary deployments
 rm -f remote_vm_setup.sh
+rm -f alpha-workspace-bundle.tar.gz
 
 echo ""
 echo "======================================================================="
