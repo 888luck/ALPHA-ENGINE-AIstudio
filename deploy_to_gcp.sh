@@ -63,7 +63,7 @@ echo "[SSH] Uploading startup services & workspace hooks to the target VM..."
 
 # Package the local workspace files directly from Cloud Shell to bypass VM-level Git cloning
 echo "[WORKSPACE] Compressing local codebase assets into an offline installer bundle..."
-tar -czf alpha-workspace-bundle.tar.gz --exclude='.git' --exclude='node_modules' --exclude='.env' --exclude='alpha-workspace-bundle.tar.gz' .
+tar -czf /tmp/alpha-workspace-bundle.tar.gz --exclude='.git' --exclude='node_modules' --exclude='.env' . || true
 
 # Make a temporary startup initialization script to load services on the VM
 cat <<EOF > remote_vm_setup.sh
@@ -117,7 +117,7 @@ echo "--------------------------------------------------------"
 EOF
 
 # Copy remote setups & local workspace archive to the VM instance
-gcloud compute scp alpha-workspace-bundle.tar.gz "$VM_NAME":~/alpha-workspace-bundle.tar.gz --zone="$ZONE" --quiet
+gcloud compute scp /tmp/alpha-workspace-bundle.tar.gz "$VM_NAME":~/alpha-workspace-bundle.tar.gz --zone="$ZONE" --quiet
 gcloud compute scp remote_vm_setup.sh "$VM_NAME":~/remote_vm_setup.sh --zone="$ZONE" --quiet
 
 # Execute remote initializations
@@ -125,7 +125,7 @@ gcloud compute ssh "$VM_NAME" --zone="$ZONE" --command="chmod +x ~/remote_vm_set
 
 # Teardown local temporary deployments
 rm -f remote_vm_setup.sh
-rm -f alpha-workspace-bundle.tar.gz
+rm -f /tmp/alpha-workspace-bundle.tar.gz
 
 echo ""
 echo "======================================================================="
