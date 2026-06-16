@@ -82,20 +82,41 @@ The Python daemon imports execution parameters dynamically at module load time v
 
 ## 🏝️ 3. How to Deploy the Edge Node Node on GCP (Frankfurt)
 
-Follow these simple steps to spin up the low-latency edge node in Frankfurt for under **$1.80/month**.
+Follow one of the two methods below to spin up the low-latency edge node in Frankfurt for under **$1.80/month**.
 
-### Step 1: Open Google Cloud Shell
-Access the free CLI console by navigating directly to [console.cloud.google.com](https://console.cloud.google.com) and clicking the `Activate Cloud Shell` icon in the top header.
+### Method A: No-Git / Direct Workspace ZIP Upload (Easiest & Fastest 🌟)
 
-### Step 2: Clone and Run the Automated Deployer
-Execute the secure script workspace to automate the VM setup, system configuration, and daemon initialization:
+You do not need a GitHub repository for this to work. Our deployment script compiles and moves your exact workspace files directly to the GCP VM.
 
-```bash
-git clone https://github.com/mstouff/alpha-engine.git
-cd alpha-engine
-chmod +x deploy_to_gcp.sh
-./deploy_to_gcp.sh
-```
+1. **Download Workspace ZIP:** In your AI Studio project interface, open the settings menu (or project options) and click **Export to ZIP** to download the static codebase.
+2. **Access Cloud Shell:** Open the Google Cloud Console ([console.cloud.google.com](https://console.cloud.google.com)) and click the **Activate Cloud Shell** button (terminal icon) in the top-right toolbar.
+3. **Upload ZIP File:** Click the `More` menu icon (three dots) in the Cloud Shell toolbar and click **Upload File**. Select your exported ZIP file.
+4. **Extract and Run Deployer:** Run the following commands in Cloud Shell to extract your files and deploy them directly:
+   ```bash
+   mkdir alpha-engine
+   unzip *.zip -d alpha-engine
+   cd alpha-engine
+   chmod +x deploy_to_gcp.sh
+   ./deploy_to_gcp.sh
+   ```
+
+---
+
+### Method B: Deploying via your Own GitHub Repository
+
+If you prefer using your GitHub repository, you **must create the repository on GitHub first** before cloning or syncing.
+
+1. **Create Repository:** Go to [GitHub](https://github.com) and create a **new** repository named `ALPHA-ENGINE-AIstudio` (public or private).
+2. **Push Code to Repository:** Open the **🦊 GIT DIRECT SYNC** tab in the dashboard of your running App, fill in your repository path (`888luck/ALPHA-ENGINE-AIstudio`), input your GitHub Personal Access Token (PAT), and click **TRANSMIT FILES**. This pushes your workspace code directly to your new repository.
+3. **Run from Cloud Shell:** Once the repository is populated, open your Google Cloud Shell:
+   ```bash
+   git clone https://<your_username>:<your_token>@github.com/888luck/ALPHA-ENGINE-AIstudio.git
+   cd ALPHA-ENGINE-AIstudio
+   chmod +x deploy_to_gcp.sh
+   ./deploy_to_gcp.sh
+   ```
+
+---
 
 ### What this Automated Script Executes:
 1. **Credentials Extraction:** Reads your workspace `firebase-applet-config.json` to configure the Python-to-Firestore Secure Tunnel.
