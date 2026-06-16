@@ -621,6 +621,53 @@ export default function Dashboard() {
     }
   };
 
+  const toggleTradingMode = async () => {
+    const nextMode = settings?.tradingMode === "LIVE" ? "PAPER" : "LIVE";
+    const nextPort = nextMode === "LIVE" ? 4001 : 4002;
+    try {
+      const res = await fetch("/api/set-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          tradingMode: nextMode,
+          ibkrPort: nextPort,
+          gatewayConnectionActive: nextMode === "LIVE" ? true : editGatewayConnectionActive
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSettings(data.settings);
+        setEditTradingMode(nextMode);
+        setEditIbkrPort(nextPort);
+        if (nextMode === "LIVE") {
+          setEditGatewayConnectionActive(true);
+        }
+        setOrderFeedback({ success: `DMA ROUTER: Switched execution pipeline to ${nextMode} (${nextPort} port).` });
+        
+        // If authorized, push state directly to Firebase
+        if (firebaseStatus === "authorized" && currentUser) {
+          const totalUnrealized = activeTrades.reduce((acc, curr) => acc + curr.unrealizedPnL, 0);
+          const totalRealized = historicalLogs.reduce((acc, curr) => acc + curr.realizedPnL, 0);
+          await setDoc(doc(db, "system_risk_state", "current_state"), {
+            netLiquidation: data.settings.netLiquidation,
+            maintenanceMargin: data.settings.maintenanceMargin,
+            dailyRealizedPnL: totalRealized,
+            dailyUnrealizedPnL: totalUnrealized,
+            routerLocked: data.settings.routerLocked,
+            ibkrAccountNumber: data.settings.ibkrAccountNumber,
+            ibkrPort: nextPort,
+            ibkrClientId: data.settings.ibkrClientId,
+            tradingMode: nextMode,
+            gatewayConnectionActive: nextMode === "LIVE" ? true : editGatewayConnectionActive,
+            lastUpdated: new Date().toISOString()
+          }, { merge: true }).catch(err => console.error("Firebase sync error: ", err));
+        }
+      }
+    } catch (e: any) {
+      setOrderFeedback({ error: "Failed to switch Trading Mode: " + e.message });
+    }
+  };
+
   const handleUpdateSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -797,15 +844,22 @@ export default function Dashboard() {
               <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2 flex-wrap">
                 Alpha Engine 
                 <span className="text-[10px] bg-[#00ff88]/10 text-[#00ff88] font-mono px-2 py-0.5 rounded border border-[#00ff88]/25">IRLAND SYSTEM</span>
-                {settings?.tradingMode === "LIVE" ? (
-                  <span className="text-[10px] bg-red-500/20 text-red-400 font-mono px-2 py-0.5 rounded border border-red-500/30 animate-pulse font-bold">
-                    🔴 IBIE LIVE PROD
-                  </span>
-                ) : (
-                  <span className="text-[10px] bg-indigo-500/20 text-indigo-300 font-mono px-2 py-0.5 rounded border border-indigo-500/30 font-bold">
-                    🎮 PAPER SIMULATION
-                  </span>
-                )}
+                <button
+                  type="button"
+                  onClick={toggleTradingMode}
+                  title="Click to toggle between PAPER and LIVE trading mode instantly"
+                  className="transition active:scale-95 duration-150 cursor-pointer select-none border-none bg-transparent p-0 rounded-md focus:outline-none"
+                >
+                  {settings?.tradingMode === "LIVE" ? (
+                    <span className="text-[10px] bg-red-500/25 hover:bg-red-500/40 text-red-400 font-mono px-2 py-0.5 rounded border border-red-500/45 animate-pulse font-bold flex items-center gap-1 shadow-lg shadow-red-500/5 select-none">
+                      🔴 IBIE LIVE PROD <span className="text-[8px] opacity-75 font-normal ml-0.5 underline decoration-red-500/50">CLICK TO FLIP</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] bg-indigo-500/25 hover:bg-indigo-500/40 text-indigo-300 font-mono px-2 py-0.5 rounded border border-indigo-500/45 font-bold flex items-center gap-1 shadow-lg shadow-indigo-500/5 select-none">
+                      🎮 PAPER SIMULATION <span className="text-[8px] opacity-75 font-normal ml-0.5 underline decoration-indigo-500/50">CLICK TO FLIP</span>
+                    </span>
+                  )}
+                </button>
               </h1>
               <p className="text-xs text-slate-400 font-mono">IBIE Regulatory (CBI Mandates) compliance module</p>
             </div>

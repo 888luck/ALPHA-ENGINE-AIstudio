@@ -4,6 +4,7 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { pushToGithub } from "./github_sync";
 import { GoogleGenAI } from "@google/genai";
+import { exec } from "child_process";
 
 const app = express();
 app.use(express.json());
@@ -726,6 +727,50 @@ app.get("/api/run-expectancy", (req, res) => {
     ]
   };
   res.json(resultData);
+});
+
+// Dedicated REST endpoint allowing selecting ticker, time range, timeframe and executing python simulation
+app.post("/api/backtest", (req, res) => {
+  const { symbol, timeframe, startDate, endDate } = req.body;
+  if (!symbol || !timeframe || !startDate || !endDate) {
+    return res.status(400).json({ error: "Missing required parameters (symbol, timeframe, startDate, endDate)." });
+  }
+
+  // Sanitize command inputs to avoid injection vulnerability
+  const cleanSymbol = symbol.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  const cleanTimeframe = timeframe.replace(/[^a-zA-Z0-9]/g, "");
+  const cleanStartDate = startDate.replace(/[^0-9\-]/g, "");
+  const cleanEndDate = endDate.replace(/[^0-9\-]/g, "");
+
+  const command = `python3 backtester.py "${cleanSymbol}" "${cleanTimeframe}" "${cleanStartDate}" "${cleanEndDate}"`;
+
+  exec(command, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`Backtest executable error: ${error.message}`);
+      // Try fallback with simple "python" if python3 lacks binary association
+      const fallbackCommand = `python backtester.py "${cleanSymbol}" "${cleanTimeframe}" "${cleanStartDate}" "${cleanEndDate}"`;
+      exec(fallbackCommand, (fallbackError, fallbackStdout, fallbackStderr) => {
+        if (fallbackError) {
+          return res.status(500).json({ error: "Execution loop failed: " + fallbackError.message });
+        }
+        try {
+          const parsed = JSON.parse(fallbackStdout);
+          res.json({ success: true, ...parsed });
+        } catch (e: any) {
+          res.status(500).json({ error: "Failed to parse system results feed: " + e.message, output: fallbackStdout });
+        }
+      });
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(stdout);
+      res.json({ success: true, ...parsed });
+    } catch (e: any) {
+      console.warn("Retrying parser error on blank output, stderr: ", stderr);
+      res.status(500).json({ error: "Invalid JSON response from backtest engine: " + e.message, output: stdout });
+    }
+  });
 });
 
 // Setup backend with static or dev mode bundler configurations

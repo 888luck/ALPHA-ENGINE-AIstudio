@@ -100,3 +100,47 @@ class ConnectionManager(EWrapper, EClient):
         Required by DRM to audit net spreads and regulatory fees.
         """
         print(f"[TRANSACTION FRICTION] Ref: {commissionReport.execId} Cost: {commissionReport.commission} {commissionReport.currency}")
+
+    # --- HISTORICAL DATA RESOLUTION WRAPPERS & CALLBACKS ---
+    def historicalData(self, reqId: int, bar: Any):
+        """
+        Processes inbound historical candlestick bars from IBKR Gateway.
+        Each bar contains date, open, high, low, close, volume, barCount, WAP.
+        """
+        if not hasattr(self, 'historical_data_buffer'):
+            self.historical_data_buffer = {}
+        if reqId not in self.historical_data_buffer:
+            self.historical_data_buffer[reqId] = []
+            
+        # Extract bar values (supports native ibapi.common.BarData as well as dictionary fallback)
+        try:
+            bar_date = bar.date
+            bar_open = bar.open
+            bar_high = bar.high
+            bar_low = bar.low
+            bar_close = bar.close
+            bar_volume = bar.volume
+        except AttributeError:
+            # Fallback if bar is dictionary
+            bar_date = bar.get("date")
+            bar_open = bar.get("open", 0.0)
+            bar_high = bar.get("high", 0.0)
+            bar_low = bar.get("low", 0.0)
+            bar_close = bar.get("close", 0.0)
+            bar_volume = bar.get("volume", 0.0)
+
+        self.historical_data_buffer[reqId].append({
+            "date": str(bar_date),
+            "open": float(bar_open),
+            "high": float(bar_high),
+            "low": float(bar_low),
+            "close": float(bar_close),
+            "volume": float(bar_volume)
+        })
+
+    def historicalDataEnd(self, reqId: int, start: str, end: str):
+        """Called when all historical bars have been received for a request."""
+        print(f"[HISTORICAL END] ReqID: {reqId} | Completed download {start} to {end}")
+        if hasattr(self, 'on_historical_data_complete_callback') and self.on_historical_data_complete_callback:
+            self.on_historical_data_complete_callback(reqId, self.historical_data_buffer.get(reqId, []))
+
