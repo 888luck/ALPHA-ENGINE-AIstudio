@@ -108,17 +108,63 @@ class ProactiveSimulator:
     """
     Simulation Module modeling Alpha Strategy metrics, expectation boundaries,
     and efficiency ratios across Energy, Utilities, and Clean Tech baskets.
+    Successfully upgraded to support dynamic, AI-powered geopolitical baskets.
     """
     def __init__(self):
+        import json
+        import os
+        
+        # Default fallback baskets
         self.baskets = {
             "Energy": ["XLE", "VLO", "COP"],
             "Utilities": ["XLU", "NEE", "DUK"],
             "Clean Tech": ["ICLN", "ENPH", "FSLR"]
         }
         
+        # Try to load dynamic geopolitical baskets from local calibration state
+        try:
+            db_path = "dynamic_baskets.json"
+            if os.path.exists(db_path):
+                with open(db_path, "r") as f:
+                    data = json.load(f)
+                    if "baskets" in data:
+                        dynamic_dict = {}
+                        for b in data["baskets"]:
+                            sector_name = b.get("sector", "Dynamic Sector")
+                            tickers = b.get("tickers", [])
+                            dynamic_dict[sector_name] = tickers
+                        self.baskets = dynamic_dict
+                        print(f"[DYNAMIC STRATEGY INIT] Loaded {len(self.baskets)} dynamically calibrated sector baskets.")
+        except Exception as e:
+            print(f"[DYNAMIC STRATEGY WARNING] Could not parse dynamic_baskets.json, using defaults: {e}")
+        
     def run_expectancy_simulation(self) -> Dict[str, Any]:
         """Runs pre-trade theoretical modeling across asset baskets for live calibration."""
+        import json
+        import os
+        
         results = {}
+        # Let's try to load the full properties from dynamic_baskets.json
+        try:
+            db_path = "dynamic_baskets.json"
+            if os.path.exists(db_path):
+                with open(db_path, "r") as f:
+                    data = json.load(f)
+                    if "baskets" in data:
+                        for b in data["baskets"]:
+                            sector = b.get("sector", "Dynamic")
+                            results[sector] = {
+                                "tickers": b.get("tickers", []),
+                                "projected_win_rate": float(b.get("winRate", 55)) / 100.0,
+                                "profit_factor": float(b.get("profitFactor", 1.35)),
+                                "average_spread": 0.03,
+                                "mifir_error_rate_pct": 0.0
+                            }
+                        print("[METRIC CALIBRATION] Dynamic sector expectations calibrated successfully.")
+                        return results
+        except Exception as e:
+            print(f"[METRIC CALIBRATION ERROR] Failed to parse dynamic metrics, falling back to static sectors: {e}")
+            
         for sector, tickers in self.baskets.items():
             results[sector] = {
                 "tickers": tickers,
@@ -127,5 +173,5 @@ class ProactiveSimulator:
                 "average_spread": 0.02 if sector == "Utilities" else 0.05,
                 "mifir_error_rate_pct": 0.0
             }
-        print("[METRIC CALIBRATION] Sector expectations completed successfully.")
+        print("[METRIC CALIBRATION] Sector expectations completed successfully using standard sectors.")
         return results

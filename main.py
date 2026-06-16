@@ -36,16 +36,33 @@ def main_loop():
     print("[INIT] Initializing Proactive Sector Expectancy Calibration...")
     sim_data = simulator.run_expectancy_simulation()
     
-    # Load initial risk settings from Firestore if available to sync active locks
+    # Load initial risk settings from Firestore if available to sync active locks and settings overrides
     remote_state = firebase_tunnel.get_system_risk_state()
     if remote_state:
         if "routerLocked" in remote_state:
             drm.router_locked = remote_state["routerLocked"]
             print(f"[INIT SYNC] Successfully loaded lock state from Firestore: LOCKED={drm.router_locked}")
-    
-    # Attempt gateway connection
+        if "ibkrPort" in remote_state:
+            config["IBKR_PORT"] = int(remote_state["ibkrPort"])
+        if "ibkrClientId" in remote_state:
+            config["IBKR_CLIENT_ID"] = int(remote_state["ibkrClientId"])
+        if "ibkrAccountNumber" in remote_state:
+            config["IBKR_ACCOUNT_NUMBER"] = remote_state["ibkrAccountNumber"]
+            drm.account_number = config["IBKR_ACCOUNT_NUMBER"]
+            print(f"[INIT SYNC] Loaded Account override: {config['IBKR_ACCOUNT_NUMBER']}")
+        if "gatewayConnectionActive" in remote_state:
+            config_active = bool(remote_state["gatewayConnectionActive"])
+            print(f"[INIT SYNC] Gateway Connection Mode: {'ACTIVE IBKR PLATFORM INTERFACE' if config_active else 'STANDALONE OFFLINE SIMULATION'}")
+            
+    # Attempt gateway connection if enabled
     try:
-        cm.connect_gateway(config["IBKR_HOST"], config["IBKR_PORT"], config["IBKR_CLIENT_ID"])
+        is_conn_enabled = remote_state.get("gatewayConnectionActive", False) if remote_state else False
+        if is_conn_enabled:
+            print(f"[GATEWAY CONNECT] Initializing Connection: Port={config['IBKR_PORT']} ClientID={config['IBKR_CLIENT_ID']}")
+            cm.connect_gateway(config["IBKR_HOST"], config["IBKR_PORT"], config["IBKR_CLIENT_ID"])
+        else:
+            print("[GATEWAY BYPASS] Operating in offline simulation sandbox mode.")
+            cm.is_connected = False
     except Exception as e:
         print(f"[CON_ERR] Could not establish connection to headless gateway: {e}")
         print("[CON_ERR] Proceeding in offline simulation mode for local diagnostics.")

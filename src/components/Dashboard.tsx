@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   AlertOctagon,
   Zap,
@@ -16,7 +16,8 @@ import {
   Play,
   Flame,
   CheckCircle2,
-  UserCheck
+  UserCheck,
+  Sparkles
 } from "lucide-react";
 import { 
   collection, 
@@ -54,6 +55,112 @@ import {
   CartesianGrid
 } from "recharts";
 import GcpCompanion from "./GcpCompanion";
+
+const HARDCODED_SECURITY_RULES = `rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Root default deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reuseable, hardened, global validation helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Helper validating trade entity structure (Anti-Update-Gap)
+    function isValidTrade(data) {
+      return data.keys().hasAll(['id', 'symbol', 'quantity', 'direction', 'entryPrice'])
+        && data.id is string && data.id.size() <= 128
+        && data.symbol is string && data.symbol.size() <= 16
+        && data.quantity is number && data.quantity > 0
+        && (data.direction == 'BUY' || data.direction == 'SELL')
+        && data.entryPrice is number && data.entryPrice > 0
+        && (data.stopPrice == null || (data.stopPrice is number && data.stopPrice > 0))
+        && (data.currentPrice == null || (data.currentPrice is number && data.currentPrice > 0))
+        && (data.unrealizedPnL == null || data.unrealizedPnL is number);
+    }
+
+    // Helper validating trade log record structure
+    function isValidTradeLog(data) {
+      return data.keys().hasAll(['id', 'symbol', 'realizedPnL', 'commission'])
+        && data.id is string && data.id.size() <= 128
+        && data.symbol is string && data.symbol.size() <= 16
+        && data.realizedPnL is number
+        && data.commission is number && data.commission >= 0;
+    }
+
+    // Helper validating risk state structure
+    function isValidRiskState(data) {
+      return data.keys().hasAll(['netLiquidation', 'routerLocked'])
+        && data.netLiquidation is number && data.netLiquidation > 0
+        && data.routerLocked is bool
+        && (data.maintenanceMargin == null || data.maintenanceMargin is number)
+        && (data.dailyRealizedPnL == null || data.dailyRealizedPnL is number)
+        && (data.dailyUnrealizedPnL == null || data.dailyUnrealizedPnL is number);
+    }
+
+    // --- COLLECTION PATH MATCH BLOCKS ---
+
+    // 2. Active Trades collection (Session Holdings)
+    match /active_trades/{tradeId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidId(tradeId)
+        && isValidTrade(incoming());
+      allow update: if isSignedIn()
+        && isValidId(tradeId)
+        && isValidTrade(incoming())
+        && incoming().id == existing().id // Immutable fields
+        && incoming().symbol == existing().symbol
+        && incoming().direction == existing().direction
+        && incoming().entryPrice == existing().entryPrice
+        && incoming().diff(existing()).affectedKeys().hasOnly(['stopPrice', 'currentPrice', 'unrealizedPnL', 'quantity']);
+      allow delete: if isSignedIn()
+        && isValidId(tradeId);
+    }
+
+    // 3. Historical logs collection
+    match /historical_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidId(logId)
+        && isValidTradeLog(incoming());
+      // Updates and deletes strictly forbidden to preserve immutable historic transaction trails (MiFIR Audit compliance)
+      allow update, delete: if false;
+    }
+
+    // 4. System Risk State config collection
+    match /system_risk_state/{stateId} {
+      allow read: if isSignedIn();
+      allow create, write: if isSignedIn()
+        && isValidId(stateId)
+        && isValidRiskState(incoming());
+      allow update: if isSignedIn()
+        && isValidId(stateId)
+        && isValidRiskState(incoming())
+        && (
+          // Allow toggle of the lock during drawdown breaches
+          incoming().diff(existing()).affectedKeys().hasOnly(['routerLocked', 'netLiquidation', 'maintenanceMargin', 'dailyRealizedPnL', 'dailyUnrealizedPnL', 'lastUpdated'])
+        );
+      allow delete: if false; // System state cannot be purged
+    }
+  }
+}`;
 
 interface SystemSettings {
   ibkrAccountNumber: string;
@@ -155,6 +262,9 @@ export default function Dashboard() {
   const [editTradingMode, setEditTradingMode] = useState<"PAPER" | "LIVE">("PAPER");
   const [editIbkrPort, setEditIbkrPort] = useState(4002);
   const [editIbkrClientId, setEditIbkrClientId] = useState(10);
+  const [editGatewayConnectionActive, setEditGatewayConnectionActive] = useState(false);
+  const [aiCalibrationPrompt, setAiCalibrationPrompt] = useState("");
+  const [isCalibratingGeopolitical, setIsCalibratingGeopolitical] = useState(false);
 
   // Pre-trade Order Setup
   const [tradeSymbol, setTradeSymbol] = useState("");
@@ -190,8 +300,10 @@ export default function Dashboard() {
   const [showFirebaseConfigPanel, setShowFirebaseConfigPanel] = useState(false);
   const [tempFirebaseConfig, setTempFirebaseConfig] = useState<any>(() => getActiveFirebaseConfig());
   const isCustomConfigActive = !!localStorage.getItem("ALPHA_FIREBASE_CONFIG_OVERRIDE");
-  const [securityRulesText, setSecurityRulesText] = useState<string>("");
+  const [securityRulesText, setSecurityRulesText] = useState<string>(HARDCODED_SECURITY_RULES);
   const [copiedRules, setCopiedRules] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const rulesTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const saveCustomFirebaseConfig = () => {
     updateActiveFirebaseConfig(tempFirebaseConfig);
@@ -216,21 +328,35 @@ export default function Dashboard() {
       document.body.removeChild(textArea);
       if (successful) {
         setCopiedRules(true);
+        setCopyFailed(false);
         setTimeout(() => setCopiedRules(false), 2000);
       } else {
         console.error("Fallback copy execution returned false");
+        setCopyFailed(true);
+        setTimeout(() => setCopyFailed(false), 6000);
       }
     } catch (err) {
       console.error("Fallback copy failed: ", err);
+      setCopyFailed(true);
+      setTimeout(() => setCopyFailed(false), 6000);
     }
   };
 
   const handleClipboardCopy = (textToCopy: string) => {
     if (!textToCopy) return;
+
+    // First and foremost, focus and select all text in the textarea.
+    // This ensures that the user can immediately press Ctrl+C / Cmd+C even if programmatic copy is blocked.
+    if (rulesTextareaRef.current) {
+      rulesTextareaRef.current.focus();
+      rulesTextareaRef.current.select();
+    }
+
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(textToCopy)
         .then(() => {
           setCopiedRules(true);
+          setCopyFailed(false);
           setTimeout(() => setCopiedRules(false), 2000);
         })
         .catch((err) => {
@@ -367,6 +493,11 @@ export default function Dashboard() {
           dailyRealizedPnL: totalRealized,
           dailyUnrealizedPnL: totalUnrealized,
           routerLocked: settings.routerLocked,
+          ibkrAccountNumber: settings.ibkrAccountNumber,
+          ibkrPort: settings.ibkrPort,
+          ibkrClientId: settings.ibkrClientId,
+          tradingMode: settings.tradingMode,
+          gatewayConnectionActive: settings.gatewayConnectionActive,
           lastUpdated: new Date().toISOString()
         }).catch(err => handleFirestoreError(err, OperationType.WRITE, "system_risk_state/current_state"));
       }
@@ -472,6 +603,9 @@ export default function Dashboard() {
       if (typeof settings.ibkrClientId === "number") {
         setEditIbkrClientId(settings.ibkrClientId);
       }
+      if (typeof settings.gatewayConnectionActive === "boolean") {
+        setEditGatewayConnectionActive(settings.gatewayConnectionActive);
+      }
     }
   }, [settings === null]);
 
@@ -501,7 +635,8 @@ export default function Dashboard() {
           virtualCapitalCeiling: editVirtualCapitalCeiling,
           tradingMode: editTradingMode,
           ibkrPort: editIbkrPort,
-          ibkrClientId: editIbkrClientId
+          ibkrClientId: editIbkrClientId,
+          gatewayConnectionActive: editGatewayConnectionActive
         })
       });
       if (res.ok) {
@@ -974,10 +1109,30 @@ export default function Dashboard() {
                     
                     <button
                       onClick={() => handleClipboardCopy(securityRulesText)}
-                      className="w-full py-2 bg-amber-500/20 hover:bg-amber-500/35 border border-amber-500/40 text-amber-200 rounded text-xs font-mono font-medium transition cursor-pointer flex items-center justify-center gap-1.5"
+                      className={`w-full py-2 border rounded text-xs font-mono font-medium transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                        copiedRules
+                          ? "bg-green-600/30 border-green-500/50 text-green-200"
+                          : copyFailed
+                          ? "bg-rose-600/30 border-rose-500/50 text-rose-200"
+                          : "bg-amber-500/20 hover:bg-amber-500/35 border-amber-500/40 text-amber-200"
+                      }`}
                     >
-                      {copiedRules ? "✅ Rules Copied!" : "📋 Copy Hardened Rules to Clipboard"}
+                      {copiedRules ? "✅ Rules Copied Successfully!" : copyFailed ? "❌ Copy Blocked by Browser Context" : "📋 Copy Hardened Rules to Clipboard"}
                     </button>
+
+                    {copyFailed && (
+                      <div className="bg-rose-950/40 border border-rose-500/30 text-rose-300 p-3 rounded text-[11px] space-y-1.5 font-sans">
+                        <p className="font-bold font-mono text-rose-200 uppercase tracking-wider text-[10px] flex items-center gap-1">
+                          ⚠️ IFRAME CLIPBOARD PROTECTION ACTIVE
+                        </p>
+                        <p className="leading-relaxed">
+                          Your browser sandboxing completely blocks programmatic updates to the clipboard from inside nested preview frames.
+                        </p>
+                        <p className="leading-relaxed font-semibold text-amber-200 font-mono">
+                          👉 Clear workaround: Click inside the dark text box below, press Ctrl + A (or Cmd + A) to highlight everything, then press Ctrl + C (or Cmd + C) to copy.
+                        </p>
+                      </div>
+                    )}
 
                     <ol className="list-decimal list-inside space-y-1.5 text-[11px] text-slate-300 pt-1.5 border-t border-white/5">
                       <li>
@@ -998,6 +1153,7 @@ export default function Dashboard() {
                       <div className="mt-3 space-y-1.5">
                         <span className="block text-[10px] text-slate-400 font-mono uppercase">Full Hardened Rules (Click to select all):</span>
                         <textarea
+                          ref={rulesTextareaRef}
                           readOnly
                           value={securityRulesText}
                           onClick={(e) => {
@@ -1202,6 +1358,63 @@ export default function Dashboard() {
                       <span className="text-[10px] text-slate-300">(${marketBooks[symbol]?.lastPrice?.toFixed(2) || "0.00"})</span>
                     </button>
                   ))}
+
+                  {/* Custom Asset Ingestor Tool */}
+                  <div className="flex items-center gap-1.5 border border-dashed border-white/10 p-1 rounded bg-black/20">
+                    <input
+                      type="text"
+                      placeholder="ADD TICKER"
+                      id="custom-symbol-input"
+                      className="w-20 bg-black/40 border border-white/10 rounded px-1.5 py-1 text-slate-100 placeholder-slate-500 text-[10px] uppercase font-mono focus:outline-none focus:border-[#00ff88]/50"
+                      onKeyDown={async (e) => {
+                        if (e.key === "Enter") {
+                          const btn = document.getElementById("custom-ingest-btn");
+                          if (btn) btn.click();
+                        }
+                      }}
+                    />
+                    <select
+                      id="custom-exchange-select"
+                      className="bg-black/40 border border-white/10 rounded px-1 py-1 text-slate-300 text-[9px] font-mono focus:outline-none"
+                    >
+                      <option value="NYSE">NYSE</option>
+                      <option value="NASDAQ">NASDAQ</option>
+                      <option value="SBF">EUR-SBF</option>
+                      <option value="IBIS">XETRA</option>
+                    </select>
+                    <button
+                      type="button"
+                      id="custom-ingest-btn"
+                      onClick={async () => {
+                        const symInput = document.getElementById("custom-symbol-input") as HTMLInputElement;
+                        const exchSelect = document.getElementById("custom-exchange-select") as HTMLSelectElement;
+                        if (symInput && symInput.value.trim()) {
+                          const sym = symInput.value.trim().toUpperCase();
+                          const exch = exchSelect.value;
+                          const startPrice = Math.floor(Math.random() * 80) + 40;
+                          try {
+                            const res = await fetch("/api/scanner-ingest", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ symbol: sym, primaryExchange: exch, lastPrice: startPrice })
+                            });
+                            if (res.ok) {
+                              const d = await res.json();
+                              setMarketBooks(d.marketBooks);
+                              setSelectedSymbol(sym);
+                              symInput.value = "";
+                              setOrderFeedback({ success: `Security INGESTED and STREAMING successfully: ${sym} (${exch}) @ $${startPrice}` });
+                            }
+                          } catch (err: any) {
+                            setOrderFeedback({ error: "Failed to ingest symbol: " + err.message });
+                          }
+                        }
+                      }}
+                      className="px-2 py-1 bg-[#00ff88]/15 hover:bg-[#00ff88]/30 text-[#00ff88] border border-[#00ff88]/30 rounded text-[9px] font-mono flex items-center transition cursor-pointer"
+                    >
+                      + INGEST
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1498,6 +1711,42 @@ export default function Dashboard() {
 
                 <div className="border-t border-white/10 pt-3 mt-3">
                   <label className="text-[10px] text-slate-400 uppercase font-mono block mb-1.5 flex justify-between">
+                    <span>Gateway Pipeline Mode</span>
+                    <span className="text-[8px] text-slate-500">TOGGLE LIVE IBKR GATEWAY LINK</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditGatewayConnectionActive(false)}
+                      className={`py-1.5 px-3 rounded text-[10px] font-bold border transition duration-150 ${
+                        !editGatewayConnectionActive
+                          ? "bg-indigo-500/25 text-indigo-300 border-indigo-500/50"
+                          : "bg-black/20 text-slate-400 border-white/5 hover:bg-black/40 hover:text-slate-200"
+                      }`}
+                    >
+                      🎮 MOCK SIMULATION
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditGatewayConnectionActive(true)}
+                      className={`py-1.5 px-3 rounded text-[10px] font-bold border transition duration-150 ${
+                        editGatewayConnectionActive
+                          ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                          : "bg-black/20 text-slate-400 border-white/5 hover:bg-black/40 hover:text-slate-200"
+                      }`}
+                    >
+                      ⚡️ ACTIVE IBKR SUB
+                    </button>
+                  </div>
+                  <p className="text-[8px] text-slate-500 mt-1 leading-normal uppercase">
+                    {!editGatewayConnectionActive 
+                      ? "Isolated sandbox. Generates synthetic Level 2 order books in-container." 
+                      : "Engages headless Native API pipeline to local standard/TWS client gateway."}
+                  </p>
+                </div>
+
+                <div className="border-t border-white/10 pt-3 mt-3">
+                  <label className="text-[10px] text-slate-400 uppercase font-mono block mb-1.5 flex justify-between">
                     <span>Trader Auth Mode</span>
                     <span className="text-[8px] text-slate-500">SELECT TO PRE-SET PORT GATEWAYS</span>
                   </label>
@@ -1565,6 +1814,86 @@ export default function Dashboard() {
                   Commit System Settings
                 </button>
               </form>
+            </div>
+          </div>
+        </div>
+
+        {/* 3.5. GEOPOLITICAL AI BASKET CALIBRATOR */}
+        <div className="frosted-glass frosted-glass-hover p-6">
+          <div className="flex items-start gap-3 border-b border-white/10 pb-4 mb-4">
+            <div className="p-2 rounded-lg bg-[#00ff88]/15 border border-[#00ff88]/30">
+              <Sparkles className="w-5 h-5 text-[#00ff88]" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
+                Geopolitical & Macro Sector AI Calibrator
+                <span className="text-[9px] px-1.5 py-0.5 rounded font-mono bg-indigo-500/15 text-indigo-300 border border-indigo-500/20">
+                  POWERED BY GEMINI
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Dynamically screen and calibrate order flow imbalance (OFI) baskets based on real-time news, economic friction, or global conflicts instead of hardcoded sectors.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-[10px] text-slate-400 uppercase font-mono block mb-1">
+                Describe Geopolitical or Macroeconomic Theme
+              </label>
+              <textarea
+                value={aiCalibrationPrompt}
+                onChange={(e) => setAiCalibrationPrompt(e.target.value)}
+                placeholder="E.g., Severe Middle East canal disruptions choking supply-chains and spiking global crude. Meanwhile, sudden Clean Energy tariffs spike solar module costs."
+                className="w-full bg-black/45 border border-white/10 rounded-lg p-3 text-slate-200 text-xs focus:outline-none focus:border-[#00ff88]/50 h-20 resize-none font-mono placeholder-slate-600"
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <span className="text-[9px] text-slate-500 font-mono uppercase">
+                * Generates 3 liquid 3-ticker portfolios & updates simulation buffers
+              </span>
+              <button
+                type="button"
+                disabled={isCalibratingGeopolitical || !aiCalibrationPrompt.trim()}
+                onClick={async () => {
+                  setIsCalibratingGeopolitical(true);
+                  try {
+                    const res = await fetch("/api/calibrate-geopolitical", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ eventDescription: aiCalibrationPrompt })
+                    });
+                    if (res.ok) {
+                      const data = await res.json();
+                      setOrderFeedback({ success: data.message || "Geopolitical sectors calibrated: Loaded 3 new AI baskets and expanded ticker streams." });
+                      // Trigger state refresh
+                      await fetchState();
+                      // Force expectancy re-simulation with the new assets
+                      await fetch("/api/run-expectancy").then(r => r.json()).then(d => setSimulationData(d.baskets || []));
+                    } else {
+                      const data = await res.json();
+                      setOrderFeedback({ error: data.error || "Failed to analyze geopolitical event." });
+                    }
+                  } catch (err: any) {
+                    setOrderFeedback({ error: "API connection anomaly: " + err.message });
+                  } finally {
+                    setIsCalibratingGeopolitical(false);
+                  }
+                }}
+                className="px-4 py-2 bg-[#00ff88]/20 hover:bg-[#00ff88]/35 border border-[#00ff88]/40 text-[#00ff88] rounded-lg text-xs font-mono font-medium flex items-center gap-1.5 transition cursor-pointer disabled:opacity-45 select-none"
+              >
+                {isCalibratingGeopolitical ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Calibrating Baskets...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" /> Calibrate Dynamic Portfolios
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
