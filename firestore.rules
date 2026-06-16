@@ -71,7 +71,7 @@ service cloud.firestore {
         && incoming().symbol == existing().symbol
         && incoming().direction == existing().direction
         && incoming().entryPrice == existing().entryPrice
-        && incoming().diff(existing()).affectedKeys().hasOnly(['stopPrice', 'currentPrice', 'unrealizedPnL', 'quantity']);
+        && incoming().diff(existing()).affectedKeys().hasOnly(['stopPrice', 'currentPrice', 'unrealizedPnL', 'quantity', 'timestamp', 'mifidDecisionMaker', 'mifidExecutionTrader']);
       allow delete: if isSignedIn()
         && isValidId(tradeId);
     }
@@ -89,14 +89,14 @@ service cloud.firestore {
     // 4. System Risk State config collection
     match /system_risk_state/{stateId} {
       allow read: if isSignedIn();
-      allow create, write: if isSignedIn()
+      allow create: if isSignedIn()
         && isValidId(stateId)
         && isValidRiskState(incoming());
       allow update: if isSignedIn()
         && isValidId(stateId)
         && isValidRiskState(incoming())
         && (
-          // Allow toggle of the lock during drawdown breaches
+          // Allow toggle of the lock during drawdown breaches and state syncing
           incoming().diff(existing()).affectedKeys().hasOnly(['routerLocked', 'netLiquidation', 'maintenanceMargin', 'dailyRealizedPnL', 'dailyUnrealizedPnL', 'lastUpdated'])
         );
       allow delete: if false; // System state cannot be purged

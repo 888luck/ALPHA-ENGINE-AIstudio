@@ -45,6 +45,22 @@ class FirebaseSyncTunnel:
         except Exception as e:
             print(f"[FIREBASE TUNNEL] Initialization warning: {e}. Defaulting to offline simulation mode.")
 
+    def _get_gce_metadata_token(self) -> str:
+        """Attempts to retrieve an OAuth2 token from the local GCE Metadata Server."""
+        url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
+        req = urllib.request.Request(url, headers={"Metadata-Flavor": "Google"})
+        try:
+            with urllib.request.urlopen(req, timeout=2) as response:
+                data = json.loads(response.read().decode("utf-8"))
+                token = data.get("access_token")
+                if token:
+                    print("[FIREBASE TUNNEL] Dynamic GCE Metadata Token Obtained. Authenticating as Cloud VM Instance Service Account.")
+                    return token
+        except Exception:
+            # Silent fallback if not on GCE
+            pass
+        return None
+
     def _authenticate(self):
         """Authenticates anonymously with Firebase Auth to get an ID token."""
         if not self.api_key:
@@ -104,7 +120,12 @@ class FirebaseSyncTunnel:
             return {}
 
         if not self.id_token:
-            self._authenticate()
+            # Check GCE VM identity first for zero-config GCP permission matching
+            gce_token = self._get_gce_metadata_token()
+            if gce_token:
+                self.id_token = gce_token
+            else:
+                self._authenticate()
 
         url = f"https://firestore.googleapis.com/v1/projects/{self.project_id}/databases/{self.database_id}/documents/{path}?key={self.api_key}"
         
