@@ -71,6 +71,20 @@ cat <<EOF > remote_vm_setup.sh
 sudo mkdir -p /opt/alpha-engine
 sudo chown -R \$USER:\$USER /opt/alpha-engine
 
+# Dynamic remote package synchronization (for safety on pre-existing instances)
+echo "[VM] Ensuring required system packages & Docker are installed..."
+sudo apt-get update
+sudo apt-get install -y python3 python3-pip git docker.io
+
+echo "[VM] Initializing Docker service and setting up permissions..."
+sudo systemctl enable docker
+sudo systemctl start docker
+sudo usermod -aG docker \$USER
+
+# Python dependencies setup
+echo "[VM] Syncing Python library packages..."
+pip3 install python-dotenv urllib3 --quiet || pip install python-dotenv urllib3 --quiet || true
+
 # Extract the local workspace installer bundle directly
 echo "[VM] Extracting workspace codebase elements to /opt/alpha-engine..."
 tar -xzf ~/alpha-workspace-bundle.tar.gz -C /opt/alpha-engine/
