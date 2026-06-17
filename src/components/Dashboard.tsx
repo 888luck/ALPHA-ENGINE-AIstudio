@@ -1508,7 +1508,7 @@ export default function Dashboard() {
                   {/* Depth Chart viz */}
                   <div className="md:col-span-2 h-64 bg-black/40 border border-white/5 rounded-lg p-2 relative">
                     <div className="absolute top-2 left-2 text-[10px] text-slate-500 font-mono">BID / ASK SHIFT HISTOGRAM</div>
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                       <BarChart data={chartData} margin={{ top: 15, right: 10, left: -15, bottom: 5 }}>
                         <XAxis dataKey="price" stroke="#475569" fontSize={9} tickLine={false} />
                         <YAxis stroke="#475569" fontSize={9} tickLine={false} />

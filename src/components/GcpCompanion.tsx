@@ -1198,7 +1198,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                   <div className="bg-black/25 rounded-lg border border-white/5 p-4 relative pt-7">
                     <span className="absolute top-2 left-4 text-[9px] text-slate-500 uppercase font-bold leading-none">Continuous Portfolio Equity Curve ($)</span>
                     <div className="w-full h-44 mt-1.5">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <LineChart data={btResults.balanceHistory} margin={{ top: 5, right: 10, left: 15, bottom: 5 }}>
                           <defs>
                             <linearGradient id="eqGlow" x1="0" y1="0" x2="0" y2="1">
