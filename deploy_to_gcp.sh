@@ -29,12 +29,23 @@ fi
 
 # Fallback prompts if blank
 if [ -z "$FIREBASE_PROJECT" ]; then
-    read -p "Enter Google Cloud Project ID: " FIREBASE_PROJECT
+    # Try to read the currently set active gcloud project
+    ACTIVE_PROJECT=$(gcloud config get-value project 2>/dev/null || true)
+    if [ -n "$ACTIVE_PROJECT" ]; then
+        echo "[GCLOUD] Auto-detected active GCP project from environment: $ACTIVE_PROJECT"
+        FIREBASE_PROJECT="$ACTIVE_PROJECT"
+    else
+        read -p "Enter Google Cloud Project ID: " FIREBASE_PROJECT
+    fi
 fi
 
 # Verify active project registration
 echo "[GCLOUD] Registering context to target project: $FIREBASE_PROJECT"
-gcloud config set project "$FIREBASE_PROJECT"
+gcloud config set project "$FIREBASE_PROJECT" --quiet
+
+# Enable required Google Cloud services automatically
+echo "[GCLOUD] Ensuring necessary Cloud APIs are fully enabled (Firestore & Vertex AI)..."
+gcloud services enable firestore.googleapis.com aiplatform.googleapis.com --quiet
 
 # 2. Spin up the Spot VM Instance in europe-west3 (Frankfurt, nearest to IBKR Europe)
 ZONE="europe-west3-a"
@@ -54,6 +65,7 @@ else
         --image-family="debian-11" \
         --image-project="debian-cloud" \
         --metadata=startup-script="sudo apt-get update && sudo apt-get install -y python3 python3-pip git && pip3 install python-dotenv urllib3" \
+        --scopes="https://www.googleapis.com/auth/cloud-platform" \
         --tags="ib-gateway-target" \
         --description="Alpha Engine High Frequency Execution node in europe-west3 (Frankfurt)"
 fi

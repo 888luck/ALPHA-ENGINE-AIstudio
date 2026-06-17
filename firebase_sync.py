@@ -33,17 +33,44 @@ class FirebaseSyncTunnel:
             self.api_key = os.getenv("FIREBASE_API_KEY", self.api_key)
             self.database_id = os.getenv("FIREBASE_DATABASE_ID", self.database_id)
             
-            if self.project_id and self.api_key:
+            # 2. Keyless discovery: if still missing project ID, check GCE Metadata Server
+            if not self.project_id:
+                self.project_id = self._get_gce_project_id()
+
+            if not self.database_id:
+                self.database_id = "(default)"
+
+            # Check if running on GCE with metadata permissions to do keyless auth
+            has_gce_metadata = False
+            try:
+                req = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/instance", headers={"Metadata-Flavor": "Google"})
+                with urllib.request.urlopen(req, timeout=1.0) as response:
+                    has_gce_metadata = True
+            except Exception:
+                pass
+            
+            if self.project_id and (self.api_key or has_gce_metadata):
                 self.enabled = True
                 print("--------------------------------------------------")
                 print("[FIREBASE TUNNEL] Sync Tunnel Initialized Successfully.")
                 print(f"Project ID: {self.project_id}")
                 print(f"Database: {self.database_id}")
+                print(f"Authentication Mode: {'Secure Keyless GCE Metadata' if has_gce_metadata else 'Standard Web API Key API'}")
                 print("--------------------------------------------------")
             else:
                 print("[FIREBASE TUNNEL] Missing credentials. Operating in virtual offline/in-memory mode.")
         except Exception as e:
             print(f"[FIREBASE TUNNEL] Initialization warning: {e}. Defaulting to offline simulation mode.")
+
+    def _get_gce_project_id(self) -> str:
+        """Attempts to retrieve the project ID from the local GCE Metadata Server."""
+        url = "http://metadata.google.internal/computeMetadata/v1/project/project-id"
+        req = urllib.request.Request(url, headers={"Metadata-Flavor": "Google"})
+        try:
+            with urllib.request.urlopen(req, timeout=1.5) as response:
+                return response.read().decode("utf-8").strip()
+        except Exception:
+            return ""
 
     def _get_gce_metadata_token(self) -> str:
         """Attempts to retrieve an OAuth2 token from the local GCE Metadata Server."""

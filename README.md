@@ -58,10 +58,7 @@ Before deploying and launching the Alpha Engine, ensure that all required cloud 
    - Installed `gcloud` CLI tool configured on your local development workspace or Cloud Shell.
 2. **Firestore (NoSQL Database):**
    - A Firestore instance initialized in **Native Mode**.
-   - Read/write Firestore rule permissions configured or authorized via a Service Account JSON file.
-3. **IAM Service Account Key:**
-   - A custom Service Account configured with **Owner** or **Datastore User** + **Compute Instance Admin** roles.
-   - Downloaded private JSON key saved as `firebase-applet-config.json` inside the root workspace folder to manage VM-to-database connections automatically.
+   - Read/write permissions are handled keylessly via GCE Instance Service Accounts—no manual private JSON credential files or custom configurations are needed.
 
 ### B. Broker Access & Data Feed Prerequisites
 1. **Interactive Brokers (IBKR) Pro account:**
@@ -193,7 +190,7 @@ Alpha Engine features a unidirectional **Push-Then-Pull** staging pipeline to se
    chmod +x deploy_to_gcp.sh
    ./deploy_to_gcp.sh
    ```
-2. The script extracts credentials from `firebase-applet-config.json`, provisions or verifies the VM spot instance in **Frankfurt (`europe-west3-a`)**, securely installs dependencies (`Pip`, `Python3`, `Systemd`), and uploads the latest files to `/opt/alpha-engine/`.
+2. The script auto-detects your active GCP Project, enables required APIs (Firestore && Vertex AI), provisions or verifies the VM spot instance in **Frankfurt (`europe-west3-a`)**, attaches secure IAM scopes keylessly, installs system dependencies, and launches the trading node.
 
 ### Operational Step 4: Daemon Management & Telemetry Verification
 To manage and inspect the trading node daemon inside the GCE Linux system, SSH into the VM (via gcloud or the GCP console panel) and execute:

@@ -453,60 +453,44 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                 </div>
               </div>
 
-              {/* Box 3: Cloud Credentials Status & Vertex AI Production Switch */}
+              {/* Box 3: Cloud Credentials Status & Vertex AI Keyless Integration */}
               <div className="p-3.5 rounded-lg border border-white/5 bg-black/40 space-y-3">
                 <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[10.5px]">
                   <Cloud className="w-4 h-4" />
-                  <span>3. GCP Cloud Credentials</span>
+                  <span>3. Secure Keyless GCP Integration</span>
                 </div>
                 <p className="text-[10px] text-slate-400 normal-case leading-relaxed font-sans">
-                  Links your VM directly to the Firestore Tunnel, maintaining low fiber latencies and system execution co-located inside Frankfurt.
+                  The Frankfurt Edge Daemon and Cloud Run frontend support secure <span className="text-[#00ff88] font-semibold">Keyless Authentication</span> via GCP Metadata service accounts. No JSON private service account key files need to be copied, created, or uploaded!
                 </p>
                 <div className="space-y-2">
-                  <div className="p-2.5 bg-slate-900/40 rounded border border-white/5 space-y-1.5">
+                  <div className="p-2.5 bg-emerald-500/5 rounded border border-emerald-500/15 space-y-1">
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="text-[9.5px] text-slate-300 block font-semibold font-sans">Firestore Account Key:</span>
-                        <span className="text-[8px] text-slate-500 font-mono">firebase-applet-config.json</span>
+                        <span className="text-[9.5px] text-slate-200 block font-semibold font-sans">Firestore Keyless Sync:</span>
+                        <span className="text-[8px] text-slate-400 font-mono">Automatic Instance-Level Auth</span>
                       </div>
-                      <span className="px-1.5 py-0.5 text-[8px] rounded font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-                        ACTIVE & SECURED
+                      <span className="px-1.5 py-0.5 text-[8px] rounded font-bold uppercase bg-emerald-500/15 text-[#00ff88] border border-emerald-500/25">
+                        AUTOMATED KEYLESS
                       </span>
                     </div>
-                    <div className="pt-1 border-t border-white/5">
-                      <a
-                        href={projectId ? `https://console.firebase.google.com/u/0/project/${projectId}/settings/serviceaccounts/adminsdk` : "https://console.firebase.google.com/"}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[9px] text-emerald-400 hover:text-emerald-300 hover:underline font-mono font-medium transition-colors cursor-pointer"
-                      >
-                        <span>→ Get key from Firebase Console Admin SDK</span>
-                        <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                      </a>
-                    </div>
+                    <p className="text-[8.5px] text-slate-400 leading-normal font-sans">
+                      The GCE instance automatically logs in using the attached project metadata token. Your database sync is seamlessly active.
+                    </p>
                   </div>
 
-                  <div className="p-2.5 bg-indigo-500/5 rounded border border-indigo-500/10 space-y-1.5">
+                  <div className="p-2.5 bg-indigo-500/5 rounded border border-indigo-500/10 space-y-1">
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="text-[9.5px] text-slate-300 block font-semibold font-sans">Vertex AI Integration:</span>
-                        <span className="text-[8px] text-slate-500 font-mono">IAM Service Account Keys</span>
+                        <span className="text-[9.5px] text-slate-200 block font-semibold font-sans">Vertex AI Integration:</span>
+                        <span className="text-[8px] text-slate-400 font-mono">Zero-Config AI Calibration</span>
                       </div>
                       <span className="px-1.5 py-0.5 text-[8px] rounded font-bold uppercase bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20">
-                        TRANSITION READY
+                        ENABLED BY DEFAULT
                       </span>
                     </div>
-                    <div className="pt-1 border-t border-indigo-500/10">
-                      <a
-                        href={projectId ? `https://console.cloud.google.com/iam-admin/serviceaccounts?project=${projectId}` : "https://console.cloud.google.com/"}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[9px] text-indigo-400 hover:text-indigo-300 hover:underline font-mono font-medium transition-colors cursor-pointer"
-                      >
-                        <span>→ Get key from GCP Console IAM</span>
-                        <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                      </a>
-                    </div>
+                    <p className="text-[8.5px] text-slate-400 leading-normal font-sans">
+                      No APIs require activation or subscription. Our Cloud Shell Deployment automatically enables <code className="bg-black/30 text-indigo-300 px-1 py-0.2 rounded font-mono text-[8.5px]">aiplatform.googleapis.com</code> on your project.
+                    </p>
                   </div>
                 </div>
               </div>
