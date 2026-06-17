@@ -234,7 +234,7 @@ Once running, the Edge Node communicates with this container on `127.0.0.1:4001`
 
 ---
 
-## 📊 5. Quantitative Strategy Specifications
+## 📊 8. Quantitative Strategy Specifications
 
 The **Alpha Intraday Strategy** executes based on clear, math-bound constraints:
 
@@ -248,7 +248,7 @@ The **Alpha Intraday Strategy** executes based on clear, math-bound constraints:
 
 ---
 
-## 🧑‍💻 6. Local Quickstart (Development Mode)
+## 🧑‍💻 9. Local Quickstart (Development Mode)
 
 ### 1. Install Dependencies
 ```bash
@@ -271,7 +271,7 @@ This generates a mock JSON output detailing equity curves, win rates, and final 
 
 ---
 
-## 📁 7. Codebase Directory Structure
+## 📁 10. Codebase Directory Structure
 
 ```
 ├── .env.example              # Example environment keys template
