@@ -507,6 +507,58 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                   </div>
                 </div>
               )}
+
+              {/* INTERACTIVE SYNC PIPELINE VISUALIZER */}
+              <div className="mt-4 p-4 rounded-lg border border-indigo-500/10 bg-black/35 space-y-3">
+                <span className="text-[10px] text-indigo-400 font-extrabold uppercase tracking-widest flex items-center gap-1.5 font-mono">
+                  <Play className="w-3 px-0.5 py-0.5 h-3 text-[#00ff88]" /> Core Deployment Pipeline Flow
+                </span>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                  {/* Step 1 */}
+                  <div className="p-2.5 rounded border border-white/5 bg-white/5 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-400">STEP 1</span>
+                      <span className="px-1.5 py-0.5 text-[8px] font-mono rounded bg-white/10 text-slate-300 border border-white/10 uppercase font-bold tracking-wider scale-95 origin-right">
+                        Sandbox
+                      </span>
+                    </div>
+                    <p className="text-[10.5px] text-slate-200 font-semibold leading-snug">Local Workspace Changes</p>
+                    <p className="text-[9.5px] text-slate-400 leading-normal">You iterate on designs & algorithms inside the safe browser environment.</p>
+                  </div>
+
+                  {/* Step 2 */}
+                  <div className="p-2.5 rounded border border-indigo-500/20 bg-indigo-500/5 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-indigo-400">STEP 2</span>
+                      <span className="px-1.5 py-0.5 text-[8px] font-mono rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase font-bold tracking-wider scale-95 origin-right">
+                        Push
+                      </span>
+                    </div>
+                    <p className="text-[10.5px] text-indigo-200 font-semibold leading-snug">Transmit to GitHub (REST)</p>
+                    <p className="text-[9.5px] text-slate-400 leading-normal">Clicking <strong>Transmit Files</strong> pushes the absolute latest source code securely directly to your repository.</p>
+                  </div>
+
+                  {/* Step 3 */}
+                  <div className="p-2.5 rounded border border-emerald-500/30 bg-emerald-500/5 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-emerald-400">STEP 3</span>
+                      <span className="px-1.5 py-0.5 text-[8px] font-mono rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase font-bold tracking-wider scale-95 origin-right">
+                        Pull & Run
+                      </span>
+                    </div>
+                    <p className="text-[10.5px] text-emerald-200 font-semibold leading-snug">Pull & Deploy on GCE Host</p>
+                    <p className="text-[9.5px] text-emerald-400 leading-normal">Your VM host runs <code className="bg-black/30 px-1 py-0.2 rounded text-[8.5px]">./deploy_to_gcp.sh</code> as configured in Tab 4 to pull changes and restart services.</p>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-amber-300 leading-normal pt-1.5 flex gap-1.5 items-start bg-amber-500/5 p-2 rounded border border-amber-500/10">
+                  <span className="font-extrabold text-[10.5px] shrink-0 mt-0.5">💡 PIPELINE RULE:</span>
+                  <span>
+                    When you customize files like <code className="text-white font-mono bg-black/20 px-1 py-0.5 text-[8.5px]">main.py</code> or <code className="text-white font-mono bg-black/20 px-1 py-0.5 text-[8.5px]">backtester.py</code>, those updates are applied on your VM by running the VM's redeploy sequence. The syncer guarantees source storage safety, and the GCE deployment script updates the host execution environment dynamically!
+                  </span>
+                </div>
+              </div>
             </div>
           )}
 
@@ -856,38 +908,69 @@ export default function GcpCompanion(props: GcpCompanionProps) {
 
           {/* TAB 4: AUTOMATED DEPLOY SECURE SCRIPT BLOCK */}
           {activeTab === "auto" && (
-            <div className="bg-black/15 backdrop-blur-sm p-5 rounded-lg border border-indigo-500/10 space-y-3 flex flex-col justify-between h-full">
-              <div className="space-y-2">
+            <div className="bg-black/15 backdrop-blur-sm p-5 rounded-lg border border-indigo-500/10 space-y-4 flex flex-col justify-between h-full">
+              <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <h4 className="text-xs font-semibold text-slate-200 flex items-center gap-2">
-                    <Terminal className="w-4 h-4 text-indigo-400" /> Auto-Provisioning Suite (Console Integration)
+                    <Terminal className="w-4 h-4 text-indigo-400" /> Cloud Shell & GCE VM Orchestration Guide
                   </h4>
                   <span className="text-[9px] text-[#00ff88] font-bold border border-[#00ff88]/30 px-1.5 py-0.5 rounded animate-pulse bg-[#00ff88]/5 font-mono uppercase">
-                    GCLOUD APPROVED
+                    GCLOUD COMPLIANT
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 leading-normal">
-                  Once synced, copy this command block and paste it directly into your <strong>Google Cloud Shell</strong> console. The script parses credentials, provisions the remote Host VM, registers the background daemon, and bridges logging telemetry.
-                </p>
 
-                {/* Command Shell Box */}
-                <div className="relative mt-2.5 bg-black/45 border border-white/10 rounded p-3 text-[11px] text-slate-300 font-mono select-all pt-7">
-                  <div className="absolute top-1.5 left-2.5 flex gap-1 bg-transparent">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                {/* ENVIRONMENTAL SANITY WARNING */}
+                <div className="p-2.5 rounded border border-amber-500/20 bg-amber-500/5 text-[10.5px] text-amber-300 leading-normal font-sans">
+                  <span className="font-bold">⚠️ CRITICAL ENVIRONMENT DESTINATION DICTIONARY:</span>
+                  <ul className="list-disc list-inside mt-1 space-y-0.5">
+                    <li><strong>Google Cloud Shell (`mstouff@cloudshell`)</strong> is a local container browser sandbox. It does <span className="underline">NOT</span> run systemd. Running <code className="bg-black/30 px-1 py-0.5 rounded">systemctl</code> here triggers <code className="text-rose-450 font-mono">"System has not been booted with systemd"</code>.</li>
+                    <li><strong>Google Compute Engine VM (`mstouff@alpha-edge-node`)</strong> is your actual co-located high-frequency trading server in Frankfurt where systemd is active.</li>
+                  </ul>
+                </div>
+
+                {/* BOX 1: RUN IN CLOUD SHELL (DEPLOYING / SYNCHRONIZING CODE) */}
+                <div className="space-y-1">
+                  <span className="text-[10px] text-[#00ff88] font-bold uppercase tracking-wider block">1. Run first inside Google Cloud Shell (To Deploy or Update)</span>
+                  <p className="text-[10.5px] text-slate-400">
+                    Use these commands to clone the code initially, sync changes to your VM, or update files from your platform:
+                  </p>
+                  <div className="relative bg-black/50 border border-white/10 rounded p-2.5 text-[11px] text-indigo-300 font-mono select-all">
+                    <span className="absolute top-1 right-2 text-[8px] text-slate-500 font-bold uppercase">Cloud Shell Tab</span>
+                    <pre className="overflow-x-auto leading-relaxed max-h-20">cd ~
+# If NOT cloned yet:
+git clone https://github.com/888luck/ALPHA-ENGINE-AIstudio.git
+cd ALPHA-ENGINE-AIstudio
+
+# To trigger a clean re-deploy / update of your latest workspace:
+git pull origin main || true
+chmod +x deploy_to_gcp.sh
+./deploy_to_gcp.sh</pre>
                   </div>
-                  <span className="absolute top-1 right-2 p-1 font-mono text-[9px] text-slate-500 uppercase tracking-widest leading-none">GCP CLOUD SHELL</span>
-                  
-                  <pre className="overflow-x-auto text-indigo-300 max-h-24 leading-relaxed">{setupCommand}</pre>
+                </div>
 
-                  <button
-                    onClick={copyToClipboard}
-                    className="absolute bottom-2 right-2 p-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-slate-400 hover:text-white transition cursor-pointer flex items-center gap-1 text-[10px]"
-                    title="Copy shell deployment command"
-                  >
-                    <Copy className="w-3" /> {copiedText ? "Copied!" : "Copy Suite"}
-                  </button>
+                {/* BOX 2: RUN INSIDE GCE VM (CONTROL DAEMON PROCESSES) */}
+                <div className="space-y-1 pt-1">
+                  <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider block">2. Run on GCE Virtual Machine (To Control & Manage Node)</span>
+                  <p className="text-[10.5px] text-slate-400">
+                    Connect directly to the GCE VM from Cloud Shell and manage the real background service. <span className="text-amber-300 font-bold">Important: The correct service name is `alpha-engine` (not `alpha-edge`)</span>:
+                  </p>
+                  <div className="relative bg-black/50 border border-white/10 rounded p-2.5 text-[11px] text-indigo-300 font-mono select-all">
+                    <span className="absolute top-1 right-2 text-[8px] text-slate-500 font-bold uppercase">GCE VM Session</span>
+                    <pre className="overflow-x-auto leading-relaxed max-h-32"># A. SSH into your VM from Cloud Shell:
+gcloud compute ssh alpha-edge-node --zone=europe-west3-a
+
+# B. Control & check your active trading node:
+sudo systemctl status alpha-engine.service -n 50
+sudo systemctl stop alpha-engine.service
+sudo systemctl start alpha-engine.service
+sudo systemctl restart alpha-engine.service
+
+# C. Follow real-time market stream & OFI logs:
+journalctl -u alpha-engine.service -f</pre>
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-normal leading-tight">
+                    💡 <em>Note: Since `/opt/alpha-engine` is dynamically loaded via scp bundles, you do not need to deal with Git passwords or complex credential logins inside the GCE VM itself. Just use Cloud Shell to deploy!</em>
+                  </p>
                 </div>
               </div>
 

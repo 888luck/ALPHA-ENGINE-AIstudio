@@ -48,7 +48,91 @@ The system couples a modern React state dashboard with an edge execution runner 
 
 ---
 
-## 🔑 2. Required Environment Variables
+## 🛠️ 2. Core Prerequisite & Infrastructure Requirements
+
+Before deploying and launching the Alpha Engine, ensure that all required cloud accounts, APIs, credentials, and broker access levels are fully provisioned and active.
+
+### A. Infrastructure & Cloud Architecture Prerequisites
+1. **Google Cloud Project (GCP):**
+   - Active billing enabled (supporting serverless Cloud Run and GCE preemptible instances).
+   - Installed `gcloud` CLI tool configured on your local development workspace or Cloud Shell.
+2. **Firestore (NoSQL Database):**
+   - A Firestore instance initialized in **Native Mode**.
+   - Read/write Firestore rule permissions configured or authorized via a Service Account JSON file.
+3. **IAM Service Account Key:**
+   - A custom Service Account configured with **Owner** or **Datastore User** + **Compute Instance Admin** roles.
+   - Downloaded private JSON key saved as `firebase-applet-config.json` inside the root workspace folder to manage VM-to-database connections automatically.
+
+### B. Broker Access & Data Feed Prerequisites
+1. **Interactive Brokers (IBKR) Pro account:**
+   - Active subscription supporting trading and socket automation.
+   - Subscribed real-time market data packages (e.g., *NASDAQ (Level 2/TotalView)*, *NYSE (OpenBook)*, or *OPRA options*) to enable dynamic, high-frequency Level 2 Order Flow Imbalance (OFI) calculations.
+2. **Headless Gateway License / Subscriptions:**
+   - Interactive Brokers Client Portal or TWS configuration enabling "ActiveX and Socket Clients" with trusted loopback binding.
+   - Credentials configured inside your local `.env` or injected during container execution (Method B).
+
+---
+
+## ⚡ 3. Mid-Term Production Standard: Vertex AI & API Lifecycles
+
+While initial prototyping or sandboxed development utilizes the **Google AI Studio Developer Key** for frictionless setup, enterprise-level production requires transitioning to **Google Cloud Vertex AI**.
+
+### A. Why Vertex AI is the Production Standard?
+- **IAM-Based Authentication (Keyless Security):** Bypasses the danger of insecure API key text exposures in databases or codebases. The Cloud Run service and GCE Edge VM authenticate seamlessly using automatic **GCP Metadata Service Account credentials** (ADC).
+- **Resource SLA & High-Throughput Quotas:** Provides guaranteed throughput quotas, lower rate-limit barriers, and isolated execution paths in specific geographic regions.
+- **Enterprise-Grade Compliance:** Private data processing guarantees, assuring proprietary prompt vectors and market heuristics are never cached or used for public foundation model tuning.
+
+### B. Vertex AI SDK Configuration (`server.ts` transition)
+To adapt the Express backend from the default standard SDK (`@google/genai`) to Vertex AI, initialize using the native GCP authorization structures in production:
+```ts
+// server.ts - Mid-Term Production Vertex AI Implementation pattern
+import { GoogleGenAI } from "@google/genai";
+
+const projectId = process.env.GOOGLE_CLOUD_PROJECT || "your-production-project-id";
+const region = "europe-west3"; // Adjacent to the edge GCE VM
+
+// Authenticates instantly via GCP metadata inside Cloud Run
+const ai = new GoogleGenAI({
+  vertex: {
+    projectId,
+    location: region
+  }
+});
+```
+
+### C. Critical Gemini Model Lifecycles (Sunset & Migration Targets)
+Model deprecations happen fast. To design a future-proof, stable trading daemon, you must migrate accordingly:
+- **Legacy Sandboxes:** Gemini 1.5 Flash (legacy API) is entering structured retirement. Gemini 2.0 Flash is fully deprecated and sunset on June 1, 2026.
+- **Production Standard Support:** Upgrade and hardcode dependencies strictly to the **Gemini 2.5 and 3.x families** (specifically, `gemini-2.1-flash` and `gemini-3.5-flash` or newer versions), which are stable, carry extended lifecycles, and exhibit higher pricing efficiencies (typically $0.075 / million input tokens, with high context window limits of up to 2M).
+
+---
+
+## 📊 4. Automated Geopolitical & Macro Sector AI Calibrator
+
+The Geopolitical Calibrator dynamically shifts the OFI asset baskets from static, brittle presets into high-relevance economic portfolios based on real-time news streams.
+
+### A. Professional Data Feeds & Sourcing Automation
+To achieve institutional calibration accuracy, the system leverages a multi-feed ingester pipeline:
+1. **Financial Wire Headlines Feed:**
+   - Automates background polling of Bloomberg Financial RSS feeds, Reuters Business wires, or Wall Street Journal markets RSS via a modular Python worker running `feedparser` every 5 minutes inside a background thread pool.
+2. **Interactive Brokers News API:**
+   - Hooks into native gateway execution callbacks (`reqHistNewsHeadlines`) to receive streaming real-time Dow Jones News Headlines, filtering on major tickers or global policy indices.
+3. **Macroeconomic Calendar API:**
+   - Integrates with free or premium calendar feeds (e.g., TradingEconomics or DailyFX) to ingest real-time indicator events (CPI, FOMC, ECB Decisions, Non-Farm Payrolls).
+
+### B. High-Frequency Edge Sentiment & Basket Analysis
+Raw headline text is processed through a fast, co-located multi-stage pipeline:
+```
+[Streaming Headlines] --> [spaCy Entity Recognition] --> [FinBERT Sentiment scoring] --> [Vertex AI Gemini Macro Scoring] --> [dynamic_baskets.json]
+```
+1. **Named-Entity Recognition (NER):** Runs a lightweight local `spaCy` task to extract key geopolitical players, countries (e.g., "Iran", "Suez Canal", "Taiwan"), or commodities.
+2. **FinBERT Local Sentiment Inference:** Applies a fast transformer model on the VM's local CPU to output a continuous sentiment score $[-1.0, 1.0]$ for specific sectors in under 150ms per headline.
+3. **Vertex AI Gemini Calibration Engine:** Once sentiment spikes cross a standard deviation threshold, a structured JSON prompt is dispatched to `gemini-3.5-flash` to map the macroeconomic news event to exact liquid ETF/equity tickers and recalibrate order flow coefficients.
+4. **Economic Blockades & Circuit Overrides:** If a high-impact macroeconomic event (like NFP or FOMC) is detected within the 15-minute window, the pipeline automatically forces a trading signal "Blanking State." This temporarily suspends edge matching routines to shield capital from sudden liquidity gaps and spread spikes.
+
+---
+
+## 🔑 5. Required Environment Variables
 
 To operate the entire system correctly, separate settings are required for the web server level and the Python edge trading node level.
 
@@ -80,62 +164,60 @@ The Python daemon imports execution parameters dynamically at module load time v
 
 ---
 
-## 🏝️ 3. How to Deploy the Edge Node Node on GCP (Frankfurt)
+## 🏝️ 6. How to Deploy & Update the Edge Node (Continuous Sync Runbook)
 
-Follow one of the two methods below to spin up the low-latency edge node in Frankfurt for under **$1.80/month**.
+Alpha Engine features a unidirectional **Push-Then-Pull** staging pipeline to securely update VM logic and strategy variables. Follow these operational steps to build, sync, and deploy.
 
-### Method A: No-Git / Direct Workspace ZIP Upload (Easiest & Fastest 🌟)
+### Operational Step 1: Push Local Modifications to GitHub
+1. Create your own repository on GitHub (e.g. `your_org/ALPHA-ENGINE-AIstudio`).
+2. Navigate to the **🦊 GIT DIRECT SYNC** tab in the running App dashboard.
+3. Input your repository path and your GitHub Personal Access Token (PAT).
+4. Click **TRANSMIT FILES**. This executes a secure server-side push, committing your exact local workspace state directly to your branch.
 
-You do not need a GitHub repository for this to work. Our deployment script compiles and moves your exact workspace files directly to the GCP VM.
-
-1. **Download Workspace ZIP:** In your AI Studio project interface, open the settings menu (or project options) and click **Export to ZIP** to download the static codebase.
-2. **Access Cloud Shell:** Open the Google Cloud Console ([console.cloud.google.com](https://console.cloud.google.com)) and click the **Activate Cloud Shell** button (terminal icon) in the top-right toolbar.
-3. **Upload ZIP File:** Click the `More` menu icon (three dots) in the Cloud Shell toolbar and click **Upload File**. Select your exported ZIP file.
-4. **Extract and Run Deployer:** Run the following commands in Cloud Shell to extract your files and deploy them directly:
+### Operational Step 2: Access Cloud Shell & Pull Latest Code
+1. Open the Google Cloud Console ([console.cloud.google.com](https://console.cloud.google.com)) and activate **Cloud Shell**.
+2. If this is your first time deploying, clone the newly populated repository:
    ```bash
-   mkdir alpha-engine
-   unzip *.zip -d alpha-engine
-   cd alpha-engine
-   chmod +x deploy_to_gcp.sh
-   ./deploy_to_gcp.sh
-   ```
-
----
-
-### Method B: Deploying via your Own GitHub Repository
-
-If you prefer using your GitHub repository, you **must create the repository on GitHub first** before cloning or syncing.
-
-1. **Create Repository:** Go to [GitHub](https://github.com) and create a **new** repository named `ALPHA-ENGINE-AIstudio` (public or private).
-2. **Push Code to Repository:** Open the **🦊 GIT DIRECT SYNC** tab in the dashboard of your running App, fill in your repository path (`888luck/ALPHA-ENGINE-AIstudio`), input your GitHub Personal Access Token (PAT), and click **TRANSMIT FILES**. This pushes your workspace code directly to your new repository.
-3. **Run from Cloud Shell:** Once the repository is populated, open your Google Cloud Shell:
-   ```bash
-   git clone https://<your_username>:<your_token>@github.com/888luck/ALPHA-ENGINE-AIstudio.git
+   git clone https://github.com/your_org/ALPHA-ENGINE-AIstudio.git
    cd ALPHA-ENGINE-AIstudio
+   ```
+3. If the VM is already running, navigate to your folder and pull the latest changes pushed from the dashboard:
+   ```bash
+   cd ALPHA-ENGINE-AIstudio
+   git pull origin main
+   ```
+
+### Operational Step 3: Run the Automated GCP Deployer Script
+1. Trigger the automated companion deployer:
+   ```bash
    chmod +x deploy_to_gcp.sh
    ./deploy_to_gcp.sh
    ```
+2. The script extracts credentials from `firebase-applet-config.json`, provisions or verifies the VM spot instance in **Frankfurt (`europe-west3-a`)**, securely installs dependencies (`Pip`, `Python3`, `Systemd`), and uploads the latest files to `/opt/alpha-engine/`.
+
+### Operational Step 4: Daemon Management & Telemetry Verification
+To manage and inspect the trading node daemon inside the GCE Linux system, SSH into the VM (via gcloud or the GCP console panel) and execute:
+
+* **View live service status:**
+  ```bash
+  sudo systemctl status alpha-engine.service
+  ```
+* **Follow live trading execution output logs:**
+  ```bash
+  sudo journalctl -u alpha-engine.service -f --no-tail
+  ```
+* **Restart the execution loop after changes:**
+  ```bash
+  sudo systemctl restart alpha-engine.service
+  ```
+* **Manually trigger manual edge client boot for debugging:**
+  ```bash
+  cd /opt/alpha-engine && python3 main.py
+  ```
 
 ---
 
-### What this Automated Script Executes:
-1. **Credentials Extraction:** Reads your workspace `firebase-applet-config.json` to configure the Python-to-Firestore Secure Tunnel.
-2. **GCLOUD VM Provisioning:** Creates an `e2-micro` Spot Instance in `europe-west3-a` (Frankfurt, Germany) with auto-installation of Python, Git, and Pip.
-3. **Workspace Syncing:** Pulls the codebase to `/opt/alpha-engine` inside the VM.
-4. **Environment Generation:** Securely writes environment variables into `/opt/alpha-engine/.env` to link system state directly to Firestore.
-5. **Systemd Daemon Establishment:** Sets up an `alpha-engine.service` system background process that starts the daemon immediately on VM boot and restarts it automatically in case of execution errors.
-
-### Step 3: Monitor Linux Service Execution Logs
-To verify that the service is active, execute the standard systemd monitoring output command inside your new GCE Virtual Machine:
-
-```bash
-sudo systemctl status alpha-engine.service
-sudo journalctl -u alpha-engine.service -f --no-tail
-```
-
----
-
-## 🐳 4. Interactive Brokers Gateway Headless Setup (Method B)
+## 🐳 7. Interactive Brokers Gateway Headless Setup (Method B)
 
 To run the system without a native desktop UI window, configure the headless Docker gateway wrapper inside your cloud virtual machine instance.
 
