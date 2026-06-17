@@ -57,6 +57,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
   const [syncStatus, setSyncStatus] = useState<{ success: boolean; message: string; url?: string } | null>(null);
 
   // VM & Container Orchestrator States
+  const [isKeylessMode, setIsKeylessMode] = useState(true);
   const [ibkrUser, setIbkrUser] = useState("");
   const [ibkrPass, setIbkrPass] = useState("");
   const [ibkrPin, setIbkrPin] = useState("");
@@ -175,34 +176,58 @@ export default function GcpCompanion(props: GcpCompanionProps) {
 
   // Run SSH / Container Orchestration sequence (Method B simulation)
   const executeContainerOrchestration = () => {
-    if (!ibkrUser || !ibkrPass) {
-      alert("Please provide the credentials parameters to sync securely.");
+    if (!isKeylessMode && (!ibkrUser || !ibkrPass)) {
+      alert("Please provide the credentials parameters or switch to 100% Keyless zero-touch mode to sync securely.");
       return;
     }
     setIsOrchestrating(true);
     setOrchStep(1);
-    setOrchLogs(["[ORCHESTRATOR] Initializing connection to Spot GCE Frankfurt VM via SSH Tunnel..."]);
 
-    const steps = [
-      { msg: "[ORCHESTRATOR] SSH Connected to zone: europe-west3-a Frankfurt (CPU: e2-micro, IP: 34.141.22.18).", delay: 1200 },
-      { msg: "[ORCHESTRATOR] Updating system packages & verifying Docker engine runtime availability...", delay: 2400 },
-      { msg: "[ORCHESTRATOR] Downloading official Headless IBKR Gateway package + IBC configuration bundle...", delay: 3800 },
-      { msg: "[ORCHESTRATOR] Synchronizing credentials variables securely into container secrets context (/root/ibc/config.ini)...", delay: 5200 },
-      { msg: "[ORCHESTRATOR] Building Dockerfile: compiling headless Java layers + IBC virtual framebuffer...", delay: 6800 },
-      { msg: "[ORCHESTRATOR] Launching container: 'docker run -d --name ibkr-ibc-gateway -p 4001:4001 -p 4002:4002 ibkr-headless-gate'...", delay: 8400 },
-      { msg: "[ORCHESTRATOR] TWS Gateway active in Paper trading mode. Polling local loop interface on port 4002...", delay: 9900 },
-      { msg: "[SYSTEM INTEGRATION] Handshake SUCCEEDED! Connection established. Fiber latency to local Frankfurt routing center: 1.12ms.", delay: 11200 }
-    ];
+    if (isKeylessMode) {
+      setOrchLogs(["[ORCHESTRATOR] 🔗 Keyless Vault connection active. Validating GCE Instance Metadata Service Account bindings..."]);
+      const steps = [
+        { msg: "[ORCHESTRATOR] Connected to Spot GCE Frankfurt VM via Secure Metadata Handshake (Zone: europe-west3-a, CPU: e2-micro).", delay: 1000 },
+        { msg: "[ORCHESTRATOR] 🔐 Handshaking with Google Cloud Secret Manager API...", delay: 1800 },
+        { msg: "[ORCHESTRATOR] 🛡️ Service account 'alpha-engine-executor@gcp-workload-identity.iam.gserviceaccount.com' authenticated successfully.", delay: 2800 },
+        { msg: "[ORCHESTRATOR] Bypassing manual credentials using Keyless OAuth Token authentication mapping.", delay: 3800 },
+        { msg: "[ORCHESTRATOR] Directly staging encrypted credentials context (KMS-sealed env variables) into secure memory sandbox...", delay: 4800 },
+        { msg: "[ORCHESTRATOR] Building Dockerfile: compiled headless Java execution layers + virtual framebuffers...", delay: 5800 },
+        { msg: "[ORCHESTRATOR] Starting container: 'docker run -d --restart=unless-stopped --name ibkr-headless-gate-keyless -p 4001:4001 -p 4002:4002'...", delay: 7000 },
+        { msg: "[SYSTEM INTEGRATION] Keyless Handshake SUCCEEDED! Core secure connection established with IBKR Frankfurt region proxy. Latency: 1.10ms.", delay: 8200 }
+      ];
 
-    steps.forEach((s, idx) => {
-      setTimeout(() => {
-        setOrchLogs(prev => [...prev, s.msg]);
-        setOrchStep(idx + 2);
-        if (idx === steps.length - 1) {
-          setIsOrchestrating(false);
-        }
-      }, s.delay);
-    });
+      steps.forEach((s, idx) => {
+        setTimeout(() => {
+          setOrchLogs(prev => [...prev, s.msg]);
+          setOrchStep(idx + 2);
+          if (idx === steps.length - 1) {
+            setIsOrchestrating(false);
+          }
+        }, s.delay);
+      });
+    } else {
+      setOrchLogs(["[ORCHESTRATOR] Initializing connection to Spot GCE Frankfurt VM via SSH Tunnel..."]);
+      const steps = [
+        { msg: "[ORCHESTRATOR] SSH Connected to zone: europe-west3-a Frankfurt (CPU: e2-micro, IP: 34.141.22.18).", delay: 1200 },
+        { msg: "[ORCHESTRATOR] Updating system packages & verifying Docker engine runtime availability...", delay: 2400 },
+        { msg: "[ORCHESTRATOR] Downloading official Headless IBKR Gateway package + IBC configuration bundle...", delay: 3800 },
+        { msg: "[ORCHESTRATOR] Synchronizing credentials variables securely into container secrets context (/root/ibc/config.ini)...", delay: 5200 },
+        { msg: "[ORCHESTRATOR] Building Dockerfile: compiling headless Java layers + IBC virtual framebuffer...", delay: 6800 },
+        { msg: "[ORCHESTRATOR] Launching container: 'docker run -d --name ibkr-ibc-gateway -p 4001:4001 -p 4002:4002 ibkr-headless-gate'...", delay: 8400 },
+        { msg: "[ORCHESTRATOR] TWS Gateway active in Paper trading mode. Polling local loop interface on port 4002...", delay: 9900 },
+        { msg: "[SYSTEM INTEGRATION] Handshake SUCCEEDED! Connection established. Fiber latency to local Frankfurt routing center: 1.12ms.", delay: 11200 }
+      ];
+
+      steps.forEach((s, idx) => {
+        setTimeout(() => {
+          setOrchLogs(prev => [...prev, s.msg]);
+          setOrchStep(idx + 2);
+          if (idx === steps.length - 1) {
+            setIsOrchestrating(false);
+          }
+        }, s.delay);
+      });
+    }
   };
 
   // Call the server-side Python Backtesting Engine
@@ -395,27 +420,58 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                   Populates execution parameters into the VM's headless TWS container secure secrets environment variables framework automatically.
                 </p>
                 <div className="space-y-2 font-sans">
+                  {/* Keyless Mode Selector */}
+                  <div className="flex items-center justify-between bg-black/55 border border-white/5 rounded p-1.5 font-mono text-[8px] leading-none">
+                    <span className="text-slate-400 font-bold uppercase pl-0.5">AUTH STRATEGY:</span>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsKeylessMode(true)}
+                        className={`px-1.5 py-0.5 rounded transition font-bold text-[8px] cursor-pointer select-none ${
+                          isKeylessMode
+                            ? "bg-blue-500/20 text-[#00ff88] border border-blue-500/30"
+                            : "text-slate-500 hover:text-slate-300"
+                        }`}
+                      >
+                        🛡️ KEYLESS
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsKeylessMode(false)}
+                        className={`px-1.5 py-0.5 rounded transition font-bold text-[8px] cursor-pointer select-none ${
+                          !isKeylessMode
+                            ? "bg-slate-700 text-slate-200 border border-slate-600"
+                            : "text-slate-500 hover:text-slate-300"
+                        }`}
+                      >
+                        ⚙️ MANUAL
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="text-[9px] uppercase font-mono text-slate-500 block mb-1 font-bold">IBKR User</label>
                       <input
                         type="text"
-                        value={ibkrUser}
-                        onChange={(e) => setIbkrUser(e.target.value)}
-                        placeholder="e.g. tradingID"
-                        className="w-full bg-black/50 border border-white/10 rounded px-2 py-1.5 text-slate-200 text-[10.5px] focus:outline-none focus:border-indigo-500/50 font-mono"
-                        title="Your Interactive Brokers trade interface login ID."
+                        value={isKeylessMode ? "[INSTANCE_IAM_ROLE]" : ibkrUser}
+                        onChange={(e) => !isKeylessMode && setIbkrUser(e.target.value)}
+                        disabled={isKeylessMode}
+                        placeholder={isKeylessMode ? "[INSTANCE_IAM_ROLE]" : "e.g. tradingID"}
+                        className="w-full bg-black/50 border border-white/10 rounded px-2 py-1.5 text-slate-200 text-[10.5px] focus:outline-none focus:border-indigo-500/50 font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={isKeylessMode ? "Automated keyless Google IAM Service Account mapping active." : "Your Interactive Brokers trade interface login ID."}
                       />
                     </div>
                     <div>
                       <label className="text-[9px] uppercase font-mono text-slate-500 block mb-1 font-bold">IBKR Password</label>
                       <input
                         type="password"
-                        value={ibkrPass}
-                        onChange={(e) => setIbkrPass(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full bg-black/50 border border-white/10 rounded px-2 py-1.5 text-slate-200 text-[10.5px] focus:outline-none focus:border-indigo-500/50 font-mono"
-                        title="Your Interactive Brokers trade interface password."
+                        value={isKeylessMode ? "••••••••••••" : ibkrPass}
+                        onChange={(e) => !isKeylessMode && setIbkrPass(e.target.value)}
+                        disabled={isKeylessMode}
+                        placeholder={isKeylessMode ? "••••••••••••" : "••••••••"}
+                        className="w-full bg-black/50 border border-white/10 rounded px-2 py-1.5 text-slate-400 text-[10.5px] focus:outline-none focus:border-indigo-500/50 font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={isKeylessMode ? "Secured dynamically with KMS Secret Manager variables." : "Your Interactive Brokers trade interface password."}
                       />
                     </div>
                   </div>
@@ -562,7 +618,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
               {/* Step B Button */}
               <button
                 type="button"
-                disabled={isOrchestrating || !ibkrUser || !ibkrPass}
+                disabled={isOrchestrating || (!isKeylessMode && (!ibkrUser || !ibkrPass))}
                 onClick={() => {
                   setChecklist(
                     checklist.map(item =>
@@ -972,35 +1028,76 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                 To run native IBKR Pro APIs continuously, you need a headless environment with auto-login capabilities. Input your IBKR credentials parameters below to bypass cloud firewalls and automatically build, provision, and deploy the Docker + IBC runtime co-located in Frankfurt.
               </p>
 
+              {/* Advanced Authentication Selector */}
+              <div className="bg-black/40 border border-white/5 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans">
+                <div>
+                  <h5 className="text-slate-200 text-xs font-bold flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    <span>Choose Automation Setup Method</span>
+                  </h5>
+                  <p className="text-[10px] text-slate-400 leading-normal">
+                    Select standard manual login credentials or the advanced 100% keyless Secret Manager setup.
+                  </p>
+                </div>
+
+                <div className="flex gap-2 font-mono shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsKeylessMode(true)}
+                    className={`px-3 py-1.5 rounded text-[10px] font-bold transition flex items-center gap-1 cursor-pointer select-none ${
+                      isKeylessMode
+                        ? "bg-emerald-500/15 border border-emerald-500/35 text-[#00ff88]"
+                        : "bg-black/30 border border-white/10 text-slate-500 hover:text-slate-300"
+                    }`}
+                  >
+                    <span>🛡️ ZERO-TOUCH (KEYLESS)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsKeylessMode(false)}
+                    className={`px-3 py-1.5 rounded text-[10px] font-bold transition flex items-center gap-1 cursor-pointer select-none ${
+                      !isKeylessMode
+                        ? "bg-blue-600/15 border border-blue-500/35 text-blue-400"
+                        : "bg-black/30 border border-white/10 text-slate-500 hover:text-slate-300"
+                    }`}
+                  >
+                    <span>⚙️ MANUAL KEYS</span>
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="text-[10px] text-slate-500 uppercase font-mono block mb-1">IBKR Username</label>
                   <input
                     type="text"
-                    value={ibkrUser}
-                    onChange={(e) => setIbkrUser(e.target.value)}
-                    placeholder="ibkr_quant_user"
-                    className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 font-mono text-xs text-slate-200 focus:outline-none focus:border-blue-500 placeholder-slate-700"
+                    value={isKeylessMode ? "[INSTANCE_IAM_ROLE]" : ibkrUser}
+                    onChange={(e) => !isKeylessMode && setIbkrUser(e.target.value)}
+                    disabled={isKeylessMode}
+                    placeholder={isKeylessMode ? "[INSTANCE_IAM_ROLE]" : "ibkr_quant_user"}
+                    className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 font-mono text-xs text-slate-200 focus:outline-none focus:border-blue-500 placeholder-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 uppercase font-mono block mb-1">IBKR Password</label>
                   <input
                     type="password"
-                    value={ibkrPass}
-                    onChange={(e) => setIbkrPass(e.target.value)}
-                    placeholder="••••••••••••"
-                    className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 font-mono text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                    value={isKeylessMode ? "••••••••••••" : ibkrPass}
+                    onChange={(e) => !isKeylessMode && setIbkrPass(e.target.value)}
+                    disabled={isKeylessMode}
+                    placeholder={isKeylessMode ? "••••••••••••" : "••••••••••••"}
+                    className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 font-mono text-xs text-slate-200 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-500 uppercase font-mono block mb-1">Debit card / Security PIN (if applicable)</label>
                   <input
                     type="password"
-                    value={ibkrPin}
-                    onChange={(e) => setIbkrPin(e.target.value)}
-                    placeholder="Optional PIN"
-                    className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 font-mono text-xs text-[#00ff88] focus:outline-none focus:border-blue-500"
+                    value={isKeylessMode ? "••••" : ibkrPin}
+                    onChange={(e) => !isKeylessMode && setIbkrPin(e.target.value)}
+                    disabled={isKeylessMode}
+                    placeholder={isKeylessMode ? "••••" : "Optional PIN"}
+                    className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 font-mono text-xs text-[#00ff88] focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
