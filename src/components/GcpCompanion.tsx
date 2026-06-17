@@ -589,8 +589,25 @@ export default function GcpCompanion(props: GcpCompanionProps) {
             </div>
 
             {saveMessage && (
-              <div className="p-2.5 rounded text-[11px] font-mono leading-tight bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-[#00ff88] shrink-0" /> {saveMessage}
+              <div className="p-3 rounded-lg text-[11.5px] font-mono leading-relaxed bg-indigo-500/10 border border-indigo-500/25 text-slate-200 space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-[#00ff88] shrink-0" />
+                  <span>{saveMessage}</span>
+                </div>
+                {saveMessage.includes("SUCCESS") && githubRepo && (
+                  <div className="pt-1.5 pl-5">
+                    <a
+                      href={`https://github.com/${githubRepo}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10.5px] font-semibold text-white bg-indigo-600 hover:bg-indigo-500 font-sans tracking-wide rounded border border-indigo-500/40 transition-colors cursor-pointer"
+                    >
+                      <Github className="w-3.5 h-3.5" />
+                      View Live Link on GitHub: <span className="underline">{githubRepo}</span>
+                      <ExternalLink className="w-3" />
+                    </a>
+                  </div>
+                )}
               </div>
             )}
 
