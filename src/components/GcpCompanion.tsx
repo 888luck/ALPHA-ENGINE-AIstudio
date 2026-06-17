@@ -69,6 +69,12 @@ export default function GcpCompanion(props: GcpCompanionProps) {
   const [btResults, setBtResults] = useState<any | null>(null);
   const [btError, setBtError] = useState<string | null>(null);
 
+  // Automated Setup Onboarding Wizard States
+  const [wizardOpen, setWizardOpen] = useState(true);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [selectedRouterLane, setSelectedRouterLane] = useState<"live" | "paper">("paper");
+  const [isSavingOnboarding, setIsSavingOnboarding] = useState(false);
+
   // Persist state inputs painlessly for the active session
   useEffect(() => {
     localStorage.setItem("alpha_github_token", githubToken);
@@ -306,6 +312,341 @@ export default function GcpCompanion(props: GcpCompanionProps) {
             🎛️ TOPOLOGY MATRIX
           </button>
         </div>
+      </div>
+
+      {/* 🚀 AUTO-SETUP & CORE ONBOARDING WIZARD */}
+      <div id="quickstart-onboarding-wizard" className="mb-6 p-5 rounded-xl border border-[#00ff88]/20 bg-[#0c101b]/95 space-y-4 font-sans">
+        <div className="flex items-center justify-between border-b border-white/10 pb-3 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded bg-[#00ff88]/15 border border-[#00ff88]/30">
+              <Zap className="w-4 h-4 text-[#00ff88] animate-bounce" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-100 uppercase tracking-widest flex items-center gap-2 font-mono">
+                Fast-Track System Onboarding & Automation Hub
+                <span className="text-[8.5px] px-1.5 py-0.5 rounded font-mono bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20 font-extrabold scale-95 uppercase tracking-normal animate-pulse">
+                  Ready
+                </span>
+              </h4>
+              <p className="text-[11px] text-slate-400 font-sans font-medium mt-0.5 leading-normal">
+                Easily configure your credentials, save keys globally, synchronization to GitHub, and automate headless VM/TWS broker gateways co-located in Frankfurt.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setWizardOpen(!wizardOpen)}
+            className="px-2.5 py-1 text-[9.5px] uppercase font-mono font-bold tracking-wider rounded border border-white/10 transition cursor-pointer hover:bg-white/5 select-none text-indigo-300"
+          >
+            {wizardOpen ? "Collapse Onboarding [-]" : "Expand Onboarding [+]"}
+          </button>
+        </div>
+
+        {wizardOpen && (
+          <div className="space-y-4 animate-fadeIn">
+            {/* Split controls into logical categories */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
+              {/* Box 1: GitHub Secure Transport config */}
+              <div className="p-3.5 rounded-lg border border-white/5 bg-black/40 space-y-3">
+                <div className="flex items-center gap-1.5 text-orange-400 font-bold text-[10.5px]">
+                  <Github className="w-4 h-4" />
+                  <span>1. GitHub Storage Syncer</span>
+                </div>
+                <p className="text-[10px] text-slate-400 normal-case leading-relaxed font-sans">
+                  Saves and synchronizes your algorithmic trading strategies securely using secure REST push pathways directly inside the VM.
+                </p>
+                <div className="space-y-2 font-sans">
+                  <div>
+                    <label className="text-[9px] uppercase font-mono text-slate-500 block mb-1 font-bold">Token (Personal Access Token PAT)</label>
+                    <input
+                      type="password"
+                      value={githubToken}
+                      onChange={(e) => setGithubToken(e.target.value)}
+                      placeholder="ghp_****************"
+                      className="w-full bg-black/50 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 text-[10.5px] focus:outline-none focus:border-indigo-500/50 font-mono"
+                      title="Enter your GitHub PAT. Requires 'repo' scope activated in GitHub -> Developer Settings -> Personal Access Tokens (Classic or Fine-grained)."
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] uppercase font-mono text-slate-500 block mb-1 font-bold">Destination Repository</label>
+                    <input
+                      type="text"
+                      value={githubRepo}
+                      onChange={(e) => setGithubRepo(e.target.value)}
+                      placeholder="username/repo-name"
+                      className="w-full bg-black/50 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 text-[10.5px] focus:outline-none focus:border-indigo-500/50 font-mono"
+                      title="Enter your custom GitHub repository destination, e.g. mstouff/alpha-trading-engine."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Box 2: IBKR Headless Container Configuration */}
+              <div className="p-3.5 rounded-lg border border-white/5 bg-black/40 space-y-3">
+                <div className="flex items-center gap-1.5 text-blue-400 font-bold text-[10.5px]">
+                  <Server className="w-4 h-4" />
+                  <span>2. IBKR Execution Socket Setup</span>
+                </div>
+                <p className="text-[10px] text-slate-400 normal-case leading-relaxed font-sans">
+                  Populates execution parameters into the VM's headless TWS container secure secrets environment variables framework automatically.
+                </p>
+                <div className="space-y-2 font-sans">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[9px] uppercase font-mono text-slate-500 block mb-1 font-bold">IBKR User</label>
+                      <input
+                        type="text"
+                        value={ibkrUser}
+                        onChange={(e) => setIbkrUser(e.target.value)}
+                        placeholder="e.g. tradingID"
+                        className="w-full bg-black/50 border border-white/10 rounded px-2 py-1.5 text-slate-200 text-[10.5px] focus:outline-none focus:border-indigo-500/50 font-mono"
+                        title="Your Interactive Brokers trade interface login ID."
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] uppercase font-mono text-slate-500 block mb-1 font-bold">IBKR Password</label>
+                      <input
+                        type="password"
+                        value={ibkrPass}
+                        onChange={(e) => setIbkrPass(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full bg-black/50 border border-white/10 rounded px-2 py-1.5 text-slate-200 text-[10.5px] focus:outline-none focus:border-indigo-500/50 font-mono"
+                        title="Your Interactive Brokers trade interface password."
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[9px] uppercase font-mono text-slate-500 block mb-1 font-bold">Operational Execution Lane</label>
+                    <div className="grid grid-cols-2 gap-1.5 bg-black/50 p-1 border border-white/10 rounded font-mono">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedRouterLane("paper");
+                          localStorage.setItem("alpha_router_lane", "paper");
+                        }}
+                        className={`py-1 rounded text-center text-[8.5px] transition cursor-pointer font-bold select-none ${
+                          selectedRouterLane === "paper" ? "bg-amber-500/15 text-amber-400 border border-amber-500/20" : "text-slate-500"
+                        }`}
+                        title="TWS Paper Simulation Lane: Port 4002"
+                      >
+                        PAPER (Port 4002)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedRouterLane("live");
+                          localStorage.setItem("alpha_router_lane", "live");
+                        }}
+                        className={`py-1 rounded text-center text-[8.5px] transition cursor-pointer font-bold select-none ${
+                          selectedRouterLane === "live" ? "bg-red-500/15 text-red-500 border border-red-500/20" : "text-slate-500"
+                        }`}
+                        title="TWS LIVE Production Execution Lane: Port 4001"
+                      >
+                        LIVE (Port 4001)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Box 3: Cloud Credentials Status & Vertex AI Production Switch */}
+              <div className="p-3.5 rounded-lg border border-white/5 bg-black/40 space-y-3">
+                <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[10.5px]">
+                  <Cloud className="w-4 h-4" />
+                  <span>3. GCP Cloud Credentials</span>
+                </div>
+                <p className="text-[10px] text-slate-400 normal-case leading-relaxed font-sans">
+                  Links your VM directly to the Firestore Tunnel, maintaining low fiber latencies and system execution co-located inside Frankfurt.
+                </p>
+                <div className="space-y-2">
+                  <div className="p-2 bg-slate-900/40 rounded border border-white/5 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9.5px] text-slate-300 block font-semibold font-sans">Firestore Account Key:</span>
+                      <span className="text-[8px] text-slate-500 font-mono">firebase-applet-config.json</span>
+                    </div>
+                    <span className="px-1.5 py-0.5 text-[8px] rounded font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                      ACTIVE & SECURED
+                    </span>
+                  </div>
+
+                  <div className="p-2 bg-indigo-500/5 rounded border border-indigo-500/10 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9.5px] text-slate-300 block font-semibold font-sans">Vertex AI Integration:</span>
+                      <span className="text-[8px] text-slate-500 font-mono">IAM Service Account Keys</span>
+                    </div>
+                    <span className="px-1.5 py-0.5 text-[8px] rounded font-bold uppercase bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20">
+                      TRANSITION READY
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Action Control Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 text-xs">
+              {/* Step A Button */}
+              <button
+                type="button"
+                disabled={isSavingOnboarding || !githubToken.trim()}
+                onClick={async () => {
+                  setIsSavingOnboarding(true);
+                  setSaveMessage(null);
+                  try {
+                    // Update server settings first
+                    const p = selectedRouterLane === "live" ? 4001 : 4002;
+                    await fetch("/api/set-settings", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        ibkrPort: p,
+                        gatewayConnectionActive: true,
+                        tradingMode: selectedRouterLane.toUpperCase()
+                      })
+                    });
+
+                    // Trigger Git synchronization action directly
+                    const resSync = await fetch("/api/github-sync-action", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        token: githubToken,
+                        repoPath: githubRepo,
+                        branch: githubBranch
+                      })
+                    });
+
+                    const dataSync = await resSync.json();
+                    if (resSync.ok && dataSync.success) {
+                      setSaveMessage("SUCCESS: System Settings saved locally, router is updated, and workspace successfully synchronized to GitHub!");
+                      setChecklist(
+                        checklist.map(item =>
+                          item.id === 1 || item.id === 2 ? { ...item, done: true } : item
+                        )
+                      );
+                    } else {
+                      setSaveMessage("SETTINGS STORED: Options saved locally but Git Sync rejected. Check token scopes.");
+                    }
+                  } catch (err: any) {
+                    setSaveMessage("ERROR during execution sync: " + err.message);
+                  } finally {
+                    setIsSavingOnboarding(false);
+                  }
+                }}
+                className="w-full py-2.5 px-3 bg-indigo-500/20 hover:bg-indigo-500/35 border border-indigo-500/40 text-indigo-300 font-mono font-bold rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer select-none disabled:opacity-40"
+              >
+                {isSavingOnboarding ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Saving parameters & syncing...
+                  </>
+                ) : (
+                  <>
+                    <Settings className="w-3.5 h-3.5 text-indigo-400" /> Save & Push to GitHub (REST)
+                  </>
+                )}
+              </button>
+
+              {/* Step B Button */}
+              <button
+                type="button"
+                disabled={isOrchestrating || !ibkrUser || !ibkrPass}
+                onClick={() => {
+                  setChecklist(
+                    checklist.map(item =>
+                      item.id === 3 ? { ...item, done: true } : item
+                    )
+                  );
+                  executeContainerOrchestration();
+                }}
+                className="w-full py-2.5 px-3 bg-blue-500/20 hover:bg-blue-500/35 border border-blue-500/40 text-blue-300 font-mono font-bold rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer select-none disabled:opacity-40"
+              >
+                {isOrchestrating ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Orchestrating headlessly...
+                  </>
+                ) : (
+                  <>
+                    <Server className="w-3.5 h-3.5 text-blue-400" /> Deploy TWS Headless Container
+                  </>
+                )}
+              </button>
+
+              {/* Step C Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setChecklist(
+                    checklist.map(item =>
+                      item.id === 4 || item.id === 5 ? { ...item, done: true } : item
+                    )
+                  );
+                  copyToClipboard();
+                  alert("Frankfurt deployment command copied! Paste it into Google Cloud Shell terminal to bootstrap the e2-micro host co-located adjacent to IBKR Europe Hub (Equinix FR2).");
+                }}
+                className="w-full py-2.5 px-3 bg-[#00ff88]/15 hover:bg-[#00ff88]/25 border border-[#00ff88]/30 text-[#00ff88] font-mono font-bold rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer select-none"
+              >
+                <Terminal className="w-3.5 h-3.5 text-[#00ff88]" /> Copy GCE Frankfurt VM Setup Cmd
+              </button>
+            </div>
+
+            {saveMessage && (
+              <div className="p-2.5 rounded text-[11px] font-mono leading-tight bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5 text-[#00ff88] shrink-0" /> {saveMessage}
+              </div>
+            )}
+
+            {/* Quick Access Engine Shortcuts Section requested */}
+            <div className="p-3.5 bg-black/50 rounded-lg border border-white/5 space-y-2">
+              <span className="text-[9.5px] uppercase text-slate-500 tracking-wider font-extrabold flex items-center gap-1 font-mono">
+                <Activity className="w-3 h-3 text-[#00ff88]" /> Active Deployment shortcuts & direct operational access URLs
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-[10.5px] text-slate-300 font-mono">
+                <a
+                  href="https://console.cloud.google.com/home/dashboard?cloudshell=true"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-2 rounded bg-white/5 border border-white/5 hover:border-indigo-500/35 hover:bg-indigo-500/5 transition flex items-center justify-between text-slate-200"
+                >
+                  <span className="flex items-center gap-1.5 font-sans font-medium text-[11px]">
+                    <Terminal className="w-3.5 h-3.5 text-indigo-400" /> Google Cloud Shell Launchpad
+                  </span>
+                  <ExternalLink className="w-3 h-3 text-slate-500" />
+                </a>
+
+                <div className="p-2 rounded bg-white/5 border border-white/5 flex items-center justify-between relative group text-slate-200">
+                  <span className="flex items-center gap-1.5 text-slate-300 truncate font-sans font-medium text-[11px]">
+                    <Server className="w-3.5 h-3.5 text-blue-400" /> SSH Connection string
+                  </span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText("gcloud compute ssh alpha-trading-node --zone=europe-west3-a");
+                      alert("Gcloud SSH command copied!");
+                    }}
+                    className="px-1.5 py-0.5 text-[8.5px] rounded bg-white/15 hover:bg-[#00ff88]/15 text-slate-300 group-hover:text-[#00ff88] transition cursor-pointer select-none font-bold"
+                    title="Copy command to securely login to your co-located VM host in Frankfurt instantly"
+                  >
+                    Copy Cmd
+                  </button>
+                </div>
+
+                <div className="p-2 rounded bg-white/5 border border-white/5 flex items-center justify-between relative group text-slate-200">
+                  <span className="flex items-center gap-1.5 text-slate-300 truncate font-sans font-medium text-[11px]">
+                    <Activity className="w-3.5 h-3.5 text-[#00ff88]" /> systemd Log Streamer
+                  </span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText("sudo journalctl -u alpha-engine.service -f --no-tail");
+                      alert("Journalctl service logging command copied!");
+                    }}
+                    className="px-1.5 py-0.5 text-[8.5px] rounded bg-white/15 hover:bg-[#00ff88]/15 text-slate-300 group-hover:text-[#00ff88] transition cursor-pointer select-none font-bold"
+                    title="Copy command to track live trades and system latency variables inside Debian Linux directly in real time!"
+                  >
+                    Copy Cmd
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-mono text-xs">

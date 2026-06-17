@@ -432,14 +432,34 @@ Ensure winRate is an integer between 48 and 75, profitFactor is a float between 
 Ensure tickers are real liquid US or European equities and ETFs (e.g. XLE, GLD, ITA, SPY, QQQ, AAPL, EURX, TSLA, COP, VLO, SAP, RWE).
 Only output the raw valid JSON. No markdown backticks or commentary outside the JSON block.`;
 
-    const ai = new GoogleGenAI({ apiKey: rawKey });
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json"
-      }
-    });
+    const useVertex = !!req.body.useVertex;
+    let response;
+
+    if (useVertex) {
+      console.log("[SERVER] Executing calibration via Vertex AI Production Standard SDK (europe-west3)...");
+      const ai = new GoogleGenAI({
+        vertexai: true,
+        project: process.env.GOOGLE_CLOUD_PROJECT || "alpha-engine-production",
+        location: "europe-west3"
+      });
+      response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json"
+        }
+      });
+    } else {
+      console.log("[SERVER] Executing calibration via AI Studio Developer Key...");
+      const ai = new GoogleGenAI({ apiKey: rawKey });
+      response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json"
+        }
+      });
+    }
 
     const parsedData = JSON.parse(response.text || "{}");
     if (parsedData && Array.isArray(parsedData.baskets)) {
