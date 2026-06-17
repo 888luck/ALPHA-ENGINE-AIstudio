@@ -35,12 +35,16 @@ import {
   CartesianGrid,
   Tooltip
 } from "recharts";
+import { getActiveFirebaseConfig } from "../firebase";
 
 interface GcpCompanionProps {
   settings?: any;
 }
 
 export default function GcpCompanion(props: GcpCompanionProps) {
+  const activeFirebaseConfig = getActiveFirebaseConfig();
+  const projectId = activeFirebaseConfig?.projectId || "";
+
   const [activeTab, setActiveTab] = useState<"github" | "orchestrator" | "backtest" | "auto" | "specs">("github");
   const [instanceType, setInstanceType] = useState<"spot" | "standard">("spot");
   const [copiedText, setCopiedText] = useState(false);
@@ -96,7 +100,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
     { zone: "us-central1 (Iowa)", desc: "Standard remote US datacenter", latency: 78.5, cost: "$1.55/mo", active: false, rating: "⚠️ RISK: High Transaction Slippage" }
   ];
 
-  const setupCommand = `git clone https://github.com/888luck/ALPHA-ENGINE-AIstudio.git\ncd ALPHA-ENGINE-AIstudio\nchmod +x deploy_to_gcp.sh\n./deploy_to_gcp.sh`;
+  const setupCommand = `git clone https://github.com/${githubRepo || "888luck/ALPHA-ENGINE-AIstudio"}.git\ncd ${githubRepo && githubRepo.includes("/") ? githubRepo.split("/")[1] : "ALPHA-ENGINE-AIstudio"}\nchmod +x deploy_to_gcp.sh\n./deploy_to_gcp.sh`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(setupCommand);
@@ -459,24 +463,50 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                   Links your VM directly to the Firestore Tunnel, maintaining low fiber latencies and system execution co-located inside Frankfurt.
                 </p>
                 <div className="space-y-2">
-                  <div className="p-2 bg-slate-900/40 rounded border border-white/5 flex items-center justify-between">
-                    <div>
-                      <span className="text-[9.5px] text-slate-300 block font-semibold font-sans">Firestore Account Key:</span>
-                      <span className="text-[8px] text-slate-500 font-mono">firebase-applet-config.json</span>
+                  <div className="p-2.5 bg-slate-900/40 rounded border border-white/5 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-[9.5px] text-slate-300 block font-semibold font-sans">Firestore Account Key:</span>
+                        <span className="text-[8px] text-slate-500 font-mono">firebase-applet-config.json</span>
+                      </div>
+                      <span className="px-1.5 py-0.5 text-[8px] rounded font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                        ACTIVE & SECURED
+                      </span>
                     </div>
-                    <span className="px-1.5 py-0.5 text-[8px] rounded font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-                      ACTIVE & SECURED
-                    </span>
+                    <div className="pt-1 border-t border-white/5">
+                      <a
+                        href={projectId ? `https://console.firebase.google.com/u/0/project/${projectId}/settings/serviceaccounts/adminsdk` : "https://console.firebase.google.com/"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[9px] text-emerald-400 hover:text-emerald-300 hover:underline font-mono font-medium transition-colors cursor-pointer"
+                      >
+                        <span>→ Get key from Firebase Console Admin SDK</span>
+                        <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                      </a>
+                    </div>
                   </div>
 
-                  <div className="p-2 bg-indigo-500/5 rounded border border-indigo-500/10 flex items-center justify-between">
-                    <div>
-                      <span className="text-[9.5px] text-slate-300 block font-semibold font-sans">Vertex AI Integration:</span>
-                      <span className="text-[8px] text-slate-500 font-mono">IAM Service Account Keys</span>
+                  <div className="p-2.5 bg-indigo-500/5 rounded border border-indigo-500/10 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-[9.5px] text-slate-300 block font-semibold font-sans">Vertex AI Integration:</span>
+                        <span className="text-[8px] text-slate-500 font-mono">IAM Service Account Keys</span>
+                      </div>
+                      <span className="px-1.5 py-0.5 text-[8px] rounded font-bold uppercase bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20">
+                        TRANSITION READY
+                      </span>
                     </div>
-                    <span className="px-1.5 py-0.5 text-[8px] rounded font-bold uppercase bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20">
-                      TRANSITION READY
-                    </span>
+                    <div className="pt-1 border-t border-indigo-500/10">
+                      <a
+                        href={projectId ? `https://console.cloud.google.com/iam-admin/serviceaccounts?project=${projectId}` : "https://console.cloud.google.com/"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[9px] text-indigo-400 hover:text-indigo-300 hover:underline font-mono font-medium transition-colors cursor-pointer"
+                      >
+                        <span>→ Get key from GCP Console IAM</span>
+                        <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -571,21 +601,41 @@ export default function GcpCompanion(props: GcpCompanionProps) {
               </button>
 
               {/* Step C Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  setChecklist(
-                    checklist.map(item =>
-                      item.id === 4 || item.id === 5 ? { ...item, done: true } : item
-                    )
-                  );
-                  copyToClipboard();
-                  alert("Frankfurt deployment command copied! Paste it into Google Cloud Shell terminal to bootstrap the e2-micro host co-located adjacent to IBKR Europe Hub (Equinix FR2).");
-                }}
-                className="w-full py-2.5 px-3 bg-[#00ff88]/15 hover:bg-[#00ff88]/25 border border-[#00ff88]/30 text-[#00ff88] font-mono font-bold rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer select-none"
-              >
-                <Terminal className="w-3.5 h-3.5 text-[#00ff88]" /> Copy GCE Frankfurt VM Setup Cmd
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2.5 w-full">
+                <a
+                  href={`https://shell.cloud.google.com/cloudshell/open?cloudshell_git_repo=${encodeURIComponent(
+                    githubRepo ? `https://github.com/${githubRepo}` : "https://github.com/888luck/ALPHA-ENGINE-AIstudio"
+                  )}&cloudshell_working_dir=.`}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => {
+                    setChecklist(
+                      checklist.map(item =>
+                        item.id === 3 ? { ...item, done: true } : item
+                      )
+                    );
+                  }}
+                  className="flex-1 py-2.5 px-3 bg-[#4285F4]/15 hover:bg-[#4285F4]/25 border border-[#4285F4]/40 text-[#4285F4] hover:text-blue-300 font-mono font-bold rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer select-none text-center"
+                >
+                  <Terminal className="w-3.5 h-3.5 text-[#4285F4] animate-pulse" /> 🚀 Open & Setup in Cloud Shell
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChecklist(
+                      checklist.map(item =>
+                        item.id === 4 || item.id === 5 ? { ...item, done: true } : item
+                      )
+                    );
+                    copyToClipboard();
+                    alert("Frankfurt deployment command copied! Paste it into Google Cloud Shell terminal to bootstrap the e2-micro host co-located adjacent to IBKR Europe Hub (Equinix FR2).");
+                  }}
+                  className="flex-1 py-2.5 px-3 bg-[#00ff88]/15 hover:bg-[#00ff88]/25 border border-[#00ff88]/30 text-[#00ff88] font-mono font-bold rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer select-none"
+                >
+                  <Copy className="w-3.5 h-3.5 text-[#00ff88]" /> Copy GCE Frankfurt VM Setup Cmd
+                </button>
+              </div>
             </div>
 
             {saveMessage && (
@@ -618,13 +668,15 @@ export default function GcpCompanion(props: GcpCompanionProps) {
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-[10.5px] text-slate-300 font-mono">
                 <a
-                  href="https://console.cloud.google.com/home/dashboard?cloudshell=true"
+                  href={`https://shell.cloud.google.com/cloudshell/open?cloudshell_git_repo=${encodeURIComponent(
+                    githubRepo ? `https://github.com/${githubRepo}` : "https://github.com/888luck/ALPHA-ENGINE-AIstudio"
+                  )}&cloudshell_working_dir=.`}
                   target="_blank"
                   rel="noreferrer"
-                  className="p-2 rounded bg-white/5 border border-white/5 hover:border-indigo-500/35 hover:bg-indigo-500/5 transition flex items-center justify-between text-slate-200"
+                  className="p-2 rounded bg-[#4285F4]/5 border border-[#4285F4]/10 hover:border-[#4285F4]/35 hover:bg-[#4285F4]/10 transition flex items-center justify-between text-slate-200"
                 >
                   <span className="flex items-center gap-1.5 font-sans font-medium text-[11px]">
-                    <Terminal className="w-3.5 h-3.5 text-indigo-400" /> Google Cloud Shell Launchpad
+                    <Terminal className="w-3.5 h-3.5 text-blue-400" /> Auto-Clone Cloud Shell Launcher
                   </span>
                   <ExternalLink className="w-3 h-3 text-slate-500" />
                 </a>
