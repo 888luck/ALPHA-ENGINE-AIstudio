@@ -150,6 +150,19 @@ def main_loop():
                     sim_stop = 51.90
                     pos_qty = drm.calculate_position_size(sim_entry, sim_stop)
                     
+                    # Log active strategy parameters pulled from Firestore for complete system parity
+                    stop_atr = remote_state.get('stopAtrMultiplier', 1.8)
+                    partial_profit = remote_state.get('partialProfit', True)
+                    breakeven_lock = remote_state.get('breakevenLock', True)
+                    max_hold = remote_state.get('maxHoldBars', 15)
+                    ofi_filter = remote_state.get('ofiFilter', True)
+                    adaptive_stop = remote_state.get('adaptiveStop', True)
+                    
+                    print(f"[EDGE NODE SIM] Active strategy params in sync: "
+                          f"ATR_Stop={stop_atr}, PartialProfit={partial_profit}, "
+                          f"BreakevenLock={breakeven_lock}, MaxHold={max_hold}, "
+                          f"OFI_Filter={ofi_filter}, AdaptiveStop={adaptive_stop}")
+                    
                     # Simulate MiFIR metadata tagging on Order Class
                     class MockOrder:
                         def __init__(self):

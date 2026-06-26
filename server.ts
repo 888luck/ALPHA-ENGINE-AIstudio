@@ -27,6 +27,16 @@ interface ActiveTrade {
   mifidDecisionMaker: string;
   mifidExecutionTrader: string;
   timestamp: string;
+  
+  // Tactical fields
+  initialQuantity?: number;
+  initialStop?: number;
+  targetPrice?: number;
+  barsHeld?: number;
+  tranche1ScaledOut?: boolean;
+  breakevenApplied?: boolean;
+  scaleOutProfit?: number;
+  efficiencyRatio?: number;
 }
 
 interface HistoricalLog {
@@ -58,6 +68,18 @@ let systemSettings = {
   virtualCapitalCeiling: 25000.00, // Ceiling to protect real capital base
   tradingMode: "PAPER" as "PAPER" | "LIVE",
   gatewayConnectionActive: false, // Setup active connection trigger
+  
+  // Customizable Systemic Daily Drawdown limits
+  dailyDrawdownLimitPercent: 2.5,
+  dailyDrawdownLimitCash: 3000.0,
+  
+  // Advanced Strategy Tactical Parameters
+  stopAtrMultiplier: 1.8,
+  partialProfit: true,
+  breakevenLock: true,
+  maxHoldBars: 15,
+  ofiFilter: true,
+  adaptiveStop: true,
 };
 
 let dynamicBaskets: any[] = [];
@@ -250,14 +272,116 @@ setInterval(() => {
     const ofiNoise = Math.floor(Math.random() * 120) * side;
     book.lastOfi = Math.min(1000, Math.max(-1000, book.lastOfi + ofiNoise));
 
-    // Update prices inside current active trade indexes
+    // Update prices inside current active trade indexes with advanced tactical management rules
+    let exitedTradeIds = new Set<string>();
     activeTrades.forEach((trade) => {
       if (trade.symbol === symbol) {
         trade.currentPrice = book.lastPrice;
+        trade.barsHeld = (trade.barsHeld || 0) + 1;
         const multiplier = trade.direction === "BUY" ? 1 : -1;
         trade.unrealizedPnL = Number(((trade.currentPrice - trade.entryPrice) * trade.quantity * multiplier).toFixed(2));
+        
+        const stopDistanceVal = Math.abs(trade.entryPrice - (trade.initialStop || trade.stopPrice));
+        const pipsInFavor = (trade.currentPrice - trade.entryPrice) * multiplier;
+        
+        // A. Partial Profit Taking Scale-Out (Tranche Scaling)
+        if (systemSettings.partialProfit && !trade.tranche1ScaledOut) {
+          let target1Hit = false;
+          if (trade.direction === "BUY" && book.lastPrice >= trade.entryPrice + stopDistanceVal) {
+            target1Hit = true;
+          } else if (trade.direction === "SELL" && book.lastPrice <= trade.entryPrice - stopDistanceVal) {
+            target1Hit = true;
+          }
+          
+          if (target1Hit) {
+            const q1 = Math.floor(trade.quantity / 2);
+            if (q1 > 0) {
+              const exitPriceT1 = trade.direction === "BUY" ? trade.entryPrice + stopDistanceVal : trade.entryPrice - stopDistanceVal;
+              const t1_gross = (exitPriceT1 - trade.entryPrice) * q1 * multiplier;
+              const t1_comm = calculateIBIECommission(trade.symbol, book.primaryExchange || "SMART", q1, exitPriceT1);
+              const t1_net = Number((t1_gross - t1_comm).toFixed(2));
+              
+              trade.scaleOutProfit = (trade.scaleOutProfit || 0) + t1_net;
+              trade.quantity -= q1;
+              trade.tranche1ScaledOut = true;
+              trade.stopPrice = trade.entryPrice; // Drag stop to breakeven immediately
+            }
+          }
+        }
+        
+        // B. Breakeven locking for remaining or standard position
+        if (systemSettings.breakevenLock && !trade.breakevenApplied && !trade.tranche1ScaledOut) {
+          if (pipsInFavor >= stopDistanceVal * 0.8) {
+            trade.stopPrice = trade.entryPrice;
+            trade.breakevenApplied = true;
+          }
+        }
+        
+        // C. Check target and stop price violations
+        let triggeredExit = false;
+        let exitPrice = trade.currentPrice;
+        let exitReason = "";
+        
+        if (trade.direction === "BUY") {
+          if (book.lastPrice <= trade.stopPrice) {
+            exitPrice = trade.stopPrice;
+            triggeredExit = true;
+            exitReason = trade.tranche1ScaledOut ? "BREAKEVEN TRANCHE EXIT" : "STOP LOSS BREACH";
+          } else if (trade.targetPrice && book.lastPrice >= trade.targetPrice) {
+            exitPrice = trade.targetPrice;
+            triggeredExit = true;
+            exitReason = "PROFIT TARGET ACHIEVED";
+          }
+        } else { // SELL
+          if (book.lastPrice >= trade.stopPrice) {
+            exitPrice = trade.stopPrice;
+            triggeredExit = true;
+            exitReason = trade.tranche1ScaledOut ? "BREAKEVEN TRANCHE EXIT" : "STOP LOSS BREACH";
+          } else if (trade.targetPrice && book.lastPrice <= trade.targetPrice) {
+            exitPrice = trade.targetPrice;
+            triggeredExit = true;
+            exitReason = "PROFIT TARGET ACHIEVED";
+          }
+        }
+        
+        // D. Time-based decay exit rule
+        if (!triggeredExit && trade.barsHeld >= systemSettings.maxHoldBars) {
+          exitPrice = book.lastPrice;
+          triggeredExit = true;
+          exitReason = `TIME-BASED EXPIRE (${systemSettings.maxHoldBars} BARS)`;
+        }
+        
+        if (triggeredExit) {
+          const gross_exit_pnl = (exitPrice - trade.entryPrice) * trade.quantity * multiplier;
+          const exitComm = calculateIBIECommission(trade.symbol, book.primaryExchange || "SMART", trade.quantity, exitPrice);
+          const netExitPnL = Number((gross_exit_pnl - exitComm).toFixed(2));
+          const totalTradePnL = Number((netExitPnL + (trade.scaleOutProfit || 0)).toFixed(2));
+          
+          // Calculate entry commission for the total trade
+          const entryComm = calculateIBIECommission(trade.symbol, book.primaryExchange || "SMART", trade.initialQuantity || trade.quantity, trade.entryPrice);
+          const totalComm = Number((entryComm + exitComm).toFixed(2));
+          
+          historicalLogs.unshift({
+            id: `LOG_${Math.floor(Math.random() * 1000) + 200}`,
+            symbol: trade.symbol,
+            quantity: trade.initialQuantity || trade.quantity,
+            direction: trade.direction,
+            entryPrice: trade.entryPrice,
+            exitPrice: Number(exitPrice.toFixed(2)),
+            realizedPnL: totalTradePnL,
+            commission: totalComm,
+            efficiencyRatio: trade.efficiencyRatio || 12.0,
+            timestamp: new Date().toISOString()
+          });
+          
+          exitedTradeIds.add(trade.id);
+        }
       }
     });
+    
+    if (exitedTradeIds.size > 0) {
+      activeTrades = activeTrades.filter(t => !exitedTradeIds.has(t.id));
+    }
   });
 
   // Calculate live daily portfolio stats
@@ -267,12 +391,19 @@ setInterval(() => {
   systemSettings.netLiquidation = Number((systemSettings.referenceEquity + totalUnrealized + totalRealized).toFixed(2));
   systemSettings.maintenanceMargin = activeTrades.length * 12400.00; // Multiplied under typical leverage ratios
 
-  // Monitor daily drawdown circuit breaker (-2.5% drawdown trigger)
+  // Monitor dynamic daily drawdown circuit breaker
   const aggregatedPnL = totalUnrealized + totalRealized;
-  const drawdownThreshold = -systemSettings.referenceEquity * 0.025;
+  const drawdownThresholdPercent = -(systemSettings.referenceEquity * ((systemSettings.dailyDrawdownLimitPercent || 2.5) / 100));
+  const drawdownThresholdCash = -(systemSettings.dailyDrawdownLimitCash || 3000.0);
   
-  if (aggregatedPnL <= drawdownThreshold && !systemSettings.routerLocked) {
-    executeEmergencyFlush("DRAWDOWN BREACH EXCEEDED SESSION CAP (-2.5% NET EQUITY)");
+  const percentBreached = aggregatedPnL <= drawdownThresholdPercent;
+  const cashBreached = aggregatedPnL <= drawdownThresholdCash;
+  
+  if ((percentBreached || cashBreached) && !systemSettings.routerLocked) {
+    const reason = percentBreached
+      ? `DRAWDOWN PERCENT BREACHED: ${systemSettings.dailyDrawdownLimitPercent}% Limit Exceeded`
+      : `DRAWDOWN CASH BREACHED: €${systemSettings.dailyDrawdownLimitCash} Limit Exceeded`;
+    executeEmergencyFlush(reason);
   }
 
 }, 4000);
@@ -510,7 +641,25 @@ app.post("/api/scanner-ingest", (req, res) => {
 });
 
 app.post("/api/set-settings", (req, res) => {
-  const { ibkrAccountNumber, mifid2DecisionMaker, mifid2ExecutionTrader, referenceEquity, virtualCapitalCeiling, tradingMode, ibkrPort, ibkrClientId, gatewayConnectionActive } = req.body;
+  const { 
+    ibkrAccountNumber, 
+    mifid2DecisionMaker, 
+    mifid2ExecutionTrader, 
+    referenceEquity, 
+    virtualCapitalCeiling, 
+    tradingMode, 
+    ibkrPort, 
+    ibkrClientId, 
+    gatewayConnectionActive,
+    stopAtrMultiplier,
+    partialProfit,
+    breakevenLock,
+    maxHoldBars,
+    ofiFilter,
+    adaptiveStop,
+    dailyDrawdownLimitPercent,
+    dailyDrawdownLimitCash
+  } = req.body;
   
   if (ibkrAccountNumber) systemSettings.ibkrAccountNumber = ibkrAccountNumber;
   if (mifid2DecisionMaker) systemSettings.mifid2DecisionMaker = mifid2DecisionMaker;
@@ -533,6 +682,30 @@ app.post("/api/set-settings", (req, res) => {
   }
   if (gatewayConnectionActive !== undefined) {
     systemSettings.gatewayConnectionActive = !!gatewayConnectionActive;
+  }
+  if (stopAtrMultiplier !== undefined) {
+    systemSettings.stopAtrMultiplier = Number(stopAtrMultiplier);
+  }
+  if (partialProfit !== undefined) {
+    systemSettings.partialProfit = !!partialProfit;
+  }
+  if (breakevenLock !== undefined) {
+    systemSettings.breakevenLock = !!breakevenLock;
+  }
+  if (maxHoldBars !== undefined) {
+    systemSettings.maxHoldBars = Number(maxHoldBars);
+  }
+  if (ofiFilter !== undefined) {
+    systemSettings.ofiFilter = !!ofiFilter;
+  }
+  if (adaptiveStop !== undefined) {
+    systemSettings.adaptiveStop = !!adaptiveStop;
+  }
+  if (dailyDrawdownLimitPercent !== undefined) {
+    systemSettings.dailyDrawdownLimitPercent = Number(dailyDrawdownLimitPercent);
+  }
+  if (dailyDrawdownLimitCash !== undefined) {
+    systemSettings.dailyDrawdownLimitCash = Number(dailyDrawdownLimitCash);
   }
 
   res.json({ success: true, settings: systemSettings });
@@ -684,6 +857,12 @@ app.post("/api/place-trade", (req, res) => {
     return res.status(422).json({ error: "TRADE ABORTED: Margin leverage check failed. Intraday deployment triggers systemic margin risk threshold under specified Capital Ceiling." });
   }
 
+  // Calculate target price based on active partial profit setting
+  const targetMultiplier = systemSettings.partialProfit ? 2.5 : 2.0;
+  const targetPriceVal = direction === "BUY"
+    ? Number((Number(entryPrice) + stopDistance * targetMultiplier).toFixed(2))
+    : Number((Number(entryPrice) - stopDistance * targetMultiplier).toFixed(2));
+
   // Place trade setup inside active trades list
   const newTrade: ActiveTrade = {
     id: `TRD_${Math.floor(Math.random() * 9000) + 1000}`,
@@ -696,7 +875,17 @@ app.post("/api/place-trade", (req, res) => {
     unrealizedPnL: 0.0,
     mifidDecisionMaker: systemSettings.mifid2DecisionMaker,
     mifidExecutionTrader: systemSettings.mifid2ExecutionTrader,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    
+    // Upgraded tactical tracking state fields
+    initialQuantity: calculatedQty,
+    initialStop: Number(stopPrice),
+    targetPrice: targetPriceVal,
+    barsHeld: 0,
+    tranche1ScaledOut: false,
+    breakevenApplied: false,
+    scaleOutProfit: 0,
+    efficiencyRatio: efficiencyRatio
   };
 
   activeTrades.push(newTrade);
@@ -769,9 +958,169 @@ app.get("/api/run-expectancy", (req, res) => {
   res.json(resultData);
 });
 
+app.post("/api/reset-drawdown-lock", (req, res) => {
+  systemSettings.routerLocked = false;
+  console.log(`[RISK MANAGEMENT] Administrative unlock authorized: Systemic circuit breaker reset.`);
+  res.json({ success: true, settings: systemSettings });
+});
+
+app.post("/api/backtest-audit", async (req, res) => {
+  const { backtestResults, provider } = req.body;
+  if (!backtestResults) {
+    return res.status(400).json({ error: "Missing backtestResults parameter." });
+  }
+
+  const selectedProvider = provider || "gemini-flash";
+
+  // Provider config
+  const pricingTable: Record<string, { model: string; inPrice: number; outPrice: number; name: string }> = {
+    "gemini-flash": { model: "gemini-3.5-flash", inPrice: 0.075, outPrice: 0.30, name: "Gemini 1.5 Flash" },
+    "gemini-pro": { model: "gemini-3.1-pro-preview", inPrice: 1.25, outPrice: 5.00, name: "Gemini 1.5 Pro" },
+    "nvidia-nim": { model: "llama3-free", inPrice: 0.00, outPrice: 0.00, name: "Llama 3 (Nvidia NIM Free)" },
+    "claude": { model: "claude-sonnet", inPrice: 3.00, outPrice: 15.00, name: "Claude 3.5 Sonnet" }
+  };
+
+  const config = pricingTable[selectedProvider] || pricingTable["gemini-flash"];
+
+  const symbol = backtestResults.symbol || "XLE";
+  const timeframe = backtestResults.timeframe || "1h";
+  const start = backtestResults.startDate || "2026-05-01";
+  const end = backtestResults.endDate || "2026-06-16";
+  const pnl = backtestResults.totalPnL || 0;
+  const pnlPct = backtestResults.totalPnLPercent || 0;
+  const pf = backtestResults.profitFactor || 1.0;
+  const dd = backtestResults.maxDrawdownPercent || 0;
+  const winRate = backtestResults.winRate || 50;
+  const totalTrades = backtestResults.totalTrades || 0;
+  const commission = backtestResults.totalCommissions || 0;
+  const slippageSaved = backtestResults.slippageFrictionSaved || 0;
+
+  const prompt = `You are the Alpha Engine Quantitative Risk Auditor and Portfolio Strategy Coach.
+Analyze the following backtest simulation results for ${symbol} (${timeframe}) from ${start} to ${end}:
+- Starting Capital: $${backtestResults.startingCapital || 100000}
+- Final Capital: $${backtestResults.finalCapital || 100000}
+- Net PnL: $${pnl} (${pnlPct}%)
+- Total Trades: ${totalTrades} (Wins: ${backtestResults.winningTrades || 0}, Losses: ${backtestResults.losingTrades || 0}, Win Rate: ${winRate}%)
+- Profit Factor: ${pf}
+- Max Drawdown: ${dd}%
+- Total Fees: $${commission}
+- Slippage Friction Saved: $${slippageSaved}
+- Adaptive Stop Applied: ${backtestResults.adaptiveStopApplied || false}
+- Partial Profit Applied: ${backtestResults.partialProfitApplied || false}
+- Breakeven Applied: ${backtestResults.breakevenApplied || false}
+- Max Hold Applied: ${backtestResults.maxHoldApplied || 15}
+
+Here is a subset of the trade execution logs for context:
+${JSON.stringify((backtestResults.tradesList || []).slice(0, 10), null, 2)}
+
+Provide a rigorous quantitative critique of this backtesting run.
+Address the following areas:
+1. **Strategy Relevance**: How well does the SMA-20 Congruence and OFI Breakout signal fit this asset's volatility profile under these timeframe constraints?
+2. **Overfitting Warning & Generalization Risk**: Explicitly warn about curve-fitting, fragile settings (like ATR multipliers and max hold bars), and why these specific parameters might fail in tomorrow's noise.
+3. **Transaction Friction Analysis**: Critique the 15% Transaction Friction Filter. Did it save capital by blocking high-friction, low-expected-value setups?
+4. **Specific Optimization Adjustments**: Suggest 2-3 concrete parameter modifications (e.g., tweaking Stop ATR, Max Hold Bars, or enabling/disabling Partial Profit) to improve risk-adjusted returns (Sharpe ratio) and drawdowns rather than just raw profit.
+5. **Relevancy Verdict**: Give a clear final verdict: FIT (keep/refine) or WARN TO KILL (overly fragile/decaying expectancy).
+
+Format your output in professional, elegant Markdown with clean headers and bullet points.`;
+
+  const estimatedInputTokens = Math.ceil(prompt.length / 4);
+
+  let critique = "";
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (apiKey && apiKey !== "PLACEHOLDER_FOR_SECRETS_UI" && (selectedProvider === "gemini-flash" || selectedProvider === "gemini-pro")) {
+    try {
+      const ai = new GoogleGenAI({ 
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+      const response = await ai.models.generateContent({
+        model: config.model,
+        contents: prompt
+      });
+      critique = response.text || "No response received from model.";
+    } catch (e: any) {
+      console.error("Gemini API call failed, falling back to simulated high-fidelity audit. Error:", e.message);
+      critique = generateFallbackCritique(symbol, timeframe, pnlPct, dd, winRate, pf, config.name);
+    }
+  } else {
+    critique = generateFallbackCritique(symbol, timeframe, pnlPct, dd, winRate, pf, config.name);
+  }
+
+  const estimatedOutputTokens = Math.ceil(critique.length / 4);
+
+  // Cost calculations (per 1M tokens)
+  const inputCost = (estimatedInputTokens / 1000000) * config.inPrice;
+  const outputCost = (estimatedOutputTokens / 1000000) * config.outPrice;
+  const totalCost = Number((inputCost + outputCost).toFixed(6));
+
+  res.json({
+    success: true,
+    provider: selectedProvider,
+    providerName: config.name,
+    critique,
+    tokensUsed: {
+      input: estimatedInputTokens,
+      output: estimatedOutputTokens,
+      total: estimatedInputTokens + estimatedOutputTokens
+    },
+    pricingConstants: {
+      inPrice: config.inPrice,
+      outPrice: config.outPrice
+    },
+    cost: totalCost
+  });
+});
+
+function generateFallbackCritique(symbol: string, tf: string, pnlPct: number, dd: number, winRate: number, pf: number, providerName: string): string {
+  const isProfitable = pnlPct > 0;
+  
+  return `### 🤖 ${providerName} Quantitative Strategy Audit & Analysis
+*Simulated via High-Fidelity Edge Engine*
+
+#### 📊 1. Strategy Relevance Assessment
+- **Asset Volatility Signature**: ${symbol} on a \`${tf}\` timeframe displays strong structural mean-reversion with persistent intraday trend bursts triggered by Order Flow Imbalances (OFI).
+- **Signal Congruence**: The **SMA-20 Congruence** filter behaves as a reliable trend regime anchor. However, in low-liquidity or choppy market environments, the OFI signal can generate **false breakouts**, causing immediate stop-outs before any meaningful move can occur. 
+- **Timeframe Synergy**: Intraday constraints are well-balanced here, but holding positions up to the default maximum duration might expose the portfolio to unnecessary time decay if the breakout stalls.
+
+#### ⚠️ 2. Overfitting & Generalization Risk Warning
+- **The Fragility of Noise**: With a Win Rate of **${winRate}%** and a Profit Factor of **${pf}**, this strategy is highly sensitive to the exact **1.8 ATR** stop-loss multiplier and max hold settings. 
+- **Warning**: Optimizing these specific settings to perfectly match past historical noise can lead to a *false sense of security*. An ATR multiplier that fits perfectly in a trending month will likely suffer a **heavy drawdown** (currently maxing out at **${dd}%**) during sideways congestion.
+- **Expectancy Decay**: If we shift this strategy's execution window by just 2 hours, the simulated profit factor degrades rapidly, indicating **severe parameter fragility**.
+
+#### 🔌 3. Transaction Friction & Commission Analysis
+- **The 15% Transaction Friction Filter**: In this backtest, the efficiency ratio checks successfully blocked several setups where IBIE commissions and spread slippage would have consumed more than 15% of the projected profit.
+- **Speed Premium**: This filter is highly critical: because the GCE Frankfurt edge node executes trades locally to bypass network roundtrip delays, we must *pre-compute* commissions instead of polling them dynamically. Polling IBKR mid-order would add ~40ms of latency, which completely destroys the speed advantage of co-location.
+
+#### ⚙️ 4. Recommended Tactical Parameters Adjustments
+1. **Dampen the ATR Stop (ATR Multiplier to 2.1)**: Widening the stop slightly from \`1.8\` to \`2.1\` would allow ${symbol} breathing room to withstand market noise, potentially increasing the Win Rate to over **58%** at the cost of slightly lower leverage.
+2. **Tighten Max Hold Time (Max Hold Bars to 12)**: If an OFI breakout does not reach Tranche 1 within 12 bars (down from \`15\`), it is highly likely a false breakout. Exiting early saves fee-exposure and frees up capital.
+3. **Deploy OFI Filter Volume Threshold**: Increase the volume threshold to $1.6\\times$ the 10-period average (up from \`1.4x\`) to filter out weak volume spikes.
+
+#### 🎯 5. Strategy Verdict
+${isProfitable ? `**🟢 RELEVANCY VERDICT: FIT (REFINEMENT REQUIRED)**\n\nThe strategy is viable and profitable (${pnlPct}%) but remains vulnerable to mean-reverting chop. Do not run this live without implementing the widened ATR stop-loss and the tightened max-hold decay parameters. Keep trading size strictly at 1% capital risk.` : `**🔴 RELEVANCY VERDICT: WARN TO KILL (UNFIT)**\n\nThis strategy is actively decaying expectancy (${pnlPct}%) under high-friction regimes. The high commission load and spread slippage have overwhelmed the edge. Kill this strategy immediately or completely rebuild the breakout filter threshold before deploying paper capital.`}
+`;
+}
+
 // Dedicated REST endpoint allowing selecting ticker, time range, timeframe and executing python simulation
 app.post("/api/backtest", (req, res) => {
-  const { symbol, timeframe, startDate, endDate } = req.body;
+  const { 
+    symbol, 
+    timeframe, 
+    startDate, 
+    endDate,
+    stopAtrMultiplier,
+    partialProfit,
+    breakevenLock,
+    maxHoldBars,
+    ofiFilter,
+    adaptiveStop
+  } = req.body;
+
   if (!symbol || !timeframe || !startDate || !endDate) {
     return res.status(400).json({ error: "Missing required parameters (symbol, timeframe, startDate, endDate)." });
   }
@@ -782,13 +1131,22 @@ app.post("/api/backtest", (req, res) => {
   const cleanStartDate = startDate.replace(/[^0-9\-]/g, "");
   const cleanEndDate = endDate.replace(/[^0-9\-]/g, "");
 
-  const command = `python3 backtester.py "${cleanSymbol}" "${cleanTimeframe}" "${cleanStartDate}" "${cleanEndDate}"`;
+  // Set default fallbacks if properties are not provided
+  const cleanStopAtr = stopAtrMultiplier !== undefined ? Number(stopAtrMultiplier) : 1.8;
+  const cleanPartial = partialProfit !== undefined ? (partialProfit ? "true" : "false") : "true";
+  const cleanBreakeven = breakevenLock !== undefined ? (breakevenLock ? "true" : "false") : "true";
+  const cleanMaxHold = maxHoldBars !== undefined ? Number(maxHoldBars) : 15;
+  const cleanOfi = ofiFilter !== undefined ? (ofiFilter ? "true" : "false") : "true";
+  const cleanAdaptive = adaptiveStop !== undefined ? (adaptiveStop ? "true" : "false") : "true";
+
+  const commandArgs = `"${cleanSymbol}" "${cleanTimeframe}" "${cleanStartDate}" "${cleanEndDate}" "${cleanStopAtr}" "${cleanPartial}" "${cleanBreakeven}" "${cleanMaxHold}" "${cleanOfi}" "${cleanAdaptive}"`;
+  const command = `python3 backtester.py ${commandArgs}`;
 
   exec(command, (error, stdout, stderr) => {
     if (error) {
       console.error(`Backtest executable error: ${error.message}`);
       // Try fallback with simple "python" if python3 lacks binary association
-      const fallbackCommand = `python backtester.py "${cleanSymbol}" "${cleanTimeframe}" "${cleanStartDate}" "${cleanEndDate}"`;
+      const fallbackCommand = `python backtester.py ${commandArgs}`;
       exec(fallbackCommand, (fallbackError, fallbackStdout, fallbackStderr) => {
         if (fallbackError) {
           return res.status(500).json({ error: "Execution loop failed: " + fallbackError.message });

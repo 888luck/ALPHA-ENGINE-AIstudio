@@ -176,6 +176,16 @@ interface SystemSettings {
   marketPhase: string;
   virtualCapitalCeiling?: number;
   tradingMode?: "PAPER" | "LIVE";
+  
+  // Tactical Strategy Upgrades
+  stopAtrMultiplier?: number;
+  partialProfit?: boolean;
+  breakevenLock?: boolean;
+  maxHoldBars?: number;
+  ofiFilter?: boolean;
+  adaptiveStop?: boolean;
+  dailyDrawdownLimitPercent?: number;
+  dailyDrawdownLimitCash?: number;
 }
 
 interface ActiveTrade {
@@ -190,6 +200,16 @@ interface ActiveTrade {
   mifidDecisionMaker: string;
   mifidExecutionTrader: string;
   timestamp: string;
+  
+  // Tactical Strategy State Fields
+  initialQuantity?: number;
+  initialStop?: number;
+  targetPrice?: number;
+  barsHeld?: number;
+  tranche1ScaledOut?: boolean;
+  breakevenApplied?: boolean;
+  scaleOutProfit?: number;
+  efficiencyRatio?: number;
 }
 
 interface HistoricalLog {
@@ -263,6 +283,16 @@ export default function Dashboard() {
   const [editIbkrPort, setEditIbkrPort] = useState(4002);
   const [editIbkrClientId, setEditIbkrClientId] = useState(10);
   const [editGatewayConnectionActive, setEditGatewayConnectionActive] = useState(false);
+  
+  // Tactical parameters
+  const [editStopAtrMultiplier, setEditStopAtrMultiplier] = useState(1.8);
+  const [editPartialProfit, setEditPartialProfit] = useState(true);
+  const [editBreakevenLock, setEditBreakevenLock] = useState(true);
+  const [editMaxHoldBars, setEditMaxHoldBars] = useState(15);
+  const [editOfiFilter, setEditOfiFilter] = useState(true);
+  const [editAdaptiveStop, setEditAdaptiveStop] = useState(true);
+  const [editDailyDrawdownLimitPercent, setEditDailyDrawdownLimitPercent] = useState(2.5);
+  const [editDailyDrawdownLimitCash, setEditDailyDrawdownLimitCash] = useState(1500.0);
   const [aiCalibrationPrompt, setAiCalibrationPrompt] = useState("");
   const [isCalibratingGeopolitical, setIsCalibratingGeopolitical] = useState(false);
   const [selectedCalibrationModel, setSelectedCalibrationModel] = useState<"ai-studio" | "vertex">("ai-studio");
@@ -529,6 +559,12 @@ export default function Dashboard() {
           ibkrClientId: settings.ibkrClientId,
           tradingMode: settings.tradingMode,
           gatewayConnectionActive: settings.gatewayConnectionActive,
+          stopAtrMultiplier: settings.stopAtrMultiplier || 1.8,
+          partialProfit: settings.partialProfit !== false,
+          breakevenLock: settings.breakevenLock !== false,
+          maxHoldBars: settings.maxHoldBars || 15,
+          ofiFilter: settings.ofiFilter !== false,
+          adaptiveStop: settings.adaptiveStop !== false,
           lastUpdated: new Date().toISOString()
         }).catch(err => handleFirestoreError(err, OperationType.WRITE, "system_risk_state/current_state"));
       }
@@ -637,6 +673,30 @@ export default function Dashboard() {
       if (typeof settings.gatewayConnectionActive === "boolean") {
         setEditGatewayConnectionActive(settings.gatewayConnectionActive);
       }
+      if (typeof settings.stopAtrMultiplier === "number") {
+        setEditStopAtrMultiplier(settings.stopAtrMultiplier);
+      }
+      if (typeof settings.partialProfit === "boolean") {
+        setEditPartialProfit(settings.partialProfit);
+      }
+      if (typeof settings.breakevenLock === "boolean") {
+        setEditBreakevenLock(settings.breakevenLock);
+      }
+      if (typeof settings.maxHoldBars === "number") {
+        setEditMaxHoldBars(settings.maxHoldBars);
+      }
+      if (typeof settings.ofiFilter === "boolean") {
+        setEditOfiFilter(settings.ofiFilter);
+      }
+      if (typeof settings.adaptiveStop === "boolean") {
+        setEditAdaptiveStop(settings.adaptiveStop);
+      }
+      if (typeof settings.dailyDrawdownLimitPercent === "number") {
+        setEditDailyDrawdownLimitPercent(settings.dailyDrawdownLimitPercent);
+      }
+      if (typeof settings.dailyDrawdownLimitCash === "number") {
+        setEditDailyDrawdownLimitCash(settings.dailyDrawdownLimitCash);
+      }
     }
   }, [settings === null]);
 
@@ -690,6 +750,12 @@ export default function Dashboard() {
             ibkrClientId: data.settings.ibkrClientId,
             tradingMode: nextMode,
             gatewayConnectionActive: nextMode === "LIVE" ? true : editGatewayConnectionActive,
+            stopAtrMultiplier: data.settings.stopAtrMultiplier,
+            partialProfit: data.settings.partialProfit,
+            breakevenLock: data.settings.breakevenLock,
+            maxHoldBars: data.settings.maxHoldBars,
+            ofiFilter: data.settings.ofiFilter,
+            adaptiveStop: data.settings.adaptiveStop,
             lastUpdated: new Date().toISOString()
           }, { merge: true }).catch(err => console.error("Firebase sync error: ", err));
         }
@@ -714,13 +780,48 @@ export default function Dashboard() {
           tradingMode: editTradingMode,
           ibkrPort: editIbkrPort,
           ibkrClientId: editIbkrClientId,
-          gatewayConnectionActive: editGatewayConnectionActive
+          gatewayConnectionActive: editGatewayConnectionActive,
+          stopAtrMultiplier: editStopAtrMultiplier,
+          partialProfit: editPartialProfit,
+          breakevenLock: editBreakevenLock,
+          maxHoldBars: editMaxHoldBars,
+          ofiFilter: editOfiFilter,
+          adaptiveStop: editAdaptiveStop,
+          dailyDrawdownLimitPercent: editDailyDrawdownLimitPercent,
+          dailyDrawdownLimitCash: editDailyDrawdownLimitCash
         })
       });
       if (res.ok) {
         const data = await safeJsonParse(res);
         setSettings(data.settings);
         setOrderFeedback({ success: "System settings updated natively inside Alpha Engine." });
+        
+        // If authorized, push state directly to Firebase
+        if (firebaseStatus === "authorized" && currentUser) {
+          const totalUnrealized = activeTrades.reduce((acc, curr) => acc + curr.unrealizedPnL, 0);
+          const totalRealized = historicalLogs.reduce((acc, curr) => acc + curr.realizedPnL, 0);
+          await setDoc(doc(db, "system_risk_state", "current_state"), {
+            netLiquidation: data.settings.netLiquidation,
+            maintenanceMargin: data.settings.maintenanceMargin,
+            dailyRealizedPnL: totalRealized,
+            dailyUnrealizedPnL: totalUnrealized,
+            routerLocked: data.settings.routerLocked,
+            ibkrAccountNumber: data.settings.ibkrAccountNumber,
+            ibkrPort: data.settings.ibkrPort,
+            ibkrClientId: data.settings.ibkrClientId,
+            tradingMode: data.settings.tradingMode,
+            gatewayConnectionActive: data.settings.gatewayConnectionActive,
+            stopAtrMultiplier: data.settings.stopAtrMultiplier,
+            partialProfit: data.settings.partialProfit,
+            breakevenLock: data.settings.breakevenLock,
+            maxHoldBars: data.settings.maxHoldBars,
+            ofiFilter: data.settings.ofiFilter,
+            adaptiveStop: data.settings.adaptiveStop,
+            dailyDrawdownLimitPercent: data.settings.dailyDrawdownLimitPercent,
+            dailyDrawdownLimitCash: data.settings.dailyDrawdownLimitCash,
+            lastUpdated: new Date().toISOString()
+          }, { merge: true }).catch(err => console.error("Firebase sync error: ", err));
+        }
       }
     } catch (e) {
       setOrderFeedback({ error: "Failed to update configuration parameter." });
@@ -789,6 +890,21 @@ export default function Dashboard() {
     }
   };
 
+  const handleResetDrawdownLock = async () => {
+    try {
+      const res = await fetch("/api/reset-drawdown-lock", { method: "POST" });
+      if (res.ok) {
+        setOrderFeedback({ success: "ADMIN OVERRIDE: Daily drawdown circuit breaker lock reset. Router online." });
+        fetchState();
+      } else {
+        const data = await res.json();
+        setOrderFeedback({ error: data.error || "Failed to reset drawdown hard lock." });
+      }
+    } catch (e: any) {
+      setOrderFeedback({ error: e.message || "Failed to communicate administrative reset." });
+    }
+  };
+
   const handleResetSimulation = async () => {
     try {
       const res = await fetch("/api/reset-simulation", { method: "POST" });
@@ -838,7 +954,7 @@ export default function Dashboard() {
   const totalRealized = historicalLogs.reduce((acc, curr) => acc + curr.realizedPnL, 0);
   const totalPnL = totalUnrealized + totalRealized;
   const drawdownPct = settings ? (totalPnL < 0 ? (Math.abs(totalPnL) / settings.referenceEquity) * 100 : 0) : 0;
-  const drawdownLimitPct = 2.5; // system threshold
+  const drawdownLimitPct = settings?.dailyDrawdownLimitPercent ?? 2.5; // dynamic threshold
 
   // Dynamically sync selectedSymbol and tradeSymbol with the first available assets as they are scanned
   useEffect(() => {
@@ -1362,22 +1478,21 @@ export default function Dashboard() {
               </div>
 
               {/* Drawdown Circuit Breaker visualization */}
-              <div className="space-y-2 border-t border-white/10 pt-4">
+              <div className="space-y-3.5 border-t border-white/10 pt-4">
                 <div className="flex items-center justify-between text-xs text-slate-400">
                   <span className="flex items-center gap-1.5 font-semibold">
-                    <AlertOctagon className="w-4 h-4 text-[#ff4444]" /> Daily Drawdown Circuit Breaker Limit (Hard Max: -2.5%)
+                    <AlertOctagon className="w-4 h-4 text-[#ff4444]" /> Daily Drawdown Circuit Breaker Limit (-{drawdownLimitPct}%)
                   </span>
                   <span className="font-mono text-slate-300">
                     {drawdownPct.toFixed(2)}% / {drawdownLimitPct}% Limit
                   </span>
                 </div>
 
-                
                 {/* Visual Bar */}
                 <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-900 relative">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
-                      drawdownPct >= 1.8 ? "bg-rose-500" : drawdownPct >= 1.0 ? "bg-amber-500" : "bg-orange-500"
+                      drawdownPct >= drawdownLimitPct * 0.75 ? "bg-rose-500" : drawdownPct >= drawdownLimitPct * 0.4 ? "bg-amber-500" : "bg-emerald-500"
                     }`}
                     style={{ width: `${Math.min(100, (drawdownPct / drawdownLimitPct) * 100)}%` }}
                   />
@@ -1386,8 +1501,37 @@ export default function Dashboard() {
                 </div>
                 <div className="flex justify-between text-[9px] text-slate-600 font-mono">
                   <span>0.0% P&L Flat</span>
-                  <span>-1.25% Buffer</span>
-                  <span className="text-rose-500 font-semibold">-2.5% Emergency Lock</span>
+                  <span>-{(drawdownLimitPct / 2).toFixed(2)}% Buffer</span>
+                  <span className="text-rose-500 font-semibold">-{drawdownLimitPct}% Emergency Lock</span>
+                </div>
+
+                {/* Cash Drawdown details & Router Lock overrides */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-black/45 rounded-lg border border-white/5 text-xs font-mono">
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-slate-500 block">CASH DRAWDOWN THRESHOLD</span>
+                    <span className={`font-semibold ${totalPnL < 0 && Math.abs(totalPnL) >= (settings?.dailyDrawdownLimitCash ?? 1500) ? "text-rose-400" : "text-slate-300"}`}>
+                      €{totalPnL < 0 ? Math.abs(totalPnL).toFixed(2) : "0.00"} / €{settings?.dailyDrawdownLimitCash ?? "1,500.00"} Limit
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end gap-3">
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-500 block">ROUTER STATE</span>
+                      <span className={`font-extrabold ${settings?.routerLocked ? "text-rose-400" : "text-[#00ff88]"}`}>
+                        {settings?.routerLocked ? "● LOCKED" : "● ONLINE"}
+                      </span>
+                    </div>
+
+                    {settings?.routerLocked && (
+                      <button
+                        type="button"
+                        onClick={handleResetDrawdownLock}
+                        className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-black font-extrabold rounded text-[10px] uppercase shadow transition cursor-pointer select-none"
+                      >
+                        ADMIN UNLOCK
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1889,6 +2033,102 @@ export default function Dashboard() {
                       placeholder="e.g. 10"
                     />
                     <span className="text-[8px] text-slate-500 mt-0.5 block">Allows parallel processes</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-white/10 pt-3 mt-3 space-y-2">
+                  <span className="text-[10px] text-slate-400 uppercase font-mono block">Tactical Strategy Upgrades</span>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[9px] text-slate-500 block uppercase font-mono">Stop ATR Mult</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={editStopAtrMultiplier}
+                        onChange={(e) => setEditStopAtrMultiplier(Number(e.target.value))}
+                        className="w-full mt-0.5 bg-black/35 border border-white/10 rounded p-1 text-slate-100 text-xs focus:outline-none focus:border-[#00ff88]/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-slate-500 block uppercase font-mono">Max Hold Bars</label>
+                      <input
+                        type="number"
+                        value={editMaxHoldBars}
+                        onChange={(e) => setEditMaxHoldBars(Number(e.target.value))}
+                        className="w-full mt-0.5 bg-black/35 border border-white/10 rounded p-1 text-slate-100 text-xs focus:outline-none focus:border-[#00ff88]/50"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 mt-2 font-mono">
+                    <label className="flex items-center gap-1.5 p-1.5 rounded bg-black/20 border border-white/5 cursor-pointer hover:bg-black/40">
+                      <input
+                        type="checkbox"
+                        checked={editPartialProfit}
+                        onChange={(e) => setEditPartialProfit(e.target.checked)}
+                        className="accent-[#00ff88]"
+                      />
+                      <span className="text-[9px] text-slate-300 uppercase">Tranche Exit</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 p-1.5 rounded bg-black/20 border border-white/5 cursor-pointer hover:bg-black/40">
+                      <input
+                        type="checkbox"
+                        checked={editBreakevenLock}
+                        onChange={(e) => setEditBreakevenLock(e.target.checked)}
+                        className="accent-[#00ff88]"
+                      />
+                      <span className="text-[9px] text-slate-300 uppercase">Breakeven Lock</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 p-1.5 rounded bg-black/20 border border-white/5 cursor-pointer hover:bg-black/40">
+                      <input
+                        type="checkbox"
+                        checked={editOfiFilter}
+                        onChange={(e) => setEditOfiFilter(e.target.checked)}
+                        className="accent-[#00ff88]"
+                      />
+                      <span className="text-[9px] text-slate-300 uppercase">OFI L2 Filter</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 p-1.5 rounded bg-black/20 border border-white/5 cursor-pointer hover:bg-black/40">
+                      <input
+                        type="checkbox"
+                        checked={editAdaptiveStop}
+                        onChange={(e) => setEditAdaptiveStop(e.target.checked)}
+                        className="accent-[#00ff88]"
+                      />
+                      <span className="text-[9px] text-slate-300 uppercase">Adaptive Stop</span>
+                    </label>
+                  </div>
+
+                  {/* Option 3 Drawdown Hard-locks */}
+                  <div className="border-t border-white/10 pt-3 mt-3 space-y-2">
+                    <span className="text-[10px] text-slate-400 uppercase font-mono block">Option 3: Drawdown Hard-Locks</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[9px] text-slate-500 block uppercase font-mono">Drawdown Limit (%)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0.5"
+                          max="10"
+                          value={editDailyDrawdownLimitPercent}
+                          onChange={(e) => setEditDailyDrawdownLimitPercent(Number(e.target.value))}
+                          className="w-full mt-0.5 bg-black/35 border border-white/10 rounded p-1 text-slate-100 text-xs focus:outline-none focus:border-[#00ff88]/50"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-slate-500 block uppercase font-mono">Drawdown Limit (Cash €)</label>
+                        <input
+                          type="number"
+                          step="100"
+                          min="100"
+                          max="50000"
+                          value={editDailyDrawdownLimitCash}
+                          onChange={(e) => setEditDailyDrawdownLimitCash(Number(e.target.value))}
+                          className="w-full mt-0.5 bg-black/35 border border-white/10 rounded p-1 text-slate-100 text-xs focus:outline-none focus:border-[#00ff88]/50"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
