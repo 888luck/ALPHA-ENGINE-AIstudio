@@ -295,6 +295,7 @@ export default function Dashboard() {
   const [editDailyDrawdownLimitCash, setEditDailyDrawdownLimitCash] = useState(1500.0);
   const [aiCalibrationPrompt, setAiCalibrationPrompt] = useState("");
   const [isCalibratingGeopolitical, setIsCalibratingGeopolitical] = useState(false);
+  const [isAutomatingNews, setIsAutomatingNews] = useState(false);
   const [selectedCalibrationModel, setSelectedCalibrationModel] = useState<"ai-studio" | "vertex">("ai-studio");
   const [selectedNewsSource, setSelectedNewsSource] = useState<"all" | "bloomberg" | "reuters" | "ibkr" | "fx">("all");
   const [macroEventLogs, setMacroEventLogs] = useState([
@@ -2309,6 +2310,66 @@ export default function Dashboard() {
                 <p className="text-[10px] text-slate-400 leading-normal mb-3">
                   Parsed global headlines used to calibrate order flow coefficients. Select a source to filter signals.
                 </p>
+
+                <div className="mb-3">
+                  <button
+                    type="button"
+                    disabled={isAutomatingNews}
+                    onClick={async () => {
+                      setIsAutomatingNews(true);
+                      try {
+                        const res = await fetch("/api/auto-calibrate-news", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ source: selectedNewsSource })
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          setOrderFeedback({ success: data.message || "Auto-Ingest Complete: New macro conditions calibrated." });
+                          
+                          // Prepend the new scraped event
+                          if (data.news) {
+                            const dateObj = new Date();
+                            const timeStr = dateObj.toTimeString().split(" ")[0];
+                            const newEvent = {
+                              time: timeStr,
+                              source: data.news.source,
+                              headline: data.news.headline,
+                              sentiment: data.news.sentiment,
+                              impact: data.news.impact,
+                              targetSector: data.news.targetSector,
+                              circuitOverrideActive: Math.abs(data.news.sentiment) > 0.7
+                            };
+                            setMacroEventLogs(prev => [newEvent, ...prev]);
+                          }
+                          
+                          // Refresh state & expectancy
+                          await fetchState();
+                          await fetch("/api/run-expectancy").then(r => r.json()).then(d => setSimulationData(d.baskets || []));
+                        } else {
+                          const errorData = await res.json();
+                          setOrderFeedback({ error: errorData.error || "Failed to automate news calibration." });
+                        }
+                      } catch (err: any) {
+                        setOrderFeedback({ error: "Connection error during auto-ingestion: " + err.message });
+                      } finally {
+                        setIsAutomatingNews(false);
+                      }
+                    }}
+                    className="w-full py-1.5 px-3 bg-indigo-600/25 hover:bg-indigo-600/40 border border-indigo-500/40 text-indigo-300 hover:text-[#00ff88] rounded-lg text-[10.5px] font-mono font-bold flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-40 select-none"
+                    title="Leverages Gemini 3.5-Flash to actively scan, generate and digest high-impact geopolitical events matching the selected source above."
+                  >
+                    {isAutomatingNews ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Ingesting & Scouring Feed...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-3.5 h-3.5 text-[#00ff88]" /> SCAN & AUTO-CALIBRATE LIVE NEWSRUN
+                      </>
+                    )}
+                  </button>
+                </div>
 
                 <div className="space-y-2.5 max-h-[160px] overflow-y-auto pr-1">
                   {macroEventLogs

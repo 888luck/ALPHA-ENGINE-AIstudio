@@ -144,6 +144,32 @@ export default function GcpCompanion(props: GcpCompanionProps) {
   const [selectedRouterLane, setSelectedRouterLane] = useState<"live" | "paper">("paper");
   const [isSavingOnboarding, setIsSavingOnboarding] = useState(false);
 
+  // New Hybrid Failsafe API Delivery and Onboarding States
+  const [vmConfigured, setVmConfigured] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("alpha_vm_configured") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const [apiEngineType, setApiEngineType] = useState<"portal" | "local-build" | "legacy">(() => {
+    try {
+      return (localStorage.getItem("alpha_api_engine_type") as any) || "local-build";
+    } catch {
+      return "local-build";
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("alpha_api_engine_type", apiEngineType);
+  }, [apiEngineType]);
+
+  useEffect(() => {
+    localStorage.setItem("alpha_vm_configured", vmConfigured ? "true" : "false");
+    window.dispatchEvent(new Event("storage"));
+  }, [vmConfigured]);
+
   // Persist state inputs painlessly for the active session
   useEffect(() => {
     localStorage.setItem("alpha_github_token", githubToken);
@@ -179,13 +205,24 @@ export default function GcpCompanion(props: GcpCompanionProps) {
     { zone: "us-central1 (GCP Iowa)", desc: "Standard remote US datacenter", latency: 78.5, cost: "$1.55/mo", active: false, rating: "⚠️ RISK: High Transaction Slippage" }
   ];
 
-  const setupCommand = cloudProvider === "hetzner"
-    ? `chmod +x deploy_to_hetzner.sh\n./deploy_to_hetzner.sh <YOUR_SERVER_IP>`
-    : cloudProvider === "aws"
-    ? `chmod +x deploy_to_hetzner.sh\n./deploy_to_hetzner.sh <AWS_INSTANCE_IP>`
-    : cloudProvider === "universal"
-    ? `chmod +x deploy_to_hetzner.sh\n./deploy_to_hetzner.sh <LINUX_VPS_IP>`
-    : `chmod +x deploy_to_gcp.sh\n./deploy_to_gcp.sh`;
+  // Dynamically append flags representing direct-from-IBKR failsafe setups
+  const setupCommand = (() => {
+    const flag = apiEngineType === "portal" 
+      ? " --client-portal" 
+      : apiEngineType === "local-build" 
+      ? " --build-official-api" 
+      : "";
+      
+    if (cloudProvider === "hetzner") {
+      return `chmod +x deploy_to_hetzner.sh\n./deploy_to_hetzner.sh <YOUR_SERVER_IP>${flag}`;
+    } else if (cloudProvider === "aws") {
+      return `chmod +x deploy_to_hetzner.sh\n./deploy_to_hetzner.sh <AWS_INSTANCE_IP>${flag}`;
+    } else if (cloudProvider === "universal") {
+      return `chmod +x deploy_to_hetzner.sh\n./deploy_to_hetzner.sh <LINUX_VPS_IP>${flag}`;
+    } else {
+      return `chmod +x deploy_to_gcp.sh\n./deploy_to_gcp.sh${flag}`;
+    }
+  })();
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(setupCommand);
@@ -556,36 +593,153 @@ export default function GcpCompanion(props: GcpCompanionProps) {
         </div>
       </div>
 
-      {/* 🚀 AUTO-SETUP & CORE ONBOARDING WIZARD */}
-      <div id="quickstart-onboarding-wizard" className="mb-6 p-5 rounded-xl border border-[#00ff88]/20 bg-[#0c101b]/95 space-y-4 font-sans">
-        <div className="flex items-center justify-between border-b border-white/10 pb-3 flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded bg-[#00ff88]/15 border border-[#00ff88]/30">
-              <Zap className="w-4 h-4 text-[#00ff88] animate-bounce" />
+      {/* 🖥️ CO-LOCATION ACTIVE SYSTEM BANNER / ONBOARDING CONTROL PLANE */}
+      {vmConfigured ? (
+        <div className="mb-6 p-4 rounded-xl border border-emerald-500/25 bg-emerald-500/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 font-sans animate-fadeIn">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-[#00ff88]">
+              <ShieldCheck className="w-5 h-5 animate-pulse" />
             </div>
             <div>
               <h4 className="text-xs font-bold text-slate-100 uppercase tracking-widest flex items-center gap-2 font-mono">
-                Fast-Track System Onboarding & Automation Hub
-                <span className="text-[8.5px] px-1.5 py-0.5 rounded font-mono bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20 font-extrabold scale-95 uppercase tracking-normal animate-pulse">
-                  Ready
+                Frankfurt Co-Location Engaged • Trading Dashboard Active
+                <span className="text-[8.5px] font-mono px-1.5 py-0.5 rounded font-bold bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20 animate-pulse">
+                  ONLINE
                 </span>
               </h4>
-              <p className="text-[11px] text-slate-400 font-sans font-medium mt-0.5 leading-normal">
-                Easily configure your credentials, save keys globally, synchronization to GitHub, and automate headless VM/TWS broker gateways co-located in Frankfurt.
+              <p className="text-[11px] text-slate-400 mt-0.5 leading-normal">
+                Your co-located <strong className="text-slate-200">{cloudProvider.toUpperCase()}</strong> instance is actively bridging telemetry. 
+                API Interface is locked to: <strong className="text-emerald-400 font-mono text-[10.5px] uppercase">{apiEngineType === "portal" ? "Official REST Web Client Portal" : apiEngineType === "local-build" ? "Direct Official Native Headless Build (Failsafe)" : "Legacy Docker Image Lock"}</strong>.
               </p>
             </div>
           </div>
           <button
             type="button"
-            onClick={() => setWizardOpen(!wizardOpen)}
-            className="px-2.5 py-1 text-[9.5px] uppercase font-mono font-bold tracking-wider rounded border border-white/10 transition cursor-pointer hover:bg-white/5 select-none text-indigo-300"
+            onClick={() => {
+              setVmConfigured(false);
+              setWizardOpen(true);
+            }}
+            className="px-3 py-1.5 text-[9.5px] uppercase font-mono font-bold tracking-wider rounded border border-white/10 hover:border-[#00ff88]/30 text-emerald-300 bg-[#00ff88]/5 hover:bg-[#00ff88]/10 transition cursor-pointer select-none whitespace-nowrap"
           >
-            {wizardOpen ? "Collapse Onboarding [-]" : "Expand Onboarding [+]"}
+            ⚙️ RE-RUN ONBOARDING WIZARD
           </button>
         </div>
+      ) : (
+        /* 🚀 AUTO-SETUP & CORE ONBOARDING WIZARD */
+        <div id="quickstart-onboarding-wizard" className="mb-6 p-5 rounded-xl border border-[#00ff88]/25 bg-[#0c101b]/95 space-y-4 font-sans">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded bg-[#00ff88]/15 border border-[#00ff88]/30">
+                <Zap className="w-4 h-4 text-[#00ff88] animate-bounce" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-100 uppercase tracking-widest flex items-center gap-2 font-mono">
+                  Fast-Track System Onboarding & Automation Hub
+                  <span className="text-[8.5px] px-1.5 py-0.5 rounded font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 font-extrabold uppercase animate-pulse">
+                    SETUP REQUIRED
+                  </span>
+                </h4>
+                <p className="text-[11px] text-slate-400 font-sans font-medium mt-0.5 leading-normal">
+                  Configure your credentials, select a failsafe direct IBKR API engine, save keys, and bootstrap co-located nodes in Frankfurt instantly.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setWizardOpen(!wizardOpen)}
+              className="px-2.5 py-1 text-[9.5px] uppercase font-mono font-bold tracking-wider rounded border border-white/10 transition cursor-pointer hover:bg-white/5 select-none text-indigo-300"
+            >
+              {wizardOpen ? "Collapse Onboarding [-]" : "Expand Onboarding [+]"}
+            </button>
+          </div>
 
-        {wizardOpen && (
-          <div className="space-y-4 animate-fadeIn">
+          {wizardOpen && (
+            <div className="space-y-4 animate-fadeIn animate-duration-300">
+              {/* Dynamic Step Indicator Block */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-black/35 p-3 rounded-lg border border-white/5 text-[10.5px]">
+                {/* Step 1 Selector */}
+                <div className="p-2.5 rounded bg-[#111622]/40 border border-indigo-500/10">
+                  <span className="text-[8.5px] font-mono text-indigo-400 uppercase font-bold tracking-wider block mb-1">Step 1: Proximity Target</span>
+                  <div className="flex items-center gap-1.5 font-bold text-slate-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                    <span className="uppercase">{cloudProvider} Frankfurt</span>
+                  </div>
+                  <span className="text-[9px] text-slate-500 block mt-0.5 font-sans">Change Cloud Provider above at any time.</span>
+                </div>
+
+                {/* Step 2 Failsafe Selector */}
+                <div className="p-2.5 rounded bg-[#111622]/40 border border-[#00ff88]/20">
+                  <span className="text-[8.5px] font-mono text-[#00ff88] uppercase font-bold tracking-wider block mb-1">Step 2: API Delivery Method</span>
+                  <div className="relative">
+                    <select
+                      value={apiEngineType}
+                      onChange={(e: any) => setApiEngineType(e.target.value)}
+                      className="w-full bg-[#0c101b]/95 border border-[#00ff88]/30 rounded px-1.5 py-1 text-slate-200 text-[10px] font-mono focus:outline-none focus:border-[#00ff88] cursor-pointer"
+                    >
+                      <option value="local-build">🛠️ DIRECT LOCAL CUSTOM BUILD</option>
+                      <option value="portal">🌐 REST CLIENT PORTAL GATEWAY</option>
+                      <option value="legacy">📦 LEGACY DOCKER IMAGE LOCK</option>
+                    </select>
+                  </div>
+                  <span className="text-[9px] text-[#00ff88]/70 block mt-0.5 font-sans leading-none">Downloads directly from official IBKR servers.</span>
+                </div>
+
+                {/* Step 3 Credentials */}
+                <div className="p-2.5 rounded bg-[#111622]/40 border border-indigo-500/10">
+                  <span className="text-[8.5px] font-mono text-blue-400 uppercase font-bold tracking-wider block mb-1">Step 3: Access Rules</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-300 font-mono">Lane: {selectedRouterLane.toUpperCase()}</span>
+                    <span className="text-[9px] text-indigo-400">{isKeylessMode ? "🛡️ KEYLESS ACTIVE" : "⚙️ MANUAL KEYS"}</span>
+                  </div>
+                  <span className="text-[9px] text-slate-500 block mt-0.5 font-sans">Secure KMS variables active.</span>
+                </div>
+
+                {/* Step 4 Save and Complete */}
+                <div className="p-2.5 rounded bg-emerald-500/5 border border-emerald-500/10">
+                  <span className="text-[8.5px] font-mono text-[#00ff88] uppercase font-bold tracking-wider block mb-1">Step 4: Launch Node</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVmConfigured(true);
+                      alert("CONGRATULATIONS! Your co-located Frankfurt node setup parameter is set to configured. The Dashboard has been unlocked and optimized strictly for high-frequency trading execution monitoring!");
+                    }}
+                    className="w-full py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-[9px] uppercase rounded transition cursor-pointer select-none border border-emerald-400/20"
+                  >
+                    🚀 FINALIZE & LOCK VM
+                  </button>
+                  <span className="text-[8.5px] text-slate-500 block mt-0.5 font-sans text-center">Toggles dashboard into compact trading view.</span>
+                </div>
+              </div>
+
+              {/* Explanatory banner details on the Failsafe APIs */}
+              <div className="bg-[#111622]/80 border border-white/5 rounded-lg p-3.5 space-y-2.5 font-sans">
+                <span className="text-[10.5px] font-bold text-slate-200 uppercase tracking-wide font-mono block flex items-center gap-1.5">
+                  🛡️ IBKR API Failsafe Delivery Standard (Direct Connection Mode)
+                </span>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Third-party Docker Hub images can be unreliable, lagging behind with deprecated login parameters or protocol version mismatch. To ensure your trading remains robust, we recommend bypassing Docker Hub locks completely:
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 text-[10.5px]">
+                  <div className={`p-3 rounded border transition ${apiEngineType === "local-build" ? "bg-indigo-500/10 border-indigo-500/40 animate-pulse" : "bg-black/30 border-white/5 text-slate-500"}`}>
+                    <strong className="text-slate-200 block font-semibold mb-1">🛠️ Direct Custom Headless Build (Recommended)</strong>
+                    <p className="leading-normal">
+                      Instructs the bootstrap script to curl the official Linux standalone installer (<code className="bg-black/40 text-indigo-300 px-1 rounded text-[10px]">ibgateway-stable-linux-x64.sh</code>) directly from IBKR's official CDN, compiling a pristine Docker gateway on-the-fly natively on your VM.
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded border transition ${apiEngineType === "portal" ? "bg-indigo-500/10 border-indigo-500/40 animate-pulse" : "bg-black/30 border-white/5 text-slate-500"}`}>
+                    <strong className="text-slate-200 block font-semibold mb-1">🌐 REST Client Portal Gateway</strong>
+                    <p className="leading-normal">
+                      Stops utilizing the old socket-based TWS interface entirely. It downloads the lightweight, headless Java Client Portal Gateway zip directly from Interactive Brokers, exposing official local REST/WebSocket endpoints.
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded border transition ${apiEngineType === "legacy" ? "bg-indigo-500/10 border-indigo-500/40" : "bg-black/30 border-white/5 text-slate-500"}`}>
+                    <strong className="text-slate-200 block font-semibold mb-1">📦 Legacy Headless Gateway</strong>
+                    <p className="leading-normal">
+                      Stands as a backup option utilizing the pre-built community image. Locked to a verified container release tag, suitable for sandboxed testing.
+                    </p>
+                  </div>
+                </div>
+              </div>
             {/* Split controls into logical categories */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
               {/* Box 1: GitHub Secure Transport config */}
@@ -970,6 +1124,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
           </div>
         )}
       </div>
+    )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-mono text-xs">
         {/* Left Column: Financial & Physical Statistics */}
