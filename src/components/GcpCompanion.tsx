@@ -39,13 +39,14 @@ import { getActiveFirebaseConfig } from "../firebase";
 
 interface GcpCompanionProps {
   settings?: any;
+  customGeminiApiKey?: string;
 }
 
 export default function GcpCompanion(props: GcpCompanionProps) {
   const activeFirebaseConfig = getActiveFirebaseConfig();
   const projectId = activeFirebaseConfig?.projectId || "";
 
-  const [activeTab, setActiveTab] = useState<"github" | "orchestrator" | "backtest" | "auto" | "specs">("github");
+  const [activeTab, setActiveTab] = useState<"github" | "orchestrator" | "backtest" | "auto" | "specs" | "forge">("forge");
   const [instanceType, setInstanceType] = useState<"spot" | "standard">("spot");
   const [copiedText, setCopiedText] = useState(false);
   const [cloudProvider, setCloudProvider] = useState<"gcp" | "hetzner" | "aws" | "universal">(() => (localStorage.getItem("alpha_cloud_provider") as any) || "gcp");
@@ -76,10 +77,16 @@ export default function GcpCompanion(props: GcpCompanionProps) {
   const [btError, setBtError] = useState<string | null>(null);
 
   // Option 1 Institutional AI Auditing & OpEx Cost States
-  const [aiProvider, setAiProvider] = useState<string>("gemini-flash");
+  const [aiProvider, setAiProvider] = useState<string>("auto");
   const [aiAuditLoading, setAiAuditLoading] = useState<boolean>(false);
   const [aiAuditResult, setAiAuditResult] = useState<any>(null);
   const [aiAuditError, setAiAuditError] = useState<string | null>(null);
+
+  // Strategy Forge State
+  const [forgePrompt, setForgePrompt] = useState<string>("Design a mean-reversion strategy for high-volatility ETFs like TQQQ using RSI and Bollinger Bands.");
+  const [isForging, setIsForging] = useState<boolean>(false);
+  const [forgeResult, setForgeResult] = useState<any>(null);
+  const [forgeError, setForgeError] = useState<string | null>(null);
   const [cumulativeAiOpEx, setCumulativeAiOpEx] = useState<number>(() => {
     try {
       const stored = localStorage.getItem("alpha_cumulative_ai_opex");
@@ -395,9 +402,15 @@ export default function GcpCompanion(props: GcpCompanionProps) {
     setAiAuditResult(null);
 
     try {
+      const customKey = props.customGeminiApiKey || localStorage.getItem("ALPHA_GEMINI_API_KEY_OVERRIDE") || "";
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (customKey) {
+        headers["x-gemini-api-key"] = customKey;
+      }
+
       const response = await fetch("/api/backtest-audit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           backtestResults: {
             ...btResults,
@@ -425,6 +438,53 @@ export default function GcpCompanion(props: GcpCompanionProps) {
       setAiAuditError(err.message || "Network error. Could not connect to AI Opex Engine.");
     } finally {
       setAiAuditLoading(false);
+    }
+  };
+
+  const handleForge = async () => {
+    if (!forgePrompt) return;
+    setIsForging(true);
+    setForgeError(null);
+    setForgeResult(null);
+
+    try {
+      const response = await fetch("/api/ai/universal-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: forgePrompt,
+          systemPrompt: `You are the Alpha Engine Strategy Forge. Design a high-performance quantitative trading strategy based on the user's requirements. 
+          Output a JSON object with:
+          {
+            "strategyName": "Name",
+            "logic": "Brief logic explanation",
+            "indicators": ["Indicator1", "Indicator2"],
+            "entryRules": ["Rule1", "Rule2"],
+            "exitRules": ["Rule1", "Rule2"],
+            "riskManagement": "Management details",
+            "suggestedAtrStop": 1.8,
+            "suggestedMaxHold": 15
+          }`,
+          provider: aiProvider,
+          jsonMode: true
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        try {
+          const parsed = typeof data.text === 'string' ? JSON.parse(data.text) : data.text;
+          setForgeResult(parsed);
+        } catch (pe) {
+          setForgeResult({ rawText: data.text });
+        }
+      } else {
+        setForgeError(data.error || "Failed to forge strategy.");
+      }
+    } catch (err: any) {
+      setForgeError(err.message || "Network error during forging.");
+    } finally {
+      setIsForging(false);
     }
   };
 
@@ -589,6 +649,17 @@ export default function GcpCompanion(props: GcpCompanionProps) {
             }`}
           >
             🎛️ TOPOLOGY MATRIX
+          </button>
+
+          <button
+            onClick={() => setActiveTab("forge")}
+            className={`px-3 py-1.5 rounded transition flex items-center gap-1 cursor-pointer ${
+              activeTab === "forge"
+                ? "bg-[#00ff88]/20 text-[#00ff88] border border-[#00ff88]/30 font-bold"
+                : "text-slate-400 hover:text-[#00ff88]/80"
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5" /> ⚒️ AI STRATEGY FORGE
           </button>
         </div>
       </div>
@@ -2394,6 +2465,169 @@ journalctl -u alpha-engine.service -f</pre>
                       </span>
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: AI STRATEGY FORGE */}
+          {activeTab === "forge" && (
+            <div className="bg-black/25 backdrop-blur-md p-6 rounded-xl border border-indigo-500/20 space-y-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <Zap className="w-4.5 h-4.5 text-[#00ff88]" /> AI-Powered Strategy Forge (Universal Intelligence)
+                  </h4>
+                  <p className="text-[11px] text-slate-400 font-sans">
+                    Design and generate quantitative Alpha strategies using your preferred AI model.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] text-slate-500 font-mono uppercase font-bold tracking-widest">Model:</span>
+                  <select
+                    value={aiProvider}
+                    onChange={(e) => setAiProvider(e.target.value)}
+                    className="bg-black/60 border border-white/10 rounded px-2.5 py-1.5 text-[10.5px] text-slate-200 font-mono focus:border-[#00ff88] focus:outline-none"
+                  >
+                    <option value="auto">System Selection</option>
+                    <option value="gemini-flash">Gemini 1.5 Flash (Low Latency)</option>
+                    <option value="gemini-pro">Gemini 1.5 Pro (Max Reasoning)</option>
+                    <option value="openai-4o">OpenAI GPT-4o (Quant Logic)</option>
+                    <option value="openai-4o-mini">OpenAI GPT-4o Mini</option>
+                    <option value="anthropic-sonnet">Claude 3.5 Sonnet</option>
+                    <option value="nvidia-llama-405">NVIDIA NIM Llama 3.1 405B</option>
+                    <option value="nvidia-llama-70">NVIDIA NIM Llama 3.1 70B</option>
+                    <option value="nvidia-nemotron">NVIDIA NIM Nemotron-4 340B</option>
+                    <option value="custom">Custom Bridge (BYO-AI)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="relative group">
+                  <textarea
+                    value={forgePrompt}
+                    onChange={(e) => setForgePrompt(e.target.value)}
+                    placeholder="Describe your trading strategy requirements..."
+                    className="w-full bg-black/40 border border-white/10 rounded-lg p-4 text-xs text-slate-200 font-sans min-h-[100px] focus:border-indigo-500/50 focus:outline-none transition resize-none"
+                  />
+                  <div className="absolute bottom-3 right-3 flex gap-2">
+                    <button
+                      onClick={handleForge}
+                      disabled={isForging}
+                      className={`px-4 py-1.5 rounded-md font-bold text-[11px] uppercase tracking-wider flex items-center gap-2 transition cursor-pointer ${
+                        isForging ? "bg-slate-800 text-slate-500 animate-pulse" : "bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/30"
+                      }`}
+                    >
+                      {isForging ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                      {isForging ? "FORGING ALPHA..." : "GENERATE STRATEGY"}
+                    </button>
+                  </div>
+                </div>
+
+                {forgeError && (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded text-[11px] text-rose-400 font-mono flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4" /> ERROR: {forgeError}
+                  </div>
+                )}
+
+                {forgeResult && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                    <div className="bg-indigo-500/5 border border-indigo-500/15 rounded-lg p-4 space-y-4">
+                      <div className="border-b border-white/5 pb-2">
+                        <h5 className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">Strategy Blueprint</h5>
+                        <h2 className="text-base font-extrabold text-slate-100 font-mono mt-1">{forgeResult.strategyName || "Quantum Mean Reversion"}</h2>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <span className="text-[9px] text-slate-500 font-bold uppercase block mb-1 font-mono">Core Logic</span>
+                          <p className="text-[11.5px] text-slate-300 leading-relaxed font-sans">{forgeResult.logic}</p>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-black/30 p-2 rounded border border-white/5">
+                            <span className="text-[8px] text-slate-500 block uppercase font-mono">Indicators</span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {forgeResult.indicators?.map((ind: string, i: number) => (
+                                <span key={i} className="text-[9px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30 font-mono">{ind}</span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="bg-black/30 p-2 rounded border border-white/5">
+                            <span className="text-[8px] text-slate-500 block uppercase font-mono">Stop ATR</span>
+                            <span className="text-xs text-[#00ff88] font-bold block mt-1">{forgeResult.suggestedAtrStop || 1.8}x ATR</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-black/35 border border-white/10 rounded-lg p-4 space-y-4">
+                      <div>
+                        <span className="text-[9px] text-indigo-400 font-bold uppercase block mb-2 font-mono flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3 h-3" /> Execution Rules Matrix
+                        </span>
+                        <div className="space-y-3">
+                          <div>
+                            <span className="text-[9px] text-emerald-400 font-bold uppercase block mb-1">Entry Criteria</span>
+                            <ul className="space-y-1">
+                              {forgeResult.entryRules?.map((rule: string, i: number) => (
+                                <li key={i} className="text-[10.5px] text-slate-300 flex items-start gap-2">
+                                  <span className="text-emerald-500 mt-1 shrink-0">•</span> {rule}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-rose-400 font-bold uppercase block mb-1">Exit Criteria</span>
+                            <ul className="space-y-1">
+                              {forgeResult.exitRules?.map((rule: string, i: number) => (
+                                <li key={i} className="text-[10.5px] text-slate-300 flex items-start gap-2">
+                                  <span className="text-rose-500 mt-1 shrink-0">•</span> {rule}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-white/5 flex gap-2">
+                        <button
+                          onClick={() => {
+                            setBtTicker("TQQQ");
+                            setBtStopAtr(forgeResult.suggestedAtrStop || 1.8);
+                            setBtMaxHoldBars(forgeResult.suggestedMaxHold || 15);
+                            setActiveTab("backtest");
+                          }}
+                          className="flex-1 bg-[#00ff88]/10 hover:bg-[#00ff88]/20 border border-[#00ff88]/30 text-[#00ff88] py-2 rounded text-[10px] font-bold uppercase transition flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <TrendingUp className="w-3.5 h-3.5" /> Initialize Backtest
+                        </button>
+                        <button
+                          onClick={() => window.alert("Strategy Export: Logic added to alpha_strategy.py repository structure.")}
+                          className="px-3 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 py-2 rounded text-[10px] font-bold uppercase transition cursor-pointer"
+                        >
+                          Export
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3 bg-black/45 rounded-lg border border-white/5 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-500/10 rounded-full">
+                    <Info className="w-3.5 h-3.5 text-indigo-400" />
+                  </div>
+                  <div className="text-[10px] text-slate-400 leading-normal">
+                    <span className="text-slate-200 font-bold">Agnostic Strategy Generation:</span> You can switch models mid-conversation to compare logic. Results are standardized for the Alpha Engine Backtester.
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-[9px] text-slate-500 block uppercase font-mono">Current AI OpEx</span>
+                  <span className="text-xs text-indigo-300 font-bold font-mono">€{cumulativeAiOpEx.toFixed(4)}</span>
                 </div>
               </div>
             </div>

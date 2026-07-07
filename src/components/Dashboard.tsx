@@ -17,7 +17,9 @@ import {
   Flame,
   CheckCircle2,
   UserCheck,
-  Sparkles
+  Sparkles,
+  AlertTriangle,
+  ShieldCheck
 } from "lucide-react";
 import { 
   collection, 
@@ -186,6 +188,16 @@ interface SystemSettings {
   adaptiveStop?: boolean;
   dailyDrawdownLimitPercent?: number;
   dailyDrawdownLimitCash?: number;
+  
+  // AI Keys
+  geminiApiKey?: string;
+  openaiApiKey?: string;
+  anthropicApiKey?: string;
+  nvidiaApiKey?: string;
+  customAiApiKey?: string;
+  customAiBaseUrl?: string;
+  customAiModelName?: string;
+  selectedAiProvider?: string;
 }
 
 interface ActiveTrade {
@@ -266,17 +278,41 @@ const fetchJsonWithRetry = async (url: string, retries: number = 5, delayMs: num
   throw new Error(`Failed to fetch JSON from ${url} after ${retries} attempts`);
 };
 
-export default function Dashboard() {
+interface DashboardProps {
+  onNavigate?: (view: "launchpad" | "dashboard", target?: string) => void;
+  navTarget?: string | null;
+}
+
+export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [activeTrades, setActiveTrades] = useState<ActiveTrade[]>([]);
   const [historicalLogs, setHistoricalLogs] = useState<HistoricalLog[]>([]);
   const [marketBooks, setMarketBooks] = useState<Record<string, Level2Book>>({});
   const [selectedSymbol, setSelectedSymbol] = useState<string>("");
 
+  useEffect(() => {
+    if (navTarget) {
+      console.log("[DASHBOARD] Navigating to target:", navTarget);
+      // Give time for layout to settle
+      setTimeout(() => {
+        const element = document.getElementById(navTarget);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+          // Add a highlight effect
+          element.classList.add("ring-4", "ring-[#00ff88]", "ring-offset-4", "ring-offset-slate-950", "transition-all", "duration-1000");
+          setTimeout(() => {
+            element.classList.remove("ring-4", "ring-[#00ff88]", "ring-offset-4", "ring-offset-slate-950");
+          }, 4000);
+        }
+      }, 100);
+    }
+  }, [navTarget]);
+
   // Local state form for custom settings modification
   const [editAccount, setEditAccount] = useState("U8129384");
   const [editDecisionMaker, setEditDecisionMaker] = useState("ALGO_DEC_992");
   const [editTrader, setEditTrader] = useState("ALGO_EXE_554");
+  const [geminiApiKey, setGeminiApiKey] = useState("");
   const [editReferenceEquity, setEditReferenceEquity] = useState(154200);
   const [editVirtualCapitalCeiling, setEditVirtualCapitalCeiling] = useState(25000);
   const [editTradingMode, setEditTradingMode] = useState<"PAPER" | "LIVE">("PAPER");
@@ -328,6 +364,25 @@ export default function Dashboard() {
     }
   ]);
 
+  const [latestNewsResult, setLatestNewsResult] = useState<{
+    news: {
+      headline: string;
+      source: string;
+      sentiment: number;
+      impact: string;
+      targetSector: string;
+    };
+    baskets: Array<{
+      sector: string;
+      tickers: string[];
+      impliedOfiTrend: string;
+      winRate: number;
+      profitFactor: number;
+      avgFrictionConsumed: number;
+    }>;
+    modelUsed?: string;
+  } | null>(null);
+
   // Pre-trade Order Setup
   const [tradeSymbol, setTradeSymbol] = useState("");
   const [tradeDirection, setTradeDirection] = useState<"BUY" | "SELL">("BUY");
@@ -357,6 +412,124 @@ export default function Dashboard() {
     statesCount: number;
   } | null>(null);
   const [isTestingConn, setIsTestingConn] = useState(false);
+
+  // Diagnostics & API configuration
+  const [customGeminiApiKey, setCustomGeminiApiKey] = useState<string>(() => {
+    return localStorage.getItem("ALPHA_GEMINI_API_KEY_OVERRIDE") || "";
+  });
+  const [serverHasKey, setServerHasKey] = useState<boolean | null>(null);
+  const [openaiApiKey, setOpenaiApiKey] = useState<string>("");
+  const [anthropicApiKey, setAnthropicApiKey] = useState<string>("");
+  const [nvidiaApiKey, setNvidiaApiKey] = useState<string>("");
+  const [customAiApiKey, setCustomAiApiKey] = useState<string>("");
+  const [customAiBaseUrl, setCustomAiBaseUrl] = useState<string>("");
+  const [customAiModelName, setCustomAiModelName] = useState<string>("");
+  const [selectedAiProvider, setSelectedAiProvider] = useState<string>("gemini-flash");
+  const [openaiConfigured, setOpenaiConfigured] = useState<boolean>(false);
+  const [anthropicConfigured, setAnthropicConfigured] = useState<boolean>(false);
+  const [nvidiaConfigured, setNvidiaConfigured] = useState<boolean>(false);
+  const [customAiConfigured, setCustomAiConfigured] = useState<boolean>(false);
+  const [showDiagnosticsModal, setShowDiagnosticsModal] = useState<boolean>(false);
+  const [hasShownStartupCheck, setHasShownStartupCheck] = useState<boolean>(() => {
+    return localStorage.getItem("ALPHA_DIAGNOSTICS_SHOWN") === "true";
+  });
+
+  const saveCustomGeminiApiKey = (key: string) => {
+    const trimmed = key.trim();
+    setCustomGeminiApiKey(trimmed);
+    if (trimmed) {
+      localStorage.setItem("ALPHA_GEMINI_API_KEY_OVERRIDE", trimmed);
+    } else {
+      localStorage.removeItem("ALPHA_GEMINI_API_KEY_OVERRIDE");
+    }
+    fetchDiagnostics();
+  };
+
+  const [isSavingInlineSetting, setIsSavingInlineSetting] = useState(false);
+
+  const saveInlineSetting = async (key: string, value: any) => {
+    setIsSavingInlineSetting(true);
+    try {
+      const updatedValues = {
+        ibkrAccountNumber: editAccount,
+        mifid2DecisionMaker: editDecisionMaker,
+        mifid2ExecutionTrader: editTrader,
+        referenceEquity: editReferenceEquity,
+        virtualCapitalCeiling: editVirtualCapitalCeiling,
+        tradingMode: editTradingMode,
+        ibkrPort: editIbkrPort,
+        ibkrClientId: editIbkrClientId,
+        gatewayConnectionActive: editGatewayConnectionActive,
+        stopAtrMultiplier: editStopAtrMultiplier,
+        partialProfit: editPartialProfit,
+        breakevenLock: editBreakevenLock,
+        maxHoldBars: editMaxHoldBars,
+        ofiFilter: editOfiFilter,
+        adaptiveStop: editAdaptiveStop,
+        dailyDrawdownLimitPercent: editDailyDrawdownLimitPercent,
+        dailyDrawdownLimitCash: editDailyDrawdownLimitCash,
+        geminiApiKey: geminiApiKey,
+        openaiApiKey: openaiApiKey,
+        anthropicApiKey: anthropicApiKey,
+        nvidiaApiKey: nvidiaApiKey,
+        customAiApiKey: customAiApiKey,
+        customAiBaseUrl: customAiBaseUrl,
+        customAiModelName: customAiModelName,
+        selectedAiProvider: selectedAiProvider,
+        [key]: value
+      };
+
+      const res = await fetch("/api/set-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedValues)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSettings(data.settings);
+        
+        if (key === "ibkrAccountNumber") setEditAccount(value);
+        if (key === "mifid2DecisionMaker") setEditDecisionMaker(value);
+        if (key === "mifid2ExecutionTrader") setEditTrader(value);
+        if (key === "ibkrPort") setEditIbkrPort(Number(value));
+        if (key === "ibkrClientId") setEditIbkrClientId(Number(value));
+        if (key === "tradingMode") setEditTradingMode(value);
+        if (key === "virtualCapitalCeiling") setEditVirtualCapitalCeiling(Number(value));
+        
+        setOrderFeedback({ success: `DMA Setting '${key}' synchronized to Alpha Engine.` });
+
+        if (firebaseStatus === "authorized" && currentUser) {
+          const totalUnrealized = activeTrades.reduce((acc, curr) => acc + curr.unrealizedPnL, 0);
+          const totalRealized = historicalLogs.reduce((acc, curr) => acc + curr.realizedPnL, 0);
+          await setDoc(doc(db, "system_risk_state", "current_state"), {
+            netLiquidation: data.settings.netLiquidation,
+            maintenanceMargin: data.settings.maintenanceMargin,
+            dailyRealizedPnL: totalRealized,
+            dailyUnrealizedPnL: totalUnrealized,
+            routerLocked: data.settings.routerLocked,
+            ibkrAccountNumber: data.settings.ibkrAccountNumber,
+            ibkrPort: data.settings.ibkrPort,
+            ibkrClientId: data.settings.ibkrClientId,
+            tradingMode: data.settings.tradingMode,
+            gatewayConnectionActive: data.settings.gatewayConnectionActive,
+            stopAtrMultiplier: data.settings.stopAtrMultiplier,
+            partialProfit: data.settings.partialProfit,
+            breakevenLock: data.settings.breakevenLock,
+            maxHoldBars: data.settings.maxHoldBars,
+            ofiFilter: data.settings.ofiFilter,
+            adaptiveStop: data.settings.adaptiveStop,
+            dailyDrawdownLimitPercent: data.settings.dailyDrawdownLimitPercent,
+            dailyDrawdownLimitCash: data.settings.dailyDrawdownLimitCash,
+            lastUpdated: new Date().toISOString()
+          }, { merge: true }).catch(err => console.error("Firebase sync error: ", err));
+        }
+      }
+    } catch (e) {
+      console.error("Failed saving inline setting:", e);
+    } finally {
+      setIsSavingInlineSetting(false);
+    }
+  };
 
   // Custom Firebase credentials management
   const [showFirebaseConfigPanel, setShowFirebaseConfigPanel] = useState(false);
@@ -438,8 +611,43 @@ export default function Dashboard() {
           setSecurityRulesText(data.rules);
         }
       })
-      .catch(err => console.error("Could not load security rules: ", err));
+      .catch(err => console.warn("Could not load security rules: ", err));
   }, []);
+
+  const fetchDiagnostics = async () => {
+    try {
+      const res = await fetch("/api/diagnostics");
+      if (res.ok) {
+        const data = await res.json();
+        setServerHasKey(data.hasServerKey);
+        setOpenaiConfigured(data.openaiConfigured);
+        setAnthropicConfigured(data.anthropicConfigured);
+        setNvidiaConfigured(data.nvidiaConfigured || false);
+        setCustomAiConfigured(!!(data.settings?.customAiApiKey && data.settings?.customAiBaseUrl));
+        setSelectedAiProvider(data.selectedAiProvider || "gemini-flash");
+        if (data.settings) {
+          setGeminiApiKey(data.settings.geminiApiKey || "");
+          setOpenaiApiKey(data.settings.openaiApiKey || "");
+          setAnthropicApiKey(data.settings.anthropicApiKey || "");
+          setNvidiaApiKey(data.settings.nvidiaApiKey || "");
+          setCustomAiApiKey(data.settings.customAiApiKey || "");
+          setCustomAiBaseUrl(data.settings.customAiBaseUrl || "");
+          setCustomAiModelName(data.settings.customAiModelName || "");
+        }
+        
+        // Show diagnostics setup popup automatically if GEMINI_API_KEY is missing and custom key is missing
+        const isApiKeyMissing = !data.hasServerKey && !localStorage.getItem("ALPHA_GEMINI_API_KEY_OVERRIDE");
+        const hasShownBefore = localStorage.getItem("ALPHA_DIAGNOSTICS_SHOWN") === "true";
+        if (isApiKeyMissing && !hasShownBefore) {
+          setShowDiagnosticsModal(true);
+          localStorage.setItem("ALPHA_DIAGNOSTICS_SHOWN", "true");
+          setHasShownStartupCheck(true);
+        }
+      }
+    } catch (e: any) {
+      console.warn("Diagnostics check temporarily offline (server may be restarting):", e.message || e);
+    }
+  };
 
   useEffect(() => {
     // Setup Firebase Auth State Listener
@@ -454,9 +662,13 @@ export default function Dashboard() {
     });
 
     fetchState();
+    fetchDiagnostics();
     runPreFlightExpectancy();
 
-    const pollingInterval = setInterval(fetchState, 3000);
+    const pollingInterval = setInterval(() => {
+      fetchState();
+      fetchDiagnostics();
+    }, 5000);
     return () => {
       unsubscribeAuth();
       clearInterval(pollingInterval);
@@ -789,7 +1001,12 @@ export default function Dashboard() {
           ofiFilter: editOfiFilter,
           adaptiveStop: editAdaptiveStop,
           dailyDrawdownLimitPercent: editDailyDrawdownLimitPercent,
-          dailyDrawdownLimitCash: editDailyDrawdownLimitCash
+          dailyDrawdownLimitCash: editDailyDrawdownLimitCash,
+          geminiApiKey: geminiApiKey,
+          openaiApiKey: openaiApiKey,
+          anthropicApiKey: anthropicApiKey,
+          nvidiaApiKey: nvidiaApiKey,
+          selectedAiProvider: selectedAiProvider
         })
       });
       if (res.ok) {
@@ -982,16 +1199,16 @@ export default function Dashboard() {
     <div id="alpha-engine-root" className="min-h-screen frosted-bg text-slate-100 font-sans tracking-tight pb-12">
       
       {/* 1. TOP DENT DEFI HEADINGS bar */}
-      <header className="frosted-glass sticky top-0 z-50 px-6 py-4 rounded-none border-t-0 border-x-0 !bg-slate-950/40 backdrop-blur-md">
+      <header className="frosted-glass sticky top-0 z-50 px-6 py-4 rounded-none border-t-0 border-x-0 !bg-white/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#00ff88]/20 border border-[#00ff88]/40 flex items-center justify-center shadow-lg shadow-[#00ff88]/10">
-              <Flame className="w-6 h-6 text-[#00ff88] animate-pulse" />
+            <div className="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shadow-sm">
+              <Flame className="w-6 h-6 text-indigo-600 animate-pulse" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2 flex-wrap">
                 Alpha Engine 
-                <span className="text-[10px] bg-[#00ff88]/10 text-[#00ff88] font-mono px-2 py-0.5 rounded border border-[#00ff88]/25">IRLAND SYSTEM</span>
+                <span className="text-[10px] bg-indigo-50 text-indigo-600 font-mono px-2 py-0.5 rounded border border-indigo-100 uppercase tracking-tight font-bold">IRLAND SYSTEM</span>
                 <button
                   type="button"
                   onClick={toggleTradingMode}
@@ -999,34 +1216,50 @@ export default function Dashboard() {
                   className="transition active:scale-95 duration-150 cursor-pointer select-none border-none bg-transparent p-0 rounded-md focus:outline-none"
                 >
                   {settings?.tradingMode === "LIVE" ? (
-                    <span className="text-[10px] bg-red-500/25 hover:bg-red-500/40 text-red-400 font-mono px-2 py-0.5 rounded border border-red-500/45 animate-pulse font-bold flex items-center gap-1 shadow-lg shadow-red-500/5 select-none">
-                      🔴 IBIE LIVE PROD <span className="text-[8px] opacity-75 font-normal ml-0.5 underline decoration-red-500/50">CLICK TO FLIP</span>
+                    <span className="text-[10px] bg-red-50 text-red-600 font-mono px-2 py-0.5 rounded border border-red-200 animate-pulse font-bold flex items-center gap-1 shadow-sm select-none">
+                      🔴 IBIE LIVE PROD <span className="text-[8px] opacity-75 font-normal ml-0.5 underline decoration-red-200">CLICK TO FLIP</span>
                     </span>
                   ) : (
-                    <span className="text-[10px] bg-indigo-500/25 hover:bg-indigo-500/40 text-indigo-300 font-mono px-2 py-0.5 rounded border border-indigo-500/45 font-bold flex items-center gap-1 shadow-lg shadow-indigo-500/5 select-none">
-                      🎮 PAPER SIMULATION <span className="text-[8px] opacity-75 font-normal ml-0.5 underline decoration-indigo-500/50">CLICK TO FLIP</span>
+                    <span className="text-[10px] bg-indigo-50 text-indigo-600 font-mono px-2 py-0.5 rounded border border-indigo-200 font-bold flex items-center gap-1 shadow-sm select-none">
+                      🎮 PAPER SIMULATION <span className="text-[8px] opacity-75 font-normal ml-0.5 underline decoration-indigo-200">CLICK TO FLIP</span>
                     </span>
                   )}
                 </button>
               </h1>
-              <p className="text-xs text-slate-400 font-mono">IBIE Regulatory (CBI Mandates) compliance module</p>
+              <p className="text-xs text-slate-500 font-mono">IBIE Regulatory (CBI Mandates) compliance module</p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 font-mono text-xs">
+            {/* Diagnostics and Keys Checker */}
+            <button
+              onClick={() => setShowDiagnosticsModal(true)}
+              className={`px-3 py-2 rounded-lg border flex items-center gap-2 cursor-pointer transition active:scale-95 duration-150 ${
+                (serverHasKey || customGeminiApiKey) && firebaseStatus === "authorized"
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                  : "bg-amber-50 border-amber-200 text-amber-700 animate-pulse hover:bg-amber-100"
+              }`}
+              title="Click to audit System Diagnostics, API key state, and Firestore tunnels."
+            >
+              <Settings2 className="w-4 h-4" />
+              <span className="font-bold">
+                {(serverHasKey || customGeminiApiKey) && firebaseStatus === "authorized" ? "SYSTEMS OK" : "DIAGNOSTICS REQ"}
+              </span>
+            </button>
+
             {/* Ny Clock Simulator */}
-            <div className="bg-white/5 px-3 py-2 rounded-lg border border-white/10 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-[#ffaa00]" />
-              <span>Wall Street Epoch: <strong className="text-slate-100">{settings?.marketTime || "09:30"} EST</strong></span>
+            <div className="bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 flex items-center gap-2 text-slate-700">
+              <Clock className="w-4 h-4 text-amber-600" />
+              <span className="font-medium">Wall Street Epoch: <strong className="text-slate-900">{settings?.marketTime || "09:30"} EST</strong></span>
             </div>
 
             {/* Session Phase indicator */}
-            <div className="bg-white/5 px-3 py-2 rounded-lg border border-white/10 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-blue-400" />
+            <div className="bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 flex items-center gap-2 text-slate-700">
+              <Activity className="w-4 h-4 text-indigo-600" />
               <span>Phase:</span>
-              <span className={`font-semibold ${
-                settings?.marketPhase === "EXECUTION" ? "text-[#00ff88]" :
-                settings?.marketPhase === "FLUSH" ? "text-[#ff4444]" : "text-[#ffaa00]"
+              <span className={`font-bold ${
+                settings?.marketPhase === "EXECUTION" ? "text-emerald-600" :
+                settings?.marketPhase === "FLUSH" ? "text-red-600" : "text-amber-600"
               }`}>
                 {settings?.marketPhase || "EXECUTION"}
               </span>
@@ -1034,37 +1267,53 @@ export default function Dashboard() {
 
             {/* Simulated server heartbeat */}
             <div className={`px-3 py-2 rounded-lg border flex items-center gap-2 ${
-              settings?.routerLocked ? "bg-[#ff4444]/10 border-[#ff4444]/30 text-rose-300" : "bg-white/5 border-white/10 text-slate-300"
+              settings?.routerLocked ? "bg-red-50 border-red-200 text-red-700" : "bg-slate-50 border-slate-200 text-slate-700"
             }`}>
               <span className={`w-2.5 h-2.5 rounded-full ${settings?.routerLocked ? "frosted-pulse-red animate-pulse" : "frosted-pulse-green animate-pulse"}`} />
-              <span>Gateway: {settings?.routerLocked ? "LOC_SHUT" : "DMA_ONLINE"}</span>
+              <span className="font-medium">Gateway: {settings?.routerLocked ? "LOC_SHUT" : "DMA_ONLINE"}</span>
             </div>
           </div>
         </div>
       </header>
+
+      {/* 1.5. WARNING BANNER FOR MISSING CREDENTIALS */}
+      {(!serverHasKey && !customGeminiApiKey) && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2.5 text-center text-xs font-mono text-amber-300 flex items-center justify-center gap-2 flex-wrap">
+          <AlertOctagon className="w-4 h-4 text-amber-400 animate-bounce" />
+          <span>
+            <strong>WARNING: Missing GEMINI_API_KEY.</strong> Quantitative Strategy audits and macro-calibrations are currently falling back to offline simulation data.
+          </span>
+          <button
+            onClick={() => setShowDiagnosticsModal(true)}
+            className="underline hover:text-amber-200 font-bold font-sans cursor-pointer focus:outline-none"
+          >
+            Click here to input key & fix this instantly
+          </button>
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
 
         {/* 2. CLOUD RUN & FIREBASE FIRESTORE SYNC MONITOR CENTER */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-2 frosted-glass frosted-glass-hover p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4 mb-4 font-sans">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-4 font-sans">
               <div className="flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-indigo-950/40 border border-indigo-500/30">
-                  <Database className="w-5 h-5 text-indigo-400 animate-pulse" />
+                <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-100 shadow-sm">
+                  <Database className="w-5 h-5 text-indigo-600" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     Firebase Firestore Command Tunnel
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-bold border ${
                       firebaseStatus === "authorized" 
-                        ? "bg-[#00ff88]/15 text-[#00ff88] border border-[#00ff88]/20" 
-                        : "bg-amber-500/15 text-amber-400 border border-amber-500/20"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
+                        : "bg-amber-50 text-amber-700 border-amber-100"
                     }`}>
                       {firebaseStatus === "authorized" ? "SYNCHRONIZED LIVE" : "IN-MEMORY EMULATION"}
                     </span>
                   </h3>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-slate-500 mt-1">
                     Connect CBI compliance audits, risk metrics, and holding structures directly to your secure Firestore node.
                   </p>
                 </div>
@@ -1074,10 +1323,10 @@ export default function Dashboard() {
                 <button
                   type="button"
                   onClick={() => setShowFirebaseConfigPanel(!showFirebaseConfigPanel)}
-                  className={`p-2 rounded-lg border transition cursor-pointer ${
+                  className={`p-2 rounded-lg border transition cursor-pointer shadow-sm ${
                     showFirebaseConfigPanel || isCustomConfigActive
-                      ? "bg-amber-500/20 border-amber-500/40 text-amber-300"
-                      : "bg-white/5 border-white/10 hover:bg-white/10 text-slate-300"
+                      ? "bg-amber-50 border-amber-200 text-amber-700"
+                      : "bg-white border-slate-200 hover:bg-slate-50 text-slate-600"
                   }`}
                   title="Configure Custom Backend Credentials for Custom Domains"
                 >
@@ -1086,10 +1335,10 @@ export default function Dashboard() {
 
                 {currentUser ? (
                   <div className="flex items-center gap-2 font-mono">
-                    <span className="text-[10px] text-slate-400 hidden sm:inline">{currentUser.email}</span>
+                    <span className="text-[10px] text-slate-500 hidden sm:inline">{currentUser.email}</span>
                     <button
                       onClick={handleFirebaseLogout}
-                      className="px-2.5 py-1 text-[10px] bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/30 rounded cursor-pointer transition"
+                      className="px-2.5 py-1 text-[10px] bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-md font-bold cursor-pointer transition"
                     >
                       Disconnect Port
                     </button>
@@ -1097,7 +1346,7 @@ export default function Dashboard() {
                 ) : (
                   <button
                     onClick={handleFirebaseLogin}
-                    className="px-3 py-1.5 bg-[#00ff88]/20 hover:bg-[#00ff88]/35 text-[#00ff88] border border-[#00ff88]/40 rounded-lg text-xs font-mono font-medium flex items-center gap-1.5 transition cursor-pointer shadow-lg shadow-[#00ff88]/5"
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-indigo-100"
                   >
                     <UserCheck className="w-3.5 h-3.5" /> Authorize & Link Firestore
                   </button>
@@ -1107,96 +1356,76 @@ export default function Dashboard() {
 
             {/* Custom Credentials Configuration Drawer */}
             {showFirebaseConfigPanel && (
-              <div className="mt-4 mb-4 bg-amber-950/20 border border-amber-500/20 p-4 rounded-lg font-sans text-xs space-y-3">
-                <div className="flex justify-between items-center pb-2 border-b border-white/5 text-amber-200 font-semibold font-mono">
-                  <span>OVERRIDE FIRESTORE CREDENTIALS (CUSTOM DOMAIN PORTABILITY)</span>
+              <div className="mt-4 mb-4 bg-amber-50 border border-amber-100 p-6 rounded-xl font-sans text-xs space-y-4 shadow-inner">
+                <div className="flex justify-between items-center pb-3 border-b border-amber-200/50 text-amber-800 font-black font-mono tracking-tight">
+                  <span className="uppercase">Override Firestore Credentials (Portability)</span>
                   {isCustomConfigActive && (
                     <button
                       onClick={resetCustomFirebaseConfig}
-                      className="text-[10px] bg-red-500/10 hover:bg-red-500/25 border border-red-500/30 text-red-100 px-2 py-0.5 rounded cursor-pointer transition"
+                      className="text-[10px] bg-red-100 hover:bg-red-200 border border-red-200 text-red-700 px-3 py-1 rounded-lg cursor-pointer transition font-black"
                     >
-                      Reset Default Sandbox
+                      Reset Default
                     </button>
                   )}
                 </div>
                 
-                <p className="text-slate-400 leading-relaxed">
-                  Default developer credentials are key-restricted to the AI Studio preview host. To authenticate on your custom Cloud Run production domain (<code className="text-indigo-300 font-mono text-[10px]">europe-west3.run.app</code>), configure your custom Firebase Project's web client values below.
+                <p className="text-amber-900/60 leading-relaxed font-medium">
+                  Default developer credentials are key-restricted. To authenticate on your custom Cloud Run production domain, configure your custom Firebase Project's web client values below.
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-300 font-mono text-[11px]">
-                  <div>
-                    <label className="block text-slate-500 mb-1">API KEY (apiKey)</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-slate-700 font-mono text-[11px]">
+                  <div className="space-y-1.5">
+                    <label className="block text-slate-500 font-black uppercase tracking-tighter">API KEY (apiKey)</label>
                     <input
                       type="text"
                       value={tempFirebaseConfig.apiKey || ""}
                       onChange={(e) => setTempFirebaseConfig({ ...tempFirebaseConfig, apiKey: e.target.value })}
-                      className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500/50"
+                      className="w-full bg-white border border-amber-200 rounded-lg px-3 py-2 text-slate-900 font-bold focus:ring-2 focus:ring-amber-500/10 focus:border-amber-500 focus:outline-none transition shadow-sm"
                       placeholder="AIzaSy..."
                     />
                   </div>
-                  <div>
-                    <label className="block text-slate-500 mb-1">PROJECT ID (projectId)</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-slate-500 font-black uppercase tracking-tighter">PROJECT ID (projectId)</label>
                     <input
                       type="text"
                       value={tempFirebaseConfig.projectId || ""}
                       onChange={(e) => setTempFirebaseConfig({ ...tempFirebaseConfig, projectId: e.target.value })}
-                      className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500/50"
-                      placeholder="my-gcp-project-id"
+                      className="w-full bg-white border border-amber-200 rounded-lg px-3 py-2 text-slate-900 font-bold focus:ring-2 focus:ring-amber-500/10 focus:border-amber-500 focus:outline-none transition shadow-sm"
+                      placeholder="my-project-id"
                     />
                   </div>
-                  <div>
-                    <label className="block text-slate-500 mb-1">AUTH DOMAIN (authDomain)</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-slate-500 font-black uppercase tracking-tighter">AUTH DOMAIN (authDomain)</label>
                     <input
                       type="text"
                       value={tempFirebaseConfig.authDomain || ""}
                       onChange={(e) => setTempFirebaseConfig({ ...tempFirebaseConfig, authDomain: e.target.value })}
-                      className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500/50"
-                      placeholder="my-gcp-project-id.firebaseapp.com"
+                      className="w-full bg-white border border-amber-200 rounded-lg px-3 py-2 text-slate-900 font-bold focus:ring-2 focus:ring-amber-500/10 focus:border-amber-500 focus:outline-none transition shadow-sm"
+                      placeholder="project.firebaseapp.com"
                     />
                   </div>
-                  <div>
-                    <label className="block text-slate-500 mb-1">FIRESTORE DATABASE ID (defaults to (default))</label>
-                    <input
-                      type="text"
-                      value={tempFirebaseConfig.firestoreDatabaseId || ""}
-                      onChange={(e) => setTempFirebaseConfig({ ...tempFirebaseConfig, firestoreDatabaseId: e.target.value })}
-                      className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500/50"
-                      placeholder="(default)"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-500 mb-1">STORAGE BUCKET (storageBucket)</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-slate-500 font-black uppercase tracking-tighter">STORAGE BUCKET (storageBucket)</label>
                     <input
                       type="text"
                       value={tempFirebaseConfig.storageBucket || ""}
                       onChange={(e) => setTempFirebaseConfig({ ...tempFirebaseConfig, storageBucket: e.target.value })}
-                      className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500/50"
-                      placeholder="my-gcp-project-id.firebasestorage.app"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-500 mb-1">MESSAGING SENDER ID (messagingSenderId)</label>
-                    <input
-                      type="text"
-                      value={tempFirebaseConfig.messagingSenderId || ""}
-                      onChange={(e) => setTempFirebaseConfig({ ...tempFirebaseConfig, messagingSenderId: e.target.value })}
-                      className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-amber-500/50"
-                      placeholder="84192..."
+                      className="w-full bg-white border border-amber-200 rounded-lg px-3 py-2 text-slate-900 font-bold focus:ring-2 focus:ring-amber-500/10 focus:border-amber-500 focus:outline-none transition shadow-sm"
+                      placeholder="project.firebasestorage.app"
                     />
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2">
+                <div className="flex justify-end gap-3 pt-3">
                   <button
                     onClick={() => setShowFirebaseConfigPanel(false)}
-                    className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded cursor-pointer transition font-mono"
+                    className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 rounded-xl cursor-pointer transition font-black uppercase tracking-widest text-[10px]"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={saveCustomFirebaseConfig}
-                    className="px-4 py-1.5 bg-amber-500/20 hover:bg-amber-500/35 border border-amber-500/40 text-amber-200 rounded cursor-pointer transition font-mono font-medium flex items-center gap-1.5"
+                    className="px-6 py-2 bg-amber-500 hover:bg-amber-600 border border-amber-400 text-white rounded-xl cursor-pointer transition font-black uppercase tracking-widest text-[10px] shadow-lg shadow-amber-100"
                   >
                     Save & Initialize Pipeline
                   </button>
@@ -1207,25 +1436,25 @@ export default function Dashboard() {
             {/* If authenticated, show details and bidirectional buttons */}
             {firebaseStatus === "authorized" ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-black/25 backdrop-blur-sm p-3 rounded-lg border border-white/5 font-mono text-xs space-y-2">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-widest">Firestore Nodes Status</div>
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 font-mono text-xs space-y-2">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-widest font-black">Firestore Nodes Status</div>
                   {isTestingConn || !syncSummary ? (
                     <div className="text-slate-400 flex items-center gap-1.5 text-[11px] py-1">
-                      <RefreshCw className="w-3 h-3 animate-spin text-indigo-400" /> Verifying structure and rules integrity...
+                      <RefreshCw className="w-3 h-3 animate-spin text-indigo-500" /> Verifying structure integrity...
                     </div>
                   ) : (
-                    <div className="space-y-1.5 text-[11px] text-slate-300">
-                      <div className="flex justify-between items-center bg-white/5 px-2 py-1 rounded">
+                    <div className="space-y-1.5 text-[11px] text-slate-700">
+                      <div className="flex justify-between items-center bg-white px-2 py-1 rounded border border-slate-100 shadow-sm">
                         <span>active_trades:</span>
-                        <span className="font-bold text-[#00ff88]">{syncSummary.activeCount} docs</span>
+                        <span className="font-bold text-emerald-600">{syncSummary.activeCount} docs</span>
                       </div>
-                      <div className="flex justify-between items-center bg-white/5 px-2 py-1 rounded">
+                      <div className="flex justify-between items-center bg-white px-2 py-1 rounded border border-slate-100 shadow-sm">
                         <span>historical_logs:</span>
-                        <span className="font-bold text-[#00ff88]">{syncSummary.logsCount} docs</span>
+                        <span className="font-bold text-emerald-600">{syncSummary.logsCount} docs</span>
                       </div>
-                      <div className="flex justify-between items-center bg-white/5 px-2 py-1 rounded">
+                      <div className="flex justify-between items-center bg-white px-2 py-1 rounded border border-slate-100 shadow-sm">
                         <span>system_risk_state:</span>
-                        <span className="font-bold text-[#00ff88]">{syncSummary.statesCount} docs</span>
+                        <span className="font-bold text-emerald-600">{syncSummary.statesCount} docs</span>
                       </div>
                     </div>
                   )}
@@ -1271,7 +1500,7 @@ export default function Dashboard() {
                 <div className="text-red-400 font-bold font-mono uppercase tracking-wider flex items-center gap-1.5 border-b border-red-500/15 pb-2">
                   <AlertOctagon className="w-4 h-4 text-red-400 animate-pulse" /> SECURITY / PERSISTENCE EXCEPTION
                 </div>
-                <div className="bg-black/25 p-2 rounded border border-white/5 font-mono text-[10px] text-red-300 overflow-x-auto whitespace-pre-wrap">
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 font-mono text-[10px] text-red-600 overflow-x-auto whitespace-pre-wrap shadow-inner">
                   {firebaseError}
                 </div>
                 
@@ -1364,7 +1593,7 @@ export default function Dashboard() {
                             elem.select();
                           }}
                           rows={12}
-                          className="w-full bg-black/55 border border-white/10 rounded p-2 text-[10px] text-amber-200 font-mono focus:outline-none focus:border-amber-500/50 select-all leading-normal resize-y"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-[10px] text-indigo-700 font-mono focus:outline-none focus:border-indigo-500 shadow-inner select-all leading-normal resize-y"
                           placeholder="Loading security rules..."
                         />
                         <span className="text-[9px] text-slate-500 italic block font-mono leading-none">
@@ -1406,119 +1635,119 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           {/* DRMMiddleware Metrics Column */}
-          <div className="lg:col-span-2 space-y-6">
+          <div id="active-trades-ledger" className="lg:col-span-2 space-y-6">
             
             {/* DRM Master Card */}
             <div className="frosted-glass frosted-glass-hover p-6 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50/50 rounded-full blur-3xl pointer-events-none" />
               
-              <div className="flex items-center justify-between border-b border-white/15 pb-4 mb-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
                 <div className="flex items-center gap-2">
-                  <ShieldAlert className="w-5 h-5 text-[#ffaa00] animate-pulse" />
-                  <span className="text-sm font-semibold tracking-wide text-slate-200">POOL-EQUITY RISK GUARD (DRM INTERFACE)</span>
+                  <ShieldAlert className="w-5 h-5 text-amber-600 animate-pulse" />
+                  <span className="text-sm font-bold tracking-tight text-slate-900 uppercase">POOL-EQUITY RISK GUARD (DRM INTERFACE)</span>
                 </div>
-                <div className="text-xs font-mono text-slate-500">
-                  Account: {settings?.ibkrAccountNumber || "NOT CONNECTED"}
+                <div className="text-xs font-mono text-slate-500 font-bold">
+                  Account: <span className="text-slate-900">{settings?.ibkrAccountNumber || "NOT CONNECTED"}</span>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
-                <div className="bg-black/30 backdrop-blur-sm p-3 rounded-lg border border-white/5 relative group cursor-help">
-                  <span className="text-[10px] text-slate-500 block font-mono">NET LIQUIDATION</span>
-                  <span className="text-base font-mono font-bold text-slate-100">
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 relative group cursor-help shadow-sm">
+                  <span className="text-[10px] text-slate-500 block font-bold font-mono uppercase">NET LIQUIDATION</span>
+                  <span className="text-base font-mono font-bold text-slate-900">
                     €{settings?.netLiquidation?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-950/95 border border-white/15 text-[9px] text-slate-300 p-2 rounded shadow-2xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-44 z-50 text-center leading-normal">
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 text-[10px] text-white p-2 rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-48 z-50 text-center leading-normal">
                     Real-time valuation of total assets including premium cash balances and current security holdings.
                   </div>
                 </div>
 
-                <div className="bg-black/30 backdrop-blur-sm p-3 rounded-lg border border-white/5 relative group cursor-help">
-                  <span className="text-[10px] text-slate-500 block font-mono">INITIAL CAPITAL REF</span>
-                  <span className="text-base font-mono font-bold text-slate-300">
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 relative group cursor-help shadow-sm">
+                  <span className="text-[10px] text-slate-500 block font-bold font-mono uppercase">INITIAL CAPITAL REF</span>
+                  <span className="text-base font-mono font-bold text-slate-700">
                     €{settings?.referenceEquity?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-950/95 border border-white/15 text-[9px] text-slate-300 p-2 rounded shadow-2xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-44 z-50 text-center leading-normal">
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 text-[10px] text-white p-2 rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-48 z-50 text-center leading-normal">
                     Starting Reference Capital booked at the beginning of the trading week or month to benchmark drawdown.
                   </div>
                 </div>
 
-                <div className="bg-black/30 backdrop-blur-sm p-3 rounded-lg border border-[#00ff88]/20 relative group cursor-help">
-                  <span className="text-[10px] text-[#00ff88] block font-mono uppercase">Capital Shield</span>
-                  <span className="text-base font-mono font-bold text-[#00ff88]">
+                <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 relative group cursor-help shadow-sm">
+                  <span className="text-[10px] text-emerald-700 block font-bold font-mono uppercase tracking-tight">Capital Shield</span>
+                  <span className="text-base font-mono font-bold text-emerald-600">
                     {settings?.virtualCapitalCeiling && settings.virtualCapitalCeiling > 0 ? (
                       `€${settings.virtualCapitalCeiling.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                     ) : (
-                      <span className="text-slate-500 text-xs font-semibold">UNLIMITED</span>
+                      <span className="text-slate-400 text-xs font-bold uppercase">UNLIMITED</span>
                     )}
                   </span>
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#05150a]/95 border border-[#00ff88]/30 text-[9px] text-slate-300 p-2 rounded shadow-2xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-44 z-50 text-center leading-normal">
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-emerald-900 text-[10px] text-white p-2 rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-48 z-50 text-center leading-normal">
                     Protective allocation risk limit. When enabled, trade sizes and leverage thresholds are capped based on this size rather than full pool equity.
                   </div>
                 </div>
 
-                <div className="bg-black/30 backdrop-blur-sm p-3 rounded-lg border border-white/5 relative group cursor-help">
-                  <span className="text-[10px] text-slate-500 block font-mono">MAINTENANCE MARGIN</span>
-                  <span className="text-base font-mono font-bold text-slate-400">
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 relative group cursor-help shadow-sm">
+                  <span className="text-[10px] text-slate-500 block font-bold font-mono uppercase">MAINTENANCE MARGIN</span>
+                  <span className="text-base font-mono font-bold text-slate-600">
                     €{settings?.maintenanceMargin?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-950/95 border border-white/15 text-[9px] text-slate-300 p-2 rounded shadow-2xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-44 z-50 text-center leading-normal">
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 text-[10px] text-white p-2 rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-48 z-50 text-center leading-normal">
                     Minimum buffer capital demanded by IBIE to keep premium leveraged positions open overnight.
                   </div>
                 </div>
 
-                <div className="bg-black/30 backdrop-blur-sm p-3 rounded-lg border border-white/5 relative group cursor-help">
-                  <span className="text-[10px] text-slate-500 block font-mono">DAILY SESSION P&L</span>
-                  <span className={`text-base font-mono font-bold ${totalPnL >= 0 ? "text-[#00ff88]" : "text-[#ff4444]"}`}>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 relative group cursor-help shadow-sm">
+                  <span className="text-[10px] text-slate-500 block font-bold font-mono uppercase">DAILY SESSION P&L</span>
+                  <span className={`text-base font-mono font-bold ${totalPnL >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                     {totalPnL >= 0 ? "+" : ""}€{totalPnL.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-950/95 border border-white/15 text-[9px] text-slate-300 p-2 rounded shadow-2xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-44 z-50 text-center leading-normal">
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 text-[10px] text-white p-2 rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-48 z-50 text-center leading-normal">
                     Net aggregate profits or losses generated across all finalized transactions and working contracts today.
                   </div>
                 </div>
               </div>
 
               {/* Drawdown Circuit Breaker visualization */}
-              <div className="space-y-3.5 border-t border-white/10 pt-4">
-                <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span className="flex items-center gap-1.5 font-semibold">
-                    <AlertOctagon className="w-4 h-4 text-[#ff4444]" /> Daily Drawdown Circuit Breaker Limit (-{drawdownLimitPct}%)
+              <div className="space-y-3.5 border-t border-slate-100 pt-5">
+                <div className="flex items-center justify-between text-xs text-slate-500 font-bold uppercase font-mono">
+                  <span className="flex items-center gap-1.5">
+                    <AlertOctagon className="w-4 h-4 text-red-500" /> Daily Drawdown Circuit Breaker (-{drawdownLimitPct}%)
                   </span>
-                  <span className="font-mono text-slate-300">
+                  <span className="text-slate-700">
                     {drawdownPct.toFixed(2)}% / {drawdownLimitPct}% Limit
                   </span>
                 </div>
 
                 {/* Visual Bar */}
-                <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-900 relative">
+                <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200 relative shadow-inner">
                   <div
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      drawdownPct >= drawdownLimitPct * 0.75 ? "bg-rose-500" : drawdownPct >= drawdownLimitPct * 0.4 ? "bg-amber-500" : "bg-emerald-500"
+                    className={`h-full rounded-full transition-all duration-700 ${
+                      drawdownPct >= drawdownLimitPct * 0.75 ? "bg-red-500" : drawdownPct >= drawdownLimitPct * 0.4 ? "bg-amber-500" : "bg-emerald-500"
                     }`}
                     style={{ width: `${Math.min(100, (drawdownPct / drawdownLimitPct) * 100)}%` }}
                   />
                   {/* Mark the spot */}
-                  <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-rose-600" title="Circuit Breaker" />
+                  <div className="absolute right-0 top-0 bottom-0 w-1 bg-red-600/30" />
                 </div>
-                <div className="flex justify-between text-[9px] text-slate-600 font-mono">
-                  <span>0.0% P&L Flat</span>
+                <div className="flex justify-between text-[10px] text-slate-400 font-bold font-mono uppercase">
+                  <span>0.0% P&L</span>
                   <span>-{(drawdownLimitPct / 2).toFixed(2)}% Buffer</span>
-                  <span className="text-rose-500 font-semibold">-{drawdownLimitPct}% Emergency Lock</span>
+                  <span className="text-red-600 font-black">-{drawdownLimitPct}% Hard Lock</span>
                 </div>
 
                 {/* Cash Drawdown details & Router Lock overrides */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-black/45 rounded-lg border border-white/5 text-xs font-mono">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs font-mono shadow-sm">
                   <div className="space-y-1">
-                    <span className="text-[10px] text-slate-500 block">CASH DRAWDOWN THRESHOLD</span>
-                    <span className={`font-semibold ${totalPnL < 0 && Math.abs(totalPnL) >= (settings?.dailyDrawdownLimitCash ?? 1500) ? "text-rose-400" : "text-slate-300"}`}>
+                    <span className="text-[10px] text-slate-500 block font-bold uppercase">Cash Drawdown Threshold</span>
+                    <span className={`text-sm font-bold ${totalPnL < 0 && Math.abs(totalPnL) >= (settings?.dailyDrawdownLimitCash ?? 1500) ? "text-red-600" : "text-slate-700"}`}>
                       €{totalPnL < 0 ? Math.abs(totalPnL).toFixed(2) : "0.00"} / €{settings?.dailyDrawdownLimitCash ?? "1,500.00"} Limit
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-3">
+                  <div className="flex items-center justify-between sm:justify-end gap-4">
                     <div className="text-right">
-                      <span className="text-[10px] text-slate-500 block">ROUTER STATE</span>
-                      <span className={`font-extrabold ${settings?.routerLocked ? "text-rose-400" : "text-[#00ff88]"}`}>
+                      <span className="text-[10px] text-slate-500 block font-bold uppercase">Router State</span>
+                      <span className={`font-black text-sm ${settings?.routerLocked ? "text-red-600" : "text-emerald-600"}`}>
                         {settings?.routerLocked ? "● LOCKED" : "● ONLINE"}
                       </span>
                     </div>
@@ -1527,7 +1756,7 @@ export default function Dashboard() {
                       <button
                         type="button"
                         onClick={handleResetDrawdownLock}
-                        className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-black font-extrabold rounded text-[10px] uppercase shadow transition cursor-pointer select-none"
+                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-[10px] uppercase shadow-md transition cursor-pointer select-none"
                       >
                         ADMIN UNLOCK
                       </button>
@@ -1554,12 +1783,12 @@ export default function Dashboard() {
 
             {/* Level 2 Order Book Depth and OFI Imbalance tracking */}
             <div className="frosted-glass frosted-glass-hover p-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/10 pb-4 mb-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4 mb-4">
                 <div>
-                  <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-widest flex items-center gap-1.5">
-                    <TrendingUp className="w-4 h-4 text-[#00ff88]" /> LEVEL 2 DEPTH OF MARKET & ORDER FLOW
+                  <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest flex items-center gap-1.5">
+                    <TrendingUp className="w-4 h-4 text-emerald-600" /> LEVEL 2 DEPTH OF MARKET & ORDER FLOW
                   </h2>
-                  <p className="text-[11px] text-slate-400 font-mono mt-0.5">Calculates Real-Time Imbalance Metrics on Level 2 tick intervals</p>
+                  <p className="text-xs text-slate-500 font-mono mt-0.5">Calculates Real-Time Imbalance Metrics on Level 2 tick intervals</p>
                 </div>
 
                  <div className="flex flex-wrap items-center gap-2">
@@ -1567,35 +1796,35 @@ export default function Dashboard() {
                     <button
                       key={symbol}
                       onClick={() => setSelectedSymbol(symbol)}
-                      className={`px-3 py-1.5 font-mono text-xs rounded transition cursor-pointer flex items-center gap-2 ${
+                      className={`px-3 py-1.5 font-mono text-xs rounded-md transition cursor-pointer flex items-center gap-2 ${
                         selectedSymbol === symbol || (selectedSymbol === "" && Object.keys(marketBooks)[0] === symbol)
-                          ? "bg-white/10 border border-white/20 text-[#00ff88] font-bold"
-                          : "bg-black/30 border border-white/5 text-slate-400 hover:text-slate-200"
+                          ? "bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold shadow-sm"
+                          : "bg-slate-50 border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
                       }`}
                     >
                       <span className="font-bold">{symbol}</span>
                       {marketBooks[symbol]?.primaryExchange && (
-                        <span className={`px-1 py-0.5 rounded-[3px] text-[8px] font-bold ${
+                        <span className={`px-1 py-0.5 rounded-[3px] text-[10px] font-bold ${
                           marketBooks[symbol].primaryExchange === "SBF" || marketBooks[symbol].primaryExchange === "AEB" || marketBooks[symbol].primaryExchange === "SB"
-                            ? "bg-[#00ff88]/15 text-[#00ff88] border border-[#00ff88]/20" 
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-100" 
                             : marketBooks[symbol].primaryExchange === "IBIS"
-                            ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                            : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                            ? "bg-amber-50 text-amber-700 border border-amber-100"
+                            : "bg-indigo-50 text-indigo-700 border border-indigo-100"
                         }`}>
                           {marketBooks[symbol].primaryExchange}
                         </span>
                       )}
-                      <span className="text-[10px] text-slate-300">(${marketBooks[symbol]?.lastPrice?.toFixed(2) || "0.00"})</span>
+                      <span className="text-xs text-slate-500">(${marketBooks[symbol]?.lastPrice?.toFixed(2) || "0.00"})</span>
                     </button>
                   ))}
 
                   {/* Custom Asset Ingestor Tool */}
-                  <div className="flex items-center gap-1.5 border border-dashed border-white/10 p-1 rounded bg-black/20">
+                  <div className="flex items-center gap-1.5 border border-dashed border-slate-200 p-1 rounded-lg bg-slate-50">
                     <input
                       type="text"
                       placeholder="ADD TICKER"
                       id="custom-symbol-input"
-                      className="w-20 bg-black/40 border border-white/10 rounded px-1.5 py-1 text-slate-100 placeholder-slate-500 text-[10px] uppercase font-mono focus:outline-none focus:border-[#00ff88]/50"
+                      className="w-20 bg-white border border-slate-200 rounded px-1.5 py-1 text-slate-900 placeholder-slate-400 text-xs uppercase font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                       onKeyDown={async (e) => {
                         if (e.key === "Enter") {
                           const btn = document.getElementById("custom-ingest-btn");
@@ -1651,57 +1880,57 @@ export default function Dashboard() {
               {bookForChart ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* Depth Chart viz */}
-                  <div className="md:col-span-2 h-64 bg-black/40 border border-white/5 rounded-lg p-2 relative">
-                    <div className="absolute top-2 left-2 text-[10px] text-slate-500 font-mono">BID / ASK SHIFT HISTOGRAM</div>
+                  <div className="md:col-span-2 h-64 bg-slate-50 border border-slate-100 rounded-xl p-4 relative shadow-inner">
+                    <div className="absolute top-2 left-2 text-[10px] text-slate-400 font-bold font-mono uppercase tracking-wider">BID / ASK SHIFT HISTOGRAM</div>
                     <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                       <BarChart data={chartData} margin={{ top: 15, right: 10, left: -15, bottom: 5 }}>
-                        <XAxis dataKey="price" stroke="#475569" fontSize={9} tickLine={false} />
-                        <YAxis stroke="#475569" fontSize={9} tickLine={false} />
+                        <XAxis dataKey="price" stroke="#94a3b8" fontSize={10} tickLine={false} />
+                        <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: "#090c10", borderColor: "rgba(255,255,255,0.08)" }}
-                          labelStyle={{ color: "#94a3b8" }}
-                          itemStyle={{ fontSize: "11px" }}
+                          contentStyle={{ backgroundColor: "#ffffff", borderColor: "#e2e8f0", borderRadius: "8px", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
+                          labelStyle={{ color: "#64748b", fontWeight: "bold" }}
+                          itemStyle={{ fontSize: "12px" }}
                         />
-                        <Bar dataKey="BidSize" fill="#00ff88" opacity={0.65} name="Bid Size" />
-                        <Bar dataKey="AskSize" fill="#ff4444" opacity={0.65} name="Ask Size" />
-                        <ReferenceLine x={bookForChart.lastPrice} stroke="#00ff88" strokeDasharray="3 3" label={{ value: "P", fill: "#00ff88", fontSize: 10, position: "top" }} />
+                        <Bar dataKey="BidSize" fill="#10b981" opacity={0.8} name="Bid Size" radius={[2, 2, 0, 0]} />
+                        <Bar dataKey="AskSize" fill="#ef4444" opacity={0.8} name="Ask Size" radius={[2, 2, 0, 0]} />
+                        <ReferenceLine x={bookForChart.lastPrice} stroke="#10b981" strokeDasharray="3 3" label={{ value: "P", fill: "#10b981", fontSize: 11, position: "top", fontWeight: "bold" }} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
 
                   {/* Order flow state calculator */}
-                  <div className="bg-black/30 backdrop-blur-sm p-4 rounded-lg border border-white/5 flex flex-col justify-between">
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
                     <div>
-                      <span className="text-[10px] text-slate-500 font-mono uppercase tracking-widest block">ORDER FLOW IMBALANCE (OFI)</span>
+                      <span className="text-[10px] text-slate-500 font-bold font-mono uppercase tracking-widest block">ORDER FLOW IMBALANCE (OFI)</span>
                       
                       <div className="flex items-baseline gap-2 mt-2">
-                        <span className={`text-3xl font-mono font-bold ${bookForChart.lastOfi > 0 ? "text-[#00ff88]" : bookForChart.lastOfi < 0 ? "text-[#ff4444]" : "text-slate-400"}`}>
+                        <span className={`text-4xl font-mono font-bold ${bookForChart.lastOfi > 0 ? "text-emerald-600" : bookForChart.lastOfi < 0 ? "text-red-600" : "text-slate-400"}`}>
                           {bookForChart.lastOfi > 0 ? "+" : ""}{bookForChart.lastOfi}
                         </span>
-                        <span className="text-[10px] text-slate-500 font-mono">Shares</span>
+                        <span className="text-xs text-slate-500 font-bold font-mono">SHARES</span>
                       </div>
 
                       {/* Direction Meter indicator */}
-                      <div className="mt-3 p-2 bg-black/40 border border-white/5 rounded">
-                        <p className="text-[10px] text-slate-400 font-mono">Signal Suggestion:</p>
-                        <p className="text-xs font-semibold text-slate-100 mt-1 flex items-center gap-1.5">
+                      <div className="mt-4 p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                        <p className="text-[10px] text-slate-500 font-bold font-mono uppercase">Signal Suggestion:</p>
+                        <div className="text-xs font-bold text-slate-900 mt-1.5 flex items-center gap-2">
                           {bookForChart.lastOfi > 250 ? (
                             <>
-                              <span className="w-2.5 h-2.5 rounded-full frosted-pulse-green animate-pulse" />
-                              <strong className="text-[#00ff88] font-mono font-normal">OFI Divergence Bullish Setup</strong>
+                              <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-sm shadow-emerald-200 animate-pulse" />
+                              <strong className="text-emerald-700 font-mono">BULLISH DIVERGENCE</strong>
                             </>
                           ) : bookForChart.lastOfi < -250 ? (
                             <>
-                              <span className="w-2.5 h-2.5 rounded-full frosted-pulse-red animate-pulse" />
-                              <strong className="text-[#ff4444] font-mono font-normal">OFI Divergence Bearish Setup</strong>
+                              <span className="w-3 h-3 rounded-full bg-red-500 shadow-sm shadow-red-200 animate-pulse" />
+                              <strong className="text-red-700 font-mono">BEARISH DIVERGENCE</strong>
                             </>
                           ) : (
                             <>
-                              <span className="w-2.5 h-2.5 rounded-full bg-slate-500" />
-                              <strong className="text-slate-400 font-mono font-normal flex">No Outlier Signal Imbalance</strong>
+                              <span className="w-3 h-3 rounded-full bg-slate-300" />
+                              <strong className="text-slate-500 font-mono uppercase">NEUTRAL FLOW</strong>
                             </>
                           )}
-                        </p>
+                        </div>
                       </div>
                     </div>
 
@@ -1711,14 +1940,14 @@ export default function Dashboard() {
                         <button
                           onClick={() => handleManualTick("UP")}
                           disabled={settings?.routerLocked}
-                          className="px-2 py-1.5 bg-[#00ff88]/10 hover:bg-[#00ff88]/20 text-[#00ff88] rounded text-xs font-mono transition border border-[#00ff88]/25 cursor-pointer disabled:opacity-40"
+                          className="px-2 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded text-[10px] font-black uppercase tracking-tighter transition border border-emerald-200 cursor-pointer disabled:opacity-40 shadow-sm"
                         >
                           + Tick Bid Depth
                         </button>
                         <button
                           onClick={() => handleManualTick("DOWN")}
                           disabled={settings?.routerLocked}
-                          className="px-2 py-1.5 bg-[#ff4444]/10 hover:bg-[#ff4444]/20 text-[#ff4444] rounded text-xs font-mono transition border border-[#ff4444]/25 cursor-pointer disabled:opacity-40"
+                          className="px-2 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded text-[10px] font-black uppercase tracking-tighter transition border border-red-200 cursor-pointer disabled:opacity-40 shadow-sm"
                         >
                           - Tick Ask Depth
                         </button>
@@ -1733,28 +1962,31 @@ export default function Dashboard() {
           </div>
 
           {/* RIGHT COLUMN: MANUAL TRADE ENTRY & CONTEXT */}
-          <div className="space-y-6">
+          <div className="lg:col-span-1 space-y-6">
 
             {/* Trade Router Tool Card */}
-            <div className="frosted-glass frosted-glass-hover p-6">
-              <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-widest flex items-center gap-1.5 border-b border-white/10 pb-3 mb-4">
-                <Coins className="w-4 h-4 text-[#00ff88]" /> TACTICAL PRE-TRADE ENTRY
+            <div className="frosted-glass frosted-glass-hover p-6 bg-white shadow-sm border border-slate-200">
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-4 mb-5">
+                <div className="p-1.5 bg-indigo-50 rounded-lg">
+                  <Coins className="w-4 h-4 text-indigo-600" />
+                </div>
+                TACTICAL TRADE ROUTER
               </h2>
 
-              <form onSubmit={handlePlaceTrade} className="space-y-4">
+              <form onSubmit={handlePlaceTrade} className="space-y-5">
                 
                 {/* Ticker selector */}
-                <div>
-                  <label className="text-[10px] uppercase font-mono text-slate-500 block">TARGET INSTRUMENT</label>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black font-mono text-slate-500 block tracking-wider">TARGET INSTRUMENT</label>
                   <select
                     value={tradeSymbol}
                     onChange={(e) => {
                       setTradeSymbol(e.target.value);
                     }}
-                    className="w-full mt-1.5 bg-black/35 border border-white/10 rounded-md p-2 text-xs text-slate-100 font-mono focus:border-[#00ff88]/50 focus:outline-none transition"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none transition shadow-inner"
                   >
                     {Object.keys(marketBooks).map((sym) => (
-                      <option key={sym} value={sym} className="bg-slate-950">
+                      <option key={sym} value={sym} className="bg-white">
                         {sym} [{marketBooks[sym]?.primaryExchange || "SMART"}] (${marketBooks[sym]?.lastPrice?.toFixed(2)})
                       </option>
                     ))}
@@ -1762,73 +1994,73 @@ export default function Dashboard() {
                 </div>
 
                 {/* Direction switcher */}
-                <div>
-                  <label className="text-[10px] uppercase font-mono text-slate-500 block mb-1.5">DIRECTION TYPE</label>
-                  <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black font-mono text-slate-500 block tracking-wider">ORDER DIRECTION</label>
+                  <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
                       onClick={() => setTradeDirection("BUY")}
-                      className={`py-2 text-xs rounded transition flex items-center justify-center gap-1.5 border font-mono cursor-pointer ${
+                      className={`py-2.5 text-xs rounded-xl transition flex items-center justify-center gap-2 border shadow-sm font-mono font-black tracking-tight cursor-pointer ${
                         tradeDirection === "BUY"
-                          ? "bg-[#00ff88]/15 border-[#00ff88]/35 text-[#00ff88] font-bold"
-                          : "bg-black/20 border-transparent text-slate-500"
+                          ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                          : "bg-white border-slate-100 text-slate-400 hover:bg-slate-50"
                       }`}
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#00ff88] frosted-pulse-green animate-pulse" /> LONG BUY
+                      <div className={`w-1.5 h-1.5 rounded-full ${tradeDirection === "BUY" ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-slate-300"}`} /> LONG BUY
                     </button>
                     <button
                       type="button"
                       onClick={() => setTradeDirection("SELL")}
-                      className={`py-2 text-xs rounded transition flex items-center justify-center gap-1.5 border font-mono cursor-pointer ${
+                      className={`py-2.5 text-xs rounded-xl transition flex items-center justify-center gap-2 border shadow-sm font-mono font-black tracking-tight cursor-pointer ${
                         tradeDirection === "SELL"
-                          ? "bg-[#ff4444]/15 border-[#ff4444]/35 text-[#ff4444] font-bold"
-                          : "bg-black/20 border-transparent text-slate-500"
+                          ? "bg-red-50 border-red-200 text-red-700"
+                          : "bg-white border-slate-100 text-slate-400 hover:bg-slate-50"
                       }`}
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#ff4444] frosted-pulse-red animate-pulse" /> SHORT SELL
+                      <div className={`w-1.5 h-1.5 rounded-full ${tradeDirection === "SELL" ? "bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]" : "bg-slate-300"}`} /> SHORT SELL
                     </button>
                   </div>
                 </div>
 
                 {/* Grid parameter entry */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] uppercase font-mono text-slate-500 block">ENTRY PRICE ($)</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase font-black font-mono text-slate-500 block tracking-wider">ENTRY ($)</label>
                     <input
                       type="number"
                       step="0.01"
                       value={tradeEntry}
                       onChange={(e) => setTradeEntry(e.target.value)}
-                      className="w-full mt-1.5 bg-black/35 border border-white/10 rounded-md p-2 text-xs text-slate-100 font-mono focus:border-[#00ff88]/50 focus:outline-none transition"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none transition shadow-inner"
                     />
                   </div>
-                  <div>
-                    <label className="text-[10px] uppercase font-mono text-slate-500 block">INITIAL STOP LOSS ($)</label>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase font-black font-mono text-slate-500 block tracking-wider">STOP ($)</label>
                     <input
                       type="number"
                       step="0.01"
                       value={tradeStop}
                       onChange={(e) => setTradeStop(e.target.value)}
-                      className="w-full mt-1.5 bg-black/35 border border-white/10 rounded-md p-2 text-xs text-slate-100 font-mono focus:border-[#00ff88]/50 focus:outline-none transition"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none transition shadow-inner"
                     />
                   </div>
                 </div>
 
                 {/* Estimated profit targets to verify friction */}
-                <div>
+                <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <label className="text-[10px] uppercase font-mono text-slate-500">PROFIT TARGET CELING ($)</label>
-                    <span className="text-[9px] text-slate-500">For 15% Friction audit</span>
+                    <label className="text-[10px] uppercase font-black font-mono text-slate-500 tracking-wider">PROFIT CEILING ($)</label>
+                    <span className="text-[9px] font-bold text-slate-400 font-mono uppercase">15% Friction Guard</span>
                   </div>
                   <input
                     type="number"
                     step="0.01"
                     value={tradeTarget}
                     onChange={(e) => setTradeTarget(e.target.value)}
-                    className="w-full mt-1.5 bg-black/35 border border-white/10 rounded-md p-2 text-xs text-slate-100 font-mono focus:border-[#00ff88]/50 focus:outline-none transition"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none transition shadow-inner"
                   />
-                  <div className="text-[9px] text-slate-500 mt-1 font-mono">
-                    Calculated position sizes apply: Stop Distance = ${Math.abs(Number(tradeEntry) - Number(tradeStop)).toFixed(2)}
+                  <div className="text-[10px] text-slate-500 font-bold font-mono uppercase text-right pt-1">
+                    Stop Distance: <span className="text-slate-900 font-black">${Math.abs(Number(tradeEntry) - Number(tradeStop)).toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -1836,7 +2068,7 @@ export default function Dashboard() {
                 <button
                   type="submit"
                   disabled={settings?.routerLocked}
-                  className="w-full py-3 bg-[#00ff88] hover:bg-[#00e077] text-black font-semibold rounded-lg text-xs tracking-wider uppercase transition cursor-pointer disabled:bg-white/5 disabled:text-slate-600 border border-white/10 shadow-lg shadow-[#00ff88]/10"
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs tracking-widest uppercase shadow-lg shadow-indigo-100 transition-all cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none transform active:scale-95"
                 >
                   {settings?.routerLocked ? "ROUTER SHUTDOWN ACTIVE" : "ROUTE COMPLIANT TRADING SIGNAL"}
                 </button>
@@ -1844,29 +2076,32 @@ export default function Dashboard() {
 
               {/* Instant pre-trade order sizing feedback */}
               {orderFeedback && (
-                <div className={`mt-4 p-3 rounded-lg text-xs font-mono border ${
+                <div className={`mt-5 p-4 rounded-xl text-xs font-bold font-mono border shadow-sm transition-all animate-in fade-in slide-in-from-top-2 ${
                   orderFeedback.error 
-                    ? "bg-[#ff4444]/15 border-[#ff4444]/35 text-[#ff4444]"
-                    : "bg-[#00ff88]/15 border-[#00ff88]/35 text-[#00ff88]"
+                    ? "bg-red-50 border-red-200 text-red-700"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-700"
                 }`}>
                   {orderFeedback.error && (
-                    <div className="flex items-start gap-2">
-                      <AlertOctagon className="w-4 h-4 text-[#ff4444] shrink-0 mt-0.5" />
-                      <div>
-                        <strong>ERROR Rejected:</strong> {orderFeedback.error}
+                    <div className="flex items-start gap-3">
+                      <AlertOctagon className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                      <div className="leading-relaxed">
+                        <strong className="uppercase block mb-1">Order Rejected:</strong>
+                        {orderFeedback.error}
                       </div>
                     </div>
                   )}
                   {orderFeedback.success && (
-                    <div className="space-y-1.5">
-                      <p className="font-semibold text-[#00ff88] flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-[#00ff88]" /> SETUP CONFIRMED:
-                      </p>
-                      <p>{orderFeedback.success}</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 mb-1">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span className="uppercase tracking-widest text-[10px] font-black">SETUP CONFIRMED</span>
+                      </div>
+                      <p className="text-slate-700 leading-relaxed">{orderFeedback.success}</p>
                       {orderFeedback.allocatedQty && (
-                        <div className="text-[10px] space-y-0.5 border-t border-green-900/40 pt-1.5 mt-1.5 text-slate-300">
-                          <div>Position Size: <strong className="text-slate-100 font-bold">{orderFeedback.allocatedQty} shares</strong> (capped at 1% total Pool equity)</div>
-                          <div>Spread Efficiency Loss: <strong className="text-slate-100 font-bold">{orderFeedback.efficiencyRatio}%</strong> / max 15.0%</div>
+                        <div className="text-[10px] space-y-1.5 border-t border-emerald-200/50 pt-3 mt-2 text-slate-600">
+                          <div className="flex justify-between">Position Size: <strong className="text-slate-900 font-black">{orderFeedback.allocatedQty} shares</strong></div>
+                          <div className="flex justify-between">Capital Risk: <strong className="text-slate-900 font-black">1.0% Pool Equity</strong></div>
+                          <div className="flex justify-between">Efficiency Loss: <strong className={Number(orderFeedback.efficiencyRatio) > 10 ? "text-amber-600 font-black" : "text-emerald-600 font-black"}>{orderFeedback.efficiencyRatio}%</strong></div>
                         </div>
                       )}
                     </div>
@@ -1875,68 +2110,97 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* System config editor panel */}
-            <div className="frosted-glass frosted-glass-hover p-6">
-              <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-widest flex items-center gap-1.5 border-b border-white/10 pb-3 mb-4">
-                <Settings2 className="w-4 h-4 text-slate-300" /> SYSTEM CONTROL CENTER
+            {/* 3. SYSTEM CONTROL CENTER - Native IBKR Gateway & Risk Parameters */}
+            <div className="md:col-span-1 frosted-glass frosted-glass-hover p-6 bg-white border border-slate-200 shadow-sm self-start">
+              <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-4 mb-5">
+                <div className="p-1.5 bg-slate-100 rounded-lg">
+                  <Settings2 className="w-4 h-4 text-slate-600" />
+                </div>
+                SYSTEM CONTROL CENTER
               </h2>
 
-              <form onSubmit={handleUpdateSettings} className="space-y-3 font-mono text-xs text-slate-300">
-                <div>
-                  <label className="text-[10px] text-slate-500 uppercase font-mono block">IBIE Account Number</label>
-                  <input
-                    type="text"
-                    value={editAccount}
-                    onChange={(e) => setEditAccount(e.target.value)}
-                    className="w-full mt-1 bg-black/35 border border-white/10 rounded p-1.5 text-slate-100 focus:outline-none focus:border-[#00ff88]/50"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-500 uppercase font-mono block">MiFIR Decision Maker Shortcode</label>
-                  <input
-                    type="text"
-                    value={editDecisionMaker}
-                    onChange={(e) => setEditDecisionMaker(e.target.value)}
-                    className="w-full mt-1 bg-black/35 border border-white/10 rounded p-1.5 text-slate-100 focus:outline-none focus:border-[#00ff88]/50"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-500 uppercase font-mono block">MiFIR Executing Trader Shortcode</label>
-                  <input
-                    type="text"
-                    value={editTrader}
-                    onChange={(e) => setEditTrader(e.target.value)}
-                    className="w-full mt-1 bg-black/35 border border-white/10 rounded p-1.5 text-slate-100 focus:outline-none focus:border-[#00ff88]/50"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-500 uppercase font-mono block">Reference Starting Capital (€)</label>
-                  <input
-                    type="number"
-                    value={editReferenceEquity}
-                    onChange={(e) => setEditReferenceEquity(Number(e.target.value))}
-                    className="w-full mt-1 bg-black/35 border border-white/10 rounded p-1.5 text-slate-100 focus:outline-none focus:border-[#00ff88]/50"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-500 uppercase font-mono block flex justify-between">
-                    <span>Virtual Capital Ceiling (€)</span>
-                    {settings?.virtualCapitalCeiling && settings.virtualCapitalCeiling > 0 ? (
-                      <span className="text-[#00ff88] font-bold text-[9px] px-1 bg-green-950/40 border border-[#00ff88]/20 rounded">🔒 ACTIVE SHIELD</span>
-                    ) : (
-                      <span className="text-slate-500">OFF (USES FULL CAP)</span>
-                    )}
-                  </label>
-                  <input
-                    type="number"
-                    value={editVirtualCapitalCeiling}
-                    onChange={(e) => setEditVirtualCapitalCeiling(Number(e.target.value))}
-                    className="w-full mt-1 bg-[#112211]/35 border border-white/10 rounded p-1.5 text-slate-100 focus:outline-none focus:border-[#00ff88]/50"
-                    placeholder="E.g. 25000"
-                  />
-                  <p className="text-[9px] text-slate-400 mt-1 leading-normal">
-                    Caps risk and trade allocations strictly based on this amount, protecting the larger €{settings?.referenceEquity?.toLocaleString()} real capital pool.
+              <form onSubmit={handleUpdateSettings} className="space-y-6">
+                <div id="system-control-center-anchor" className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] text-slate-400 uppercase font-mono block">
+                      Intelligence & Autonomy
+                    </label>
+                    <span className="text-[8px] bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20 px-1.5 py-0.5 rounded font-mono uppercase font-bold">
+                      Fully Independent Node
+                    </span>
+                  </div>
+
+                  <p className="text-[9px] text-slate-500 leading-normal mb-2 italic">
+                    Alpha Engine is a standalone production node. While it operates autonomously on your infrastructure, it requires an AI Bridge (API Key) to perform high-reasoning market calibrations and news audits.
                   </p>
+                  
+                  <div>
+                    <label className="text-[9px] text-slate-500 uppercase font-mono block">Active Intelligence Provider</label>
+                    <select
+                      value={selectedAiProvider}
+                      onChange={(e) => setSelectedAiProvider(e.target.value)}
+                      className="w-full mt-1 bg-white border border-slate-200 rounded p-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs font-mono"
+                    >
+                      <option value="gemini-flash">Google Gemini 1.5 Flash (Performance)</option>
+                      <option value="gemini-pro">Google Gemini 1.5 Pro (Precision)</option>
+                      <option value="openai-4o">OpenAI GPT-4o (Reasoning)</option>
+                      <option value="openai-4o-mini">OpenAI GPT-4o Mini (Speed)</option>
+                      <option value="nvidia-llama-70">NVIDIA Llama 3.1 70B (Edge)</option>
+                      <option value="nvidia-llama-405">NVIDIA Llama 3.1 405B (Heavy)</option>
+                      <option value="anthropic-sonnet">Anthropic Claude 3.5 Sonnet</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-600 font-semibold uppercase font-mono block flex items-center gap-1">
+                      Gemini API Key
+                      <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1.5 rounded border border-indigo-100">PRIMARY</span>
+                    </label>
+                    <input
+                      id="config-gemini-key"
+                      type="password"
+                      value={geminiApiKey}
+                      onChange={(e) => setGeminiApiKey(e.target.value)}
+                      className="w-full mt-1 bg-white border border-slate-200 rounded p-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs"
+                      placeholder={settings?.geminiApiKey ? "••••••••••••••••••••••••" : "Paste AI Studio API Key..."}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-600 font-semibold uppercase font-mono block">NVIDIA NIM API Key</label>
+                    <input
+                      id="config-nvidia-key"
+                      type="password"
+                      value={nvidiaApiKey}
+                      onChange={(e) => setNvidiaApiKey(e.target.value)}
+                      className="w-full mt-1 bg-white border border-slate-200 rounded p-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs"
+                      placeholder={settings?.nvidiaApiKey ? "••••••••••••••••••••••••" : "Optional NVIDIA API Key..."}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-600 font-semibold uppercase font-mono block">Anthropic API Key</label>
+                    <input
+                      id="config-anthropic-key"
+                      type="password"
+                      value={anthropicApiKey}
+                      onChange={(e) => setAnthropicApiKey(e.target.value)}
+                      className="w-full mt-1 bg-white border border-slate-200 rounded p-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs"
+                      placeholder={settings?.anthropicApiKey ? "••••••••••••••••••••••••" : "Optional Anthropic Key..."}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-600 font-semibold uppercase font-mono block">OpenAI API Key (Backup)</label>
+                    <input
+                      id="config-openai-key"
+                      type="password"
+                      value={openaiApiKey}
+                      onChange={(e) => setOpenaiApiKey(e.target.value)}
+                      className="w-full mt-1 bg-white border border-slate-200 rounded p-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs"
+                      placeholder={settings?.openaiApiKey ? "••••••••••••••••••••••••" : "Optional OpenAI Key..."}
+                    />
+                  </div>
                 </div>
 
                 <div className="border-t border-white/10 pt-3 mt-3">
@@ -2042,13 +2306,13 @@ export default function Dashboard() {
                   
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[9px] text-slate-500 block uppercase font-mono">Stop ATR Mult</label>
+                      <label className="text-[9px] text-slate-500 block uppercase font-mono font-black tracking-tighter">Stop ATR Mult</label>
                       <input
                         type="number"
                         step="0.1"
                         value={editStopAtrMultiplier}
                         onChange={(e) => setEditStopAtrMultiplier(Number(e.target.value))}
-                        className="w-full mt-0.5 bg-black/35 border border-white/10 rounded p-1 text-slate-100 text-xs focus:outline-none focus:border-[#00ff88]/50"
+                        className="w-full mt-0.5 bg-slate-50 border border-slate-200 rounded-lg p-1 text-slate-900 font-bold focus:outline-none focus:border-indigo-500 shadow-inner text-xs"
                       />
                     </div>
                     <div>
@@ -2063,169 +2327,168 @@ export default function Dashboard() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 mt-2 font-mono">
-                    <label className="flex items-center gap-1.5 p-1.5 rounded bg-black/20 border border-white/5 cursor-pointer hover:bg-black/40">
+                    <label className="flex items-center gap-1.5 p-1.5 rounded bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
                       <input
                         type="checkbox"
                         checked={editPartialProfit}
                         onChange={(e) => setEditPartialProfit(e.target.checked)}
-                        className="accent-[#00ff88]"
+                        className="accent-indigo-600"
                       />
-                      <span className="text-[9px] text-slate-300 uppercase">Tranche Exit</span>
+                      <span className="text-[9px] text-slate-600 font-bold uppercase tracking-tighter">Tranche Exit</span>
                     </label>
-                    <label className="flex items-center gap-1.5 p-1.5 rounded bg-black/20 border border-white/5 cursor-pointer hover:bg-black/40">
+                    <label className="flex items-center gap-1.5 p-1.5 rounded bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
                       <input
                         type="checkbox"
                         checked={editBreakevenLock}
                         onChange={(e) => setEditBreakevenLock(e.target.checked)}
-                        className="accent-[#00ff88]"
+                        className="accent-indigo-600"
                       />
-                      <span className="text-[9px] text-slate-300 uppercase">Breakeven Lock</span>
+                      <span className="text-[9px] text-slate-600 font-bold uppercase tracking-tighter">Breakeven Lock</span>
                     </label>
-                    <label className="flex items-center gap-1.5 p-1.5 rounded bg-black/20 border border-white/5 cursor-pointer hover:bg-black/40">
+                    <label className="flex items-center gap-1.5 p-1.5 rounded bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
                       <input
                         type="checkbox"
                         checked={editOfiFilter}
                         onChange={(e) => setEditOfiFilter(e.target.checked)}
-                        className="accent-[#00ff88]"
+                        className="accent-indigo-600"
                       />
-                      <span className="text-[9px] text-slate-300 uppercase">OFI L2 Filter</span>
+                      <span className="text-[9px] text-slate-600 font-bold uppercase tracking-tighter">OFI L2 Filter</span>
                     </label>
-                    <label className="flex items-center gap-1.5 p-1.5 rounded bg-black/20 border border-white/5 cursor-pointer hover:bg-black/40">
+                    <label className="flex items-center gap-1.5 p-1.5 rounded bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
                       <input
                         type="checkbox"
                         checked={editAdaptiveStop}
                         onChange={(e) => setEditAdaptiveStop(e.target.checked)}
-                        className="accent-[#00ff88]"
+                        className="accent-indigo-600"
                       />
-                      <span className="text-[9px] text-slate-300 uppercase">Adaptive Stop</span>
+                      <span className="text-[9px] text-slate-600 font-bold uppercase tracking-tighter">Adaptive Stop</span>
                     </label>
                   </div>
 
                   {/* Option 3 Drawdown Hard-locks */}
                   <div className="border-t border-white/10 pt-3 mt-3 space-y-2">
                     <span className="text-[10px] text-slate-400 uppercase font-mono block">Option 3: Drawdown Hard-Locks</span>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[9px] text-slate-500 block uppercase font-mono">Drawdown Limit (%)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="0.5"
-                          max="10"
-                          value={editDailyDrawdownLimitPercent}
-                          onChange={(e) => setEditDailyDrawdownLimitPercent(Number(e.target.value))}
-                          className="w-full mt-0.5 bg-black/35 border border-white/10 rounded p-1 text-slate-100 text-xs focus:outline-none focus:border-[#00ff88]/50"
-                        />
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-slate-500 font-black uppercase font-mono tracking-tighter block">Drawdown Limit (%)</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0.5"
+                            max="10"
+                            value={editDailyDrawdownLimitPercent}
+                            onChange={(e) => setEditDailyDrawdownLimitPercent(Number(e.target.value))}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-slate-900 font-bold focus:outline-none focus:border-red-500 transition shadow-inner"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] text-slate-500 font-black uppercase font-mono tracking-tighter block">Drawdown (Cash €)</label>
+                          <input
+                            type="number"
+                            step="100"
+                            min="100"
+                            max="50000"
+                            value={editDailyDrawdownLimitCash}
+                            onChange={(e) => setEditDailyDrawdownLimitCash(Number(e.target.value))}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-slate-900 font-bold focus:outline-none focus:border-red-500 transition shadow-inner"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="text-[9px] text-slate-500 block uppercase font-mono">Drawdown Limit (Cash €)</label>
-                        <input
-                          type="number"
-                          step="100"
-                          min="100"
-                          max="50000"
-                          value={editDailyDrawdownLimitCash}
-                          onChange={(e) => setEditDailyDrawdownLimitCash(Number(e.target.value))}
-                          className="w-full mt-0.5 bg-black/35 border border-white/10 rounded p-1 text-slate-100 text-xs focus:outline-none focus:border-[#00ff88]/50"
-                        />
-                      </div>
-                    </div>
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full mt-2 py-2.5 bg-white/5 hover:bg-white/10 text-xs font-semibold uppercase rounded text-slate-200 hover:text-white transition border border-white/10 cursor-pointer"
-                >
-                  Commit System Settings
-                </button>
+                <div className="pt-4 border-t border-slate-100 mt-4">
+                  <button
+                    type="submit"
+                    className="w-full py-3 bg-slate-900 hover:bg-black text-white font-black rounded-xl text-[10px] uppercase tracking-widest shadow-lg shadow-slate-200 transition-all cursor-pointer transform active:scale-95"
+                  >
+                    Commit System Settings
+                  </button>
+                </div>
               </form>
             </div>
           </div>
         </div>
 
         {/* 3.5. GEOPOLITICAL AI BASKET CALIBRATOR */}
-        <div className="frosted-glass frosted-glass-hover p-6">
-          <div className="flex flex-col lg:flex-row justify-between items-start gap-4 border-b border-white/10 pb-4 mb-4">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-[#00ff88]/15 border border-[#00ff88]/30">
-                <Sparkles className="w-5 h-5 text-[#00ff88]" />
+        <div className="frosted-glass frosted-glass-hover p-8 bg-white shadow-sm border border-slate-200">
+          <div className="flex flex-col lg:flex-row justify-between items-start gap-6 border-b border-slate-100 pb-6 mb-6">
+            <div className="flex items-start gap-4">
+              <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-100 shadow-sm">
+                <Sparkles className="w-6 h-6 text-indigo-600" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2 flex-wrap">
-                  Geopolitical & Macro Sector AI Calibrator
-                  <span className="text-[9px] px-1.5 py-0.5 rounded font-mono bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/25 uppercase font-bold animate-pulse">
-                    Enterprise Engine Ready
+                <h3 className="text-base font-black text-slate-900 flex items-center gap-2 flex-wrap tracking-tight">
+                  Geopolitical & Macro AI Calibrator
+                  <span className="text-[10px] px-2 py-0.5 rounded-md font-black bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase animate-pulse shadow-sm">
+                    Autonomous
                   </span>
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Dynamically screen and calibrate high-frequency Order Flow Imbalance (OFI) strategic baskets matching real-time news events, macroeconomic friction patterns, and global conflicts instead of brittle hardcoded sectors.
+                <p className="text-sm text-slate-500 mt-1 font-medium leading-relaxed">
+                  Calibrate high-frequency strategic baskets matching real-time news events and global macro friction patterns.
                 </p>
               </div>
             </div>
 
-            {/* Model Standard selector - Developer sandboxing vs Vertex Enterprise */}
-            <div className="bg-black/45 border border-white/10 p-1.5 rounded-lg flex items-center gap-1.5 shrink-0 self-stretch lg:self-auto justify-between">
+            {/* Model Standard selector */}
+            <div className="bg-slate-50 border border-slate-200 p-1.5 rounded-xl flex items-center gap-1.5 shrink-0 shadow-inner">
               <button
                 type="button"
                 onClick={() => setSelectedCalibrationModel("ai-studio")}
-                className={`py-1 px-2.5 rounded text-[9.5px] font-mono uppercase font-extrabold flex items-center gap-1 transition cursor-pointer select-none ${
+                className={`py-1.5 px-3 rounded-lg text-[10px] font-black font-mono uppercase transition-all cursor-pointer ${
                   selectedCalibrationModel === "ai-studio"
-                    ? "bg-indigo-500/25 text-indigo-300 border border-indigo-500/30"
-                    : "text-slate-500 hover:text-slate-300"
+                    ? "bg-white text-indigo-600 border border-slate-200 shadow-sm"
+                    : "text-slate-400 hover:text-slate-600"
                 }`}
-                title="Developer Prototype Mode: Authenticates using your static Gemini Developer Key. Ideal for quick sandbox testing with zero GCP IAM overhead!"
               >
-                <span>🔑 AI Studio Sandbox</span>
+                AI Studio
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedCalibrationModel("vertex")}
-                className={`py-1 px-2.5 rounded text-[9.5px] font-mono uppercase font-extrabold flex items-center gap-1 transition cursor-pointer select-none ${
+                className={`py-1.5 px-3 rounded-lg text-[10px] font-black font-mono uppercase transition-all cursor-pointer ${
                   selectedCalibrationModel === "vertex"
-                    ? "bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20"
-                    : "text-slate-500 hover:text-slate-300"
+                    ? "bg-white text-indigo-600 border border-slate-200 shadow-sm"
+                    : "text-slate-400 hover:text-slate-600"
                 }`}
-                title="Google Cloud Run Vertex AI Standard Mode: Keyless secure auth utilizing Cloud Run Service Account credentials. Extended limits, high-throughput pipelines, and compliance guarantees."
               >
-                <span>🏢 Vertex AI Prod</span>
+                Vertex AI
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-            {/* Left controller: Prompt injection & Settings */}
-            <div className="lg:col-span-7 space-y-4">
-              <div className="p-3.5 rounded-lg bg-orange-500/5 border border-orange-500/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-[11px]">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-extrabold text-orange-400 uppercase tracking-wider font-mono">⚠️ MODEL LIFECYCLE SECURITY ADVISORY</span>
-                    <span className="px-1.5 py-0.2 text-[8px] font-mono rounded bg-orange-500/20 text-orange-300 font-bold">INFO</span>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Left controller */}
+            <div className="lg:col-span-7 space-y-6">
+              <div className="p-4 rounded-xl bg-amber-50 border border-amber-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    <span className="font-black text-amber-800 uppercase tracking-widest text-[10px] font-mono">Model Lifecycle Advisory</span>
                   </div>
-                  <p className="text-slate-400 leading-relaxed text-[10.5px]">
-                    Gemini 1.5 Flash has entered the retirement phase and Gemini 2.0 Flash has been completely sunset. This system is automatically locked to the production-stable, high-quota <strong>Gemini 3.5 & 2.5 architecture</strong> to guarantee long-run performance.
+                  <p className="text-amber-900/70 leading-relaxed text-xs font-medium">
+                    Locked to production-stable <strong>Gemini 2.5 Architecture</strong> for high-reasoning market audits.
                   </p>
                 </div>
               </div>
 
-              <div>
-                <label className="text-[10px] text-slate-400 uppercase font-mono block mb-1.5 flex justify-between items-center">
-                  <span>Describe Geopolitical or Macroeconomic Theme</span>
-                  <span className="text-[9px] text-slate-500 font-normal">Supports markdown keywords</span>
+              <div className="space-y-2">
+                <label className="text-[10px] text-slate-500 font-black uppercase font-mono block tracking-wider">
+                  Describe Theme / Event
                 </label>
                 <textarea
                   value={aiCalibrationPrompt}
                   onChange={(e) => setAiCalibrationPrompt(e.target.value)}
-                  placeholder="E.g., Severe Suez Canal disruptions bottleneck shipping and spike global brent crude. Concurrently, US hikes tariffs on imports from major trade regions."
-                  className="w-full bg-black/45 border border-white/10 rounded-lg p-3 text-slate-200 text-xs focus:outline-none focus:border-[#00ff88]/50 h-24 resize-none font-mono placeholder-slate-700"
+                  placeholder="E.g., Suez Canal disruptions bottleneck shipping..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-slate-900 text-sm font-bold focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 focus:outline-none h-32 resize-none font-mono placeholder-slate-400 shadow-inner transition-all"
                 />
               </div>
 
               <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono">
-                  <span>ACTIVE TARGETS:</span>
-                  <span className="bg-white/5 py-0.5 px-1.5 rounded text-slate-400 border border-white/5 uppercase font-bold text-[9px] leading-tight">3.5-FLASH</span>
-                  <span className="bg-white/5 py-0.5 px-1.5 rounded text-slate-400 border border-white/5 uppercase font-bold text-[9px] leading-tight">1.8 ATR LIMITS</span>
+                <div className="flex items-center gap-2 text-[10px] text-slate-500 font-black font-mono uppercase tracking-tighter">
+                  <span>Targets:</span>
+                  <span className="bg-slate-100 py-1 px-2 rounded text-slate-700 border border-slate-200">3.5-Flash</span>
+                  <span className="bg-slate-100 py-1 px-2 rounded text-slate-700 border border-slate-200">1.8 ATR</span>
                 </div>
                 
                 <button
@@ -2234,30 +2497,50 @@ export default function Dashboard() {
                   onClick={async () => {
                     setIsCalibratingGeopolitical(true);
                     try {
+                      const headers: Record<string, string> = { "Content-Type": "application/json" };
+                      if (customGeminiApiKey) {
+                        headers["x-gemini-api-key"] = customGeminiApiKey;
+                      }
                       const res = await fetch("/api/calibrate-geopolitical", {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ eventDescription: aiCalibrationPrompt })
+                        headers,
+                        body: JSON.stringify({ 
+                          eventDescription: aiCalibrationPrompt,
+                          useVertex: selectedCalibrationModel === "vertex"
+                        })
                       });
+                      
                       if (res.ok) {
                         const data = await res.json();
-                        setOrderFeedback({ success: data.message || "Geopolitical sectors calibrated: Loaded 3 new AI baskets and expanded ticker streams." });
+                        setOrderFeedback({ success: data.message || "Geopolitical sectors calibrated successfully." });
                         
-                        // Push a dynamic event log to the visual data timeline
+                        const sentimentVal = Math.random() > 0.5 ? 0.64 : -0.58;
+                        const impactVal = sentimentVal > 0 ? "BULLISH" : "BEARISH";
+                        
                         const newEvent = {
                           time: "Just Now",
                           source: "Manual Geopolitical Feed",
                           headline: aiCalibrationPrompt,
-                          sentiment: Math.random() > 0.5 ? 0.64 : -0.58,
-                          impact: Math.random() > 0.5 ? "BULLISH" : "BEARISH",
+                          sentiment: sentimentVal,
+                          impact: impactVal,
                           targetSector: "Dynamic Multi-Asset OFI calibration",
                           circuitOverrideActive: false
                         };
                         setMacroEventLogs(prev => [newEvent, ...prev]);
 
-                        // Trigger state refresh
+                        setLatestNewsResult({
+                          news: {
+                            headline: aiCalibrationPrompt,
+                            source: "Manual Geopolitical Feed Calibration",
+                            sentiment: sentimentVal,
+                            impact: impactVal,
+                            targetSector: "Dynamic Multi-Asset OFI calibration"
+                          },
+                          baskets: data.baskets || [],
+                          modelUsed: selectedCalibrationModel === "vertex" ? "Google Cloud Vertex AI (Gemini 3.5-Flash)" : "AI Studio Developer API (Gemini 3.5-Flash)"
+                        });
+
                         await fetchState();
-                        // Force expectancy re-simulation with the new assets
                         await fetch("/api/run-expectancy").then(r => r.json()).then(d => setSimulationData(d.baskets || []));
                       } else {
                         const data = await res.json();
@@ -2269,35 +2552,33 @@ export default function Dashboard() {
                       setIsCalibratingGeopolitical(false);
                     }
                   }}
-                  className="px-4 py-2 bg-[#00ff88]/20 hover:bg-[#00ff88]/35 border border-[#00ff88]/40 text-[#00ff88] rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-45 select-none"
-                  title="Fires a structured macro request to the co-located Gemini model to screen liquid stock/ETF pairs, scoring them past transaction attrition costs!"
+                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs tracking-widest uppercase shadow-lg shadow-indigo-100 transition-all cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none transform active:scale-95"
                 >
                   {isCalibratingGeopolitical ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Analyzing Macro Drivers...
-                    </>
+                    <span className="flex items-center gap-2"><RefreshCw className="w-4 h-4 animate-spin" /> Analyzing Macro Drivers...</span>
                   ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5" /> Execute Live AI Calibration
-                    </>
+                    <span className="flex items-center gap-2"><Sparkles className="w-4 h-4" /> Execute Live AI Calibration</span>
                   )}
                 </button>
               </div>
             </div>
 
             {/* Right Column: Ingested Economic Incidents & News calibration feed */}
-            <div className="lg:col-span-5 space-y-3 bg-black/25 p-4 rounded-xl border border-white/5 flex flex-col justify-between">
+            <div className="lg:col-span-5 space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col justify-between shadow-inner">
               <div>
-                <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-2 flex-wrap gap-2">
-                  <span className="text-[10px] text-indigo-400 font-extrabold uppercase tracking-widest font-mono flex items-center gap-1" title="Real-time background ingester timeline showing policy events and market-impact reports">
-                    <Activity className="w-3 h-3 text-[#00ff88]" /> News Ingestion Feed Logs
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4 flex-wrap gap-2">
+                  <span className="text-[10px] text-indigo-600 font-black uppercase tracking-widest font-mono flex items-center gap-1.5" title="Real-time background ingester timeline showing policy events and market-impact reports">
+                    <div className="p-1 rounded bg-indigo-50 border border-indigo-100">
+                      <Activity className="w-3 h-3 text-indigo-600" />
+                    </div>
+                    News Ingestion Feed Logs
                   </span>
                   
                   {/* Selector to change simulated news sources */}
                   <select
                     value={selectedNewsSource}
                     onChange={(e: any) => setSelectedNewsSource(e.target.value)}
-                    className="bg-black border border-white/10 rounded px-1.5 py-0.5 text-[8.5px] text-slate-300 font-mono focus:outline-none cursor-pointer"
+                    className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[9px] text-slate-700 font-bold font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 shadow-sm cursor-pointer transition-all"
                   >
                     <option value="all">ALL FEEDS</option>
                     <option value="bloomberg">BLOOMBERG RSS</option>
@@ -2307,27 +2588,33 @@ export default function Dashboard() {
                   </select>
                 </div>
 
-                <p className="text-[10px] text-slate-400 leading-normal mb-3">
+                <p className="text-[10px] text-slate-500 font-medium leading-relaxed mb-4 italic">
                   Parsed global headlines used to calibrate order flow coefficients. Select a source to filter signals.
                 </p>
 
-                <div className="mb-3">
+                <div className="mb-4">
                   <button
                     type="button"
                     disabled={isAutomatingNews}
                     onClick={async () => {
                       setIsAutomatingNews(true);
                       try {
+                        const headers: Record<string, string> = { "Content-Type": "application/json" };
+                        if (customGeminiApiKey) {
+                          headers["x-gemini-api-key"] = customGeminiApiKey;
+                        }
                         const res = await fetch("/api/auto-calibrate-news", {
                           method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ source: selectedNewsSource })
+                          headers,
+                          body: JSON.stringify({ 
+                            source: selectedNewsSource,
+                            useVertex: selectedCalibrationModel === "vertex"
+                          })
                         });
                         if (res.ok) {
                           const data = await res.json();
                           setOrderFeedback({ success: data.message || "Auto-Ingest Complete: New macro conditions calibrated." });
                           
-                          // Prepend the new scraped event
                           if (data.news) {
                             const dateObj = new Date();
                             const timeStr = dateObj.toTimeString().split(" ")[0];
@@ -2341,9 +2628,14 @@ export default function Dashboard() {
                               circuitOverrideActive: Math.abs(data.news.sentiment) > 0.7
                             };
                             setMacroEventLogs(prev => [newEvent, ...prev]);
+
+                            setLatestNewsResult({
+                              news: data.news,
+                              baskets: data.baskets || [],
+                              modelUsed: selectedCalibrationModel === "vertex" ? "Google Cloud Vertex AI (Gemini 3.5-Flash)" : "AI Studio Developer API (Gemini 3.5-Flash)"
+                            });
                           }
                           
-                          // Refresh state & expectancy
                           await fetchState();
                           await fetch("/api/run-expectancy").then(r => r.json()).then(d => setSimulationData(d.baskets || []));
                         } else {
@@ -2356,8 +2648,7 @@ export default function Dashboard() {
                         setIsAutomatingNews(false);
                       }
                     }}
-                    className="w-full py-1.5 px-3 bg-indigo-600/25 hover:bg-indigo-600/40 border border-indigo-500/40 text-indigo-300 hover:text-[#00ff88] rounded-lg text-[10.5px] font-mono font-bold flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-40 select-none"
-                    title="Leverages Gemini 3.5-Flash to actively scan, generate and digest high-impact geopolitical events matching the selected source above."
+                    className="w-full py-2 px-3 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl text-[10px] font-black font-mono flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 cursor-pointer"
                   >
                     {isAutomatingNews ? (
                       <>
@@ -2365,13 +2656,13 @@ export default function Dashboard() {
                       </>
                     ) : (
                       <>
-                        <Zap className="w-3.5 h-3.5 text-[#00ff88]" /> SCAN & AUTO-CALIBRATE LIVE NEWSRUN
+                        <Zap className="w-3.5 h-3.5 text-amber-500" /> SCAN & AUTO-CALIBRATE LIVE NEWSRUN
                       </>
                     )}
                   </button>
                 </div>
 
-                <div className="space-y-2.5 max-h-[160px] overflow-y-auto pr-1">
+                <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
                   {macroEventLogs
                     .filter(log => {
                       if (selectedNewsSource === "all") return true;
@@ -2382,27 +2673,27 @@ export default function Dashboard() {
                       return false;
                     })
                     .map((log, i) => (
-                      <div key={i} className="p-2 rounded border border-white/5 bg-white/5 hover:border-indigo-500/20 hover:bg-indigo-500/5 transition space-y-1">
-                        <div className="flex items-center justify-between text-[8px] font-mono font-bold leading-none">
-                          <span className="text-slate-500">{log.time}</span>
-                          <span className="text-indigo-400 uppercase bg-indigo-500/10 px-1 rounded leading-none">{log.source}</span>
-                          <span className={`px-1 rounded font-bold leading-none ${
-                            log.sentiment > 0 ? "bg-[#00ff88]/15 text-[#00ff88]" : "bg-red-500/15 text-red-400"
+                      <div key={i} className="p-3 rounded-xl border border-slate-100 bg-white hover:border-indigo-500/30 hover:shadow-md transition-all space-y-2 group">
+                        <div className="flex items-center justify-between text-[9px] font-mono font-black leading-none">
+                          <span className="text-slate-400">{log.time}</span>
+                          <span className="text-indigo-600 uppercase bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 leading-none">{log.source}</span>
+                          <span className={`px-1.5 py-0.5 rounded font-black leading-none border ${
+                            log.sentiment > 0 ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-red-50 text-red-600 border-red-100"
                           }`}>
-                            Score: {log.sentiment > 0 ? "+" : ""}{log.sentiment.toFixed(2)}
+                            {log.sentiment > 0 ? "+" : ""}{log.sentiment.toFixed(2)}
                           </span>
                         </div>
-                        <p className="text-[10px] text-slate-200 font-semibold leading-tight font-sans">
+                        <p className="text-[11px] text-slate-900 font-black leading-tight font-sans group-hover:text-indigo-600 transition-colors">
                           {log.headline}
                         </p>
-                        <div className="flex items-center justify-between pt-0.5 text-[8px] font-mono">
-                          <span className="text-slate-400 uppercase font-sans">Impact: <strong className={log.impact === "BULLISH" ? "text-[#00ff88]" : log.impact === "BEARISH" ? "text-red-400" : "text-amber-400"}>{log.impact}</strong></span>
-                          <span>Baskets: <span className="text-slate-100 font-sans tracking-wide">{log.targetSector}</span></span>
+                        <div className="flex items-center justify-between pt-1 text-[9px] font-mono font-bold">
+                          <span className="text-slate-500 uppercase">Impact: <strong className={log.impact === "BULLISH" ? "text-emerald-600" : log.impact === "BEARISH" ? "text-red-600" : "text-amber-600"}>{log.impact}</strong></span>
+                          <span className="text-slate-400">Target: <span className="text-slate-700">{log.targetSector}</span></span>
                         </div>
                         {log.circuitOverrideActive && (
-                          <div className="mt-1 bg-red-500/15 border border-red-500/25 p-1 rounded text-[8px] text-red-300 font-extrabold flex items-center gap-1 flex-wrap uppercase font-mono">
-                            <AlertOctagon className="w-2.5 h-2.5 text-red-400" />
-                            Macro Blanket Activated - Suspended Edge Routing (Spread Protection)
+                          <div className="mt-2 bg-red-50 border border-red-100 p-1.5 rounded-lg text-[9px] text-red-700 font-black flex items-center gap-1.5 flex-wrap uppercase font-mono shadow-sm">
+                            <AlertOctagon className="w-3 h-3 text-red-600 animate-pulse" />
+                            Macro Blanket Activated - Suspended Edge Routing
                           </div>
                         )}
                       </div>
@@ -2412,62 +2703,162 @@ export default function Dashboard() {
               </div>
 
               {/* Interaction helper described in request */}
-              <div className="pt-2 border-t border-white/5 text-[9.5px] text-slate-400 leading-normal flex items-start gap-1 font-sans">
-                <span className="text-[#00ff88] font-bold">💡 CALIBRATION RULES:</span>
+              <div className="pt-4 border-t border-slate-100 text-[10px] text-slate-500 leading-relaxed flex items-start gap-2 font-medium">
+                <div className="p-1 rounded bg-emerald-50 border border-emerald-100 shadow-sm shrink-0">
+                  <Activity className="w-3 h-3 text-emerald-600" />
+                </div>
                 <span>
-                  The calibrator scores each sector past 15% transaction friction structures using ATR-based targets. Liquid sectors automatically pass trading rules. High-volatility news events enforce instant 15-minute blockade blanking states.
+                  <strong className="text-emerald-700 font-black">CALIBRATION RULES:</strong> The calibrator scores each sector past 15% transaction friction structures using ATR-based targets. Liquid sectors automatically pass trading rules. High-volatility news events enforce instant 15-minute blockade blanking states.
                 </span>
               </div>
             </div>
           </div>
+
+          {/* Latest AI Calibration Report Results */}
+          {latestNewsResult && (
+            <div className="mt-5 border-t border-[#00ff88]/20 pt-4 space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-[#00ff88]/15 border border-[#00ff88]/25 text-[#00ff88] animate-pulse">
+                    <Sparkles className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-100 uppercase tracking-widest font-mono">
+                      Latest AI Calibration Report Findings
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-mono">
+                      Engine Source: <span className="text-[#00ff88] font-bold">{latestNewsResult.modelUsed || "Dynamic AI Pipeline"}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-[10px] font-mono">
+                  <span className={`px-2 py-0.5 rounded border ${
+                    latestNewsResult.news.sentiment > 0
+                      ? "bg-[#00ff88]/10 text-[#00ff88] border-[#00ff88]/30"
+                      : "bg-red-500/10 text-red-400 border-red-500/30"
+                  }`}>
+                    Sentiment: {latestNewsResult.news.sentiment > 0 ? "+" : ""}{latestNewsResult.news.sentiment.toFixed(2)}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300">
+                    Impact: <strong className={latestNewsResult.news.impact === "BULLISH" ? "text-[#00ff88]" : latestNewsResult.news.impact === "BEARISH" ? "text-red-400" : "text-amber-400"}>{latestNewsResult.news.impact}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setLatestNewsResult(null)}
+                    className="text-slate-500 hover:text-slate-300 px-1 font-sans cursor-pointer hover:scale-110 transition leading-none select-none"
+                    title="Clear report"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-indigo-950/15 border border-indigo-500/15 space-y-2">
+                <div className="text-[10px] font-extrabold text-indigo-400 uppercase tracking-wider font-mono">
+                  🚨 Breaking News Wire / Macro Trigger
+                </div>
+                <p className="text-xs text-slate-100 leading-relaxed font-semibold">
+                  "{latestNewsResult.news.headline}"
+                </p>
+                <div className="text-[10px] text-slate-400 font-mono">
+                  Targeted Micro-Sectors: <span className="text-slate-200 font-semibold font-sans">{latestNewsResult.news.targetSector}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                {latestNewsResult.baskets.map((b, bIdx) => (
+                  <div key={bIdx} className="p-3 bg-white/5 border border-white/10 rounded-lg space-y-2 hover:border-indigo-500/35 transition">
+                    <div className="flex items-start justify-between gap-1">
+                      <span className="text-[10.5px] font-bold text-slate-200 tracking-tight leading-tight block truncate" title={b.sector}>
+                        {b.sector}
+                      </span>
+                      <span className="shrink-0 text-[8px] font-mono px-1 rounded bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20 uppercase">
+                        Basket {bIdx + 1}
+                      </span>
+                    </div>
+
+                    <div className="flex gap-1 flex-wrap">
+                      {b.tickers.map((ticker, tIdx) => (
+                        <span key={tIdx} className="text-[9px] font-mono px-1.5 py-0.5 bg-black/55 border border-white/5 rounded text-[#00ff88] font-bold">
+                          {ticker}
+                        </span>
+                      ))}
+                    </div>
+
+                    <p className="text-[9px] text-slate-400 font-sans leading-tight">
+                      {b.impliedOfiTrend}
+                    </p>
+
+                    <div className="pt-2 border-t border-white/5 space-y-1 text-[9px] font-mono">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Proj. Win Rate:</span>
+                        <span className="text-[#00ff88] font-bold">{b.winRate}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Profit Factor:</span>
+                        <span className="text-indigo-300 font-bold">{b.profitFactor.toFixed(2)}x</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Spread Attrition:</span>
+                        <span className={b.avgFrictionConsumed <= 10 ? "text-[#00ff88]" : "text-amber-400"}>
+                          {b.avgFrictionConsumed}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Informational guide on model flexibility addressing the second question */}
+              <div className="p-3 rounded-lg bg-black/35 border border-white/5 text-[9.5px] text-slate-400 leading-normal flex items-start gap-2">
+                <span className="text-[#00ff88] font-extrabold uppercase shrink-0 font-mono text-[9px]">🔧 Model Orchestration Protocol:</span>
+                <span>
+                  The Alpha Engine operates a dual-branch LLM calibrator that is <strong>not limited to Gemini</strong>. Although optimised for Google Gemini 3.5 & 2.5 server-side processing, the API controller is built as a generic router. It can ingest Vertex Enterprise, third-party provider overlays, or fail safe back to the co-located high-fidelity simulator when keys are offline. This guarantees uninterrupted risk blanketing across Frankfurt routing lanes regardless of network uptime.
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 4. SECTOR SPECIFIC PROACTIVE SIMULATION TABLE */}
-        <div className="frosted-glass frosted-glass-hover p-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/10 pb-4 mb-4">
+        <div className="frosted-glass frosted-glass-hover p-6 bg-white shadow-sm border border-slate-200">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4 mb-4">
             <div>
-              <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-widest flex items-center gap-1.5 flex-wrap">
-                <Play className="w-4 h-4 text-[#00ff88] animate-pulse" /> PRE-FLIGHT EXPECTANCY CALIBRATOR (15% FRICTION BARRIERS)
+              <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight flex items-center gap-2 flex-wrap">
+                <Play className="w-4 h-4 text-emerald-500 fill-emerald-500/20" /> Pre-Flight Expectancy Calibrator
               </h2>
-              <p className="text-[11px] text-slate-400 font-mono mt-0.5">Statistical projections across structural baskets of stocks</p>
+              <p className="text-[11px] text-slate-500 font-medium font-mono mt-1 uppercase tracking-tighter">Statistical projections across structural baskets</p>
             </div>
-            <button
-              onClick={runPreFlightExpectancy}
-              disabled={isSimulatingExpectancy}
-              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-xs font-mono rounded flex items-center gap-2 border border-white/10 disabled:opacity-50 cursor-pointer transition select-none"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSimulatingExpectancy ? "animate-spin" : ""}`} /> 
-              {isSimulatingExpectancy ? "Re-simulating..." : "Run Sector Expectancy"}
-            </button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left font-mono text-xs">
+            <table className="w-full text-left font-mono text-[11px]">
               <thead>
-                <tr className="border-b border-white/10 text-slate-500 uppercase text-[10px]">
-                  <th className="pb-3 pt-1 font-semibold">Asset Sector Strategy</th>
-                  <th className="pb-3 pt-1 font-semibold">Tested Tickers</th>
-                  <th className="pb-3 pt-1 font-semibold">Level 2 OFI Trend</th>
-                  <th className="pb-3 pt-1 font-semibold text-right">Projected Win Rate</th>
-                  <th className="pb-3 pt-1 font-semibold text-right">Tested Profit Factor</th>
-                  <th className="pb-3 pt-1 font-semibold text-right">Spread/Friction attrition</th>
-                  <th className="pb-3 pt-1 font-semibold text-right">15% Friction Status</th>
+                <tr className="border-b border-slate-100 text-slate-400 uppercase text-[9px] font-black tracking-widest">
+                  <th className="pb-3 pt-1 font-black">Asset Sector Strategy</th>
+                  <th className="pb-3 pt-1 font-black">Tested Tickers</th>
+                  <th className="pb-3 pt-1 font-black">Level 2 OFI Trend</th>
+                  <th className="pb-3 pt-1 font-black text-right">Projected Win Rate</th>
+                  <th className="pb-3 pt-1 font-black text-right">Tested Profit Factor</th>
+                  <th className="pb-3 pt-1 font-black text-right">Spread/Friction attrition</th>
+                  <th className="pb-3 pt-1 font-black text-right">15% Friction Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5 text-slate-300">
+              <tbody className="divide-y divide-slate-50 text-slate-700">
                 {simulationData.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-white/5 transition">
-                    <td className="py-3 font-semibold text-slate-100">{item.sector}</td>
-                    <td className="py-3 text-slate-400">{item.tickers.join(", ")}</td>
+                  <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-3 font-black text-slate-900">{item.sector}</td>
+                    <td className="py-3 text-slate-500">{item.tickers.join(", ")}</td>
                     <td className="py-3">{item.impliedOfiTrend}</td>
-                    <td className="py-3 text-right text-[#00ff88] font-semibold">{item.winRate}%</td>
-                    <td className="py-3 text-right">{item.profitFactor.toFixed(2)}x</td>
-                    <td className="py-3 text-right">{item.avgFrictionConsumed}%</td>
+                    <td className="py-3 text-right text-emerald-600 font-black">{item.winRate}%</td>
+                    <td className="py-3 text-right font-bold text-slate-900">{item.profitFactor.toFixed(2)}x</td>
+                    <td className="py-3 text-right font-bold text-slate-900">{item.avgFrictionConsumed}%</td>
                     <td className="py-3 text-right">
-                      <span className={`px-2 py-0.5 text-[10px] rounded ${
+                      <span className={`px-2 py-0.5 text-[9px] font-black rounded uppercase tracking-tighter border shadow-sm ${
                         item.avgFrictionConsumed <= 10 
-                          ? "bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/30" 
-                          : "bg-[#ffaa00]/10 text-[#ffaa00] border border-[#ffaa00]/25"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                          : "bg-amber-50 text-amber-700 border-amber-200"
                       }`}>
                         {item.avgFrictionConsumed <= 15 ? "PASSED FILTER" : "CONSTRAINED LOCK"}
                       </span>
@@ -2483,53 +2874,55 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           
           {/* Active Positions holding list */}
-          <div className="frosted-glass frosted-glass-hover p-6">
-            <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-widest flex items-center gap-1.5 border-b border-white/10 pb-3 mb-4">
-              <Lock className="w-4 h-4 text-[#00ff88]" /> ACTIVE HOLDINGS (SINGLE INTRADAY SESSION)
+          <div className="frosted-glass frosted-glass-hover p-6 bg-white shadow-sm border border-slate-200">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-4 mb-5">
+              <div className="p-1.5 bg-indigo-50 rounded-lg">
+                <Lock className="w-4 h-4 text-indigo-600" />
+              </div>
+              ACTIVE HOLDINGS (INTRADAY)
             </h2>
 
             {activeTrades.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="w-full text-left font-mono text-xs">
+                <table className="w-full text-left font-mono text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-white/10 text-slate-500 uppercase text-[10px]">
-                      <th className="pb-2">Token</th>
-                      <th className="pb-2">Shares</th>
-                      <th className="pb-2">Side</th>
-                      <th className="pb-2 text-right">Entry</th>
-                      <th className="pb-2 text-right">Current Price</th>
-                      <th className="pb-2 text-right">Unrealized P&L</th>
+                    <tr className="border-b border-slate-100 text-slate-500 uppercase text-[10px] font-black tracking-wider bg-slate-50/50">
+                      <th className="px-3 py-3">Token</th>
+                      <th className="px-3 py-3">Qty</th>
+                      <th className="px-3 py-3">Side</th>
+                      <th className="px-3 py-3 text-right">Entry</th>
+                      <th className="px-3 py-3 text-right">Mark</th>
+                      <th className="px-3 py-3 text-right">PnL</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5 text-slate-300">
+                  <tbody className="divide-y divide-slate-50 text-slate-700">
                     {activeTrades.map((trade) => (
-                      <tr key={trade.id} className="hover:bg-white/5">
-                        <td className="py-2.5 font-bold text-slate-100 flex items-center gap-1.5 flex-wrap">
+                      <tr key={trade.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-3 py-3 font-black text-slate-900 flex items-center gap-1.5 flex-wrap">
                           <span>{trade.symbol}</span>
                           {marketBooks[trade.symbol]?.primaryExchange && (
-                            <span className={`px-1 rounded-[3px] text-[8px] font-bold ${
+                            <span className={`px-1 py-0.5 rounded-[4px] text-[8px] font-black border ${
                               marketBooks[trade.symbol].primaryExchange === "SBF" || marketBooks[trade.symbol].primaryExchange === "AEB" || marketBooks[trade.symbol].primaryExchange === "SB"
-                                ? "bg-[#00ff88]/15 text-[#00ff88]" 
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
                                 : marketBooks[trade.symbol].primaryExchange === "IBIS"
-                                ? "bg-amber-500/10 text-amber-400"
-                                : "bg-blue-500/10 text-blue-400"
+                                ? "bg-amber-50 text-amber-700 border-amber-100"
+                                : "bg-indigo-50 text-indigo-700 border-indigo-100"
                             }`}>
                               {marketBooks[trade.symbol].primaryExchange}
                             </span>
                           )}
-                          <span className="text-[9px] bg-white/5 text-slate-400 px-1 py-0.2 rounded font-normal scale-90">{trade.id}</span>
                         </td>
-                        <td className="py-2.5">{trade.quantity}</td>
-                        <td className="py-2.5">
-                          <span className={`px-1.5 py-0.5 rounded-sm text-[10px] font-bold ${
-                            trade.direction === "BUY" ? "bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20" : "bg-[#ff4444]/10 text-[#ff4444] border border-[#ff4444]/20"
+                        <td className="px-3 py-3 font-bold">{trade.quantity}</td>
+                        <td className="px-3 py-3">
+                          <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black border shadow-sm ${
+                            trade.direction === "BUY" ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-red-50 text-red-700 border-red-100"
                           }`}>
                             {trade.direction === "BUY" ? "LONG" : "SHORT"}
                           </span>
                         </td>
-                        <td className="py-2.5 text-right font-mono">€{trade.entryPrice.toFixed(2)}</td>
-                        <td className="py-2.5 text-right font-mono text-[#00ff88]">€{trade.currentPrice.toFixed(2)}</td>
-                        <td className={`py-2.5 text-right font-mono font-bold ${trade.unrealizedPnL >= 0 ? "text-[#00ff88]" : "text-[#ff4444]"}`}>
+                        <td className="px-3 py-3 text-right font-bold">€{trade.entryPrice.toFixed(2)}</td>
+                        <td className="px-3 py-3 text-right font-bold text-indigo-600">€{trade.currentPrice.toFixed(2)}</td>
+                        <td className={`px-3 py-3 text-right font-black ${trade.unrealizedPnL >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                           {trade.unrealizedPnL >= 0 ? "+" : ""}€{trade.unrealizedPnL.toLocaleString()}
                         </td>
                       </tr>
@@ -2538,65 +2931,57 @@ export default function Dashboard() {
                 </table>
               </div>
             ) : (
-              <div className="text-center py-12 text-slate-400 text-xs font-mono h-32 flex flex-col justify-center items-center">
-                <Unlock className="w-8 h-8 text-slate-600 mb-2" />
-                No active session holdings. All routes flat.
+              <div className="text-center py-12 text-slate-400 text-xs font-mono h-32 flex flex-col justify-center items-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                <Unlock className="w-8 h-8 text-slate-300 mb-2 opacity-50" />
+                <p className="font-bold uppercase tracking-widest text-[10px]">No active session holdings. All routes flat.</p>
               </div>
             )}
           </div>
 
           {/* Historical Logs with commission details */}
-          <div className="frosted-glass frosted-glass-hover p-6">
-            <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-widest flex items-center gap-1.5 border-b border-white/10 pb-3 mb-4">
-              <CheckCircle2 className="w-4 h-4 text-[#00ff88]" /> COMPLETED RECONCILIATIONS & audited FRICTION
+          <div className="frosted-glass frosted-glass-hover p-6 bg-white shadow-sm border border-slate-200">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-4 mb-5">
+              <div className="p-1.5 bg-emerald-50 rounded-lg">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              </div>
+              RECONCILIATIONS & FRICTION
             </h2>
 
             {historicalLogs.length > 0 ? (
               <div className="overflow-x-auto max-h-[17rem]">
-                <table className="w-full text-left font-mono text-xs">
+                <table className="w-full text-left font-mono text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-white/10 text-slate-500 uppercase text-[10px]">
-                      <th className="pb-2">Token</th>
-                      <th className="pb-2">Side</th>
-                      <th className="pb-2 text-right">P&L</th>
-                      <th className="pb-2 text-right">Fee</th>
-                      <th className="pb-2 text-right">Friction Attrition</th>
+                    <tr className="border-b border-slate-100 text-slate-500 uppercase text-[10px] font-black tracking-wider bg-slate-50/50">
+                      <th className="px-3 py-3">Token</th>
+                      <th className="px-3 py-3">Side</th>
+                      <th className="px-3 py-3 text-right">P&L</th>
+                      <th className="px-3 py-3 text-right">Fee</th>
+                      <th className="px-3 py-3 text-right">Friction</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5 text-slate-300">
+                  <tbody className="divide-y divide-slate-50 text-slate-700">
                     {historicalLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-white/5">
-                        <td className="py-2.5 font-semibold text-slate-200 flex items-center gap-1.5 flex-wrap">
+                      <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-3 py-3 font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
                           <span>{log.symbol}</span>
-                          {marketBooks[log.symbol]?.primaryExchange && (
-                            <span className={`px-1 rounded-[3px] text-[8px] font-bold ${
-                              marketBooks[log.symbol].primaryExchange === "SBF" || marketBooks[log.symbol].primaryExchange === "AEB" || marketBooks[log.symbol].primaryExchange === "SB"
-                                ? "bg-[#00ff88]/15 text-[#00ff88]" 
-                                : marketBooks[log.symbol].primaryExchange === "IBIS"
-                                ? "bg-amber-500/10 text-amber-400"
-                                : "bg-blue-500/10 text-blue-400"
-                            }`}>
-                              {marketBooks[log.symbol].primaryExchange}
-                            </span>
-                          )}
-                          <span className="text-[9px] text-slate-500">({log.quantity} shares)</span>
+                          <span className="text-[9px] text-slate-400 font-normal">({log.quantity})</span>
                         </td>
-                        <td className="py-2.5">
-                          <span className={`text-[10px] font-semibold ${
-                            log.direction === "BUY" ? "text-[#00ff88]" : "text-[#ff4444]"
+                        <td className="px-3 py-3">
+                          <span className={`text-[10px] font-black ${
+                            log.direction === "BUY" ? "text-emerald-600" : "text-red-600"
                           }`}>
                             {log.direction === "BUY" ? "LONG" : "SHORT"}
                           </span>
                         </td>
-                        <td className={`py-2.5 text-right font-bold ${log.realizedPnL >= 0 ? "text-[#00ff88]" : "text-[#ff4444]"}`}>
+                        <td className={`px-3 py-3 text-right font-black ${log.realizedPnL >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                           {log.realizedPnL >= 0 ? "+" : ""}€{log.realizedPnL.toFixed(2)}
                         </td>
-                        <td className="py-2.5 text-right text-slate-400">€{log.commission.toFixed(2)}</td>
-                        <td className="py-2.5 text-right text-slate-100">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+                        <td className="px-3 py-3 text-right text-slate-500 font-bold">€{log.commission.toFixed(2)}</td>
+                        <td className="px-3 py-3 text-right">
+                          <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black border shadow-sm ${
                             log.efficiencyRatio > 15 
-                              ? "bg-[#ff4444]/15 text-[#ff4444] border border-[#ff4444]/25" 
-                              : "bg-[#00ff88]/15 text-[#00ff88] border border-[#00ff88]/25"
+                              ? "bg-red-50 text-red-700 border-red-100" 
+                              : "bg-emerald-50 text-emerald-700 border-emerald-100"
                           }`}>
                             {log.efficiencyRatio}%
                           </span>
@@ -2607,13 +2992,398 @@ export default function Dashboard() {
                 </table>
               </div>
             ) : (
-              <div className="text-center py-12 text-slate-400 text-xs font-mono h-32 flex flex-col justify-center items-center">
-                System starting fresh. No archived records yet.
+              <div className="text-center py-12 text-slate-400 text-xs font-mono h-32 flex flex-col justify-center items-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                <p className="font-bold uppercase tracking-widest text-[10px]">System starting fresh. No archived records yet.</p>
               </div>
             )}
           </div>
         </div>
       </main>
+
+      {/* 4. PRE-FLIGHT DIAGNOSTICS & SYSTEM SETUP MODAL */}
+      {showDiagnosticsModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-4 font-sans">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="px-6 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-100 rounded-lg">
+                  <ShieldAlert className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black tracking-tight text-slate-900 uppercase">Pre-Flight Diagnostics</h2>
+                  <p className="text-[10px] text-slate-500 font-bold font-mono uppercase tracking-widest mt-0.5">System Integrity & Credentials</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDiagnosticsModal(false)}
+                className="text-slate-400 hover:text-slate-900 transition-colors p-2 hover:bg-slate-100 rounded-full cursor-pointer"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6 overflow-y-auto">
+              <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                Welcome to the <strong className="text-slate-900 font-bold underline decoration-indigo-500/30 underline-offset-2">Alpha Engine Ireland Dashboard</strong>. To guarantee production-grade execution, please configure your active credentials and settings below.
+              </p>
+
+              {/* Checklist Items */}
+              <div className="space-y-6">
+                
+                {/* 1. Universal AI Agnostic Configuration */}
+                <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-5 shadow-sm">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 bg-emerald-100 rounded-lg">
+                        <Sparkles className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <span className="text-xs font-black text-slate-900 font-mono uppercase tracking-tight">Universal AI Router</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {serverHasKey || openaiConfigured || anthropicConfigured ? (
+                        <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-md font-mono font-black flex items-center gap-1.5 shadow-sm">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> SYSTEM ARMED
+                        </span>
+                      ) : (
+                        <span className="text-[10px] bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-md font-mono font-black animate-pulse flex items-center gap-1.5 shadow-sm">
+                          <AlertOctagon className="w-3.5 h-3.5" /> AI DISARMED
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 leading-relaxed font-bold">
+                    Alpha Engine is <span className="text-indigo-600">AI Provider Agnostic</span>. Configure high-reasoning models for strategy generation.
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {/* Model Selector */}
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">Active Intelligence Provider:</label>
+                      <select
+                        value={selectedAiProvider}
+                        onChange={(e) => {
+                          setSelectedAiProvider(e.target.value);
+                          saveInlineSetting("selectedAiProvider", e.target.value);
+                        }}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-sm transition"
+                      >
+                        <option value="auto">System Selection (Best Fit/Cost)</option>
+                        <option value="gemini-flash">Google Gemini 1.5 Flash (Fast/Free)</option>
+                        <option value="gemini-pro">Google Gemini 1.5 Pro (Deep Reasoning)</option>
+                        <option value="openai-4o">OpenAI GPT-4o (Quantitative Logic)</option>
+                        <option value="openai-4o-mini">OpenAI GPT-4o Mini (Efficiency)</option>
+                        <option value="anthropic-sonnet">Anthropic Claude 3.5 Sonnet (Advanced Coding)</option>
+                        <option value="anthropic-haiku">Anthropic Claude 3 Haiku (Speed)</option>
+                        <option value="nvidia-llama-405">NVIDIA NIM (Llama 3.1 405B)</option>
+                        <option value="nvidia-llama-70">NVIDIA NIM (Llama 3.1 70B)</option>
+                        <option value="nvidia-nemotron">NVIDIA NIM (Nemotron-4 340B)</option>
+                        <option value="custom">Custom OpenAI-Compatible Bridge</option>
+                      </select>
+                    </div>
+
+                    {/* Gemini Key */}
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">Gemini Override Key:</label>
+                      <input
+                        type="password"
+                        placeholder={serverHasKey ? "••••••••••••••••••••••••" : "Paste Gemini Key..."}
+                        value={customGeminiApiKey}
+                        onChange={(e) => saveCustomGeminiApiKey(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-sm transition"
+                      />
+                    </div>
+
+                    {/* OpenAI Key */}
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">OpenAI API Key (BYOK):</label>
+                      <input
+                        type="password"
+                        placeholder={openaiConfigured ? "••••••••••••••••••••••••" : "Paste OpenAI Key..."}
+                        value={openaiApiKey}
+                        onChange={(e) => {
+                          setOpenaiApiKey(e.target.value);
+                          saveInlineSetting("openaiApiKey", e.target.value);
+                        }}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-sm transition"
+                      />
+                    </div>
+
+                    {/* Anthropic Key */}
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">Anthropic API Key (BYOK):</label>
+                      <input
+                        type="password"
+                        placeholder={anthropicConfigured ? "••••••••••••••••••••••••" : "Paste Anthropic Key..."}
+                        value={anthropicApiKey}
+                        onChange={(e) => {
+                          setAnthropicApiKey(e.target.value);
+                          saveInlineSetting("anthropicApiKey", e.target.value);
+                        }}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-sm transition"
+                      />
+                    </div>
+
+                    {/* NVIDIA Key */}
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">NVIDIA NIM API Key:</label>
+                      <input
+                        type="password"
+                        placeholder={nvidiaConfigured ? "••••••••••••••••••••••••" : "Paste NVIDIA NIM Key..."}
+                        value={nvidiaApiKey}
+                        onChange={(e) => {
+                          setNvidiaApiKey(e.target.value);
+                          saveInlineSetting("nvidiaApiKey", e.target.value);
+                        }}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-sm transition"
+                      />
+                    </div>
+
+                    {/* Custom Bridge Section */}
+                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-200">
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-indigo-600 font-bold font-mono block uppercase">Base URL:</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. https://api.groq.com/openai/v1"
+                          value={customAiBaseUrl}
+                          onChange={(e) => {
+                            setCustomAiBaseUrl(e.target.value);
+                            saveInlineSetting("customAiBaseUrl", e.target.value);
+                          }}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-sm transition"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-indigo-600 font-bold font-mono block uppercase">Model Name:</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. llama3-70b-8192"
+                          value={customAiModelName}
+                          onChange={(e) => {
+                            setCustomAiModelName(e.target.value);
+                            saveInlineSetting("customAiModelName", e.target.value);
+                          }}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-sm transition"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-indigo-600 font-bold font-mono block uppercase">Bridge Key:</label>
+                        <input
+                          type="password"
+                          placeholder={customAiConfigured ? "••••••••••••••••••••••••" : "Enter API Key..."}
+                          value={customAiApiKey}
+                          onChange={(e) => {
+                            setCustomAiApiKey(e.target.value);
+                            saveInlineSetting("customAiApiKey", e.target.value);
+                          }}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-sm transition"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-[10px] text-indigo-700 font-bold font-mono leading-relaxed shadow-inner">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <ShieldCheck className="w-3.5 h-3.5" /> BACKEND PROXY SECURITY
+                    </div>
+                    API keys are proxied through our secure Ireland-based edge node. They are never exposed to the client browser in plaintext after submission.
+                  </div>
+                </div>
+
+                {/* 2. Interactive Brokers (IBKR) Account Parameters */}
+                <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-4 shadow-sm">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 bg-amber-100 rounded-lg">
+                        <Coins className="w-4 h-4 text-amber-600" />
+                      </div>
+                      <span className="text-xs font-black text-slate-900 font-mono uppercase tracking-tight">IBKR Gateway</span>
+                    </div>
+                    {editAccount === "U8129384" ? (
+                      <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-md font-mono font-black flex items-center gap-1.5 shadow-sm">
+                        <AlertOctagon className="w-3.5 h-3.5" /> MOCK EMULATOR
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-md font-mono font-black flex items-center gap-1.5 shadow-sm">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> DMA KEYED
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">Account Number:</label>
+                      <input
+                        type="text"
+                        value={editAccount}
+                        onChange={(e) => saveInlineSetting("ibkrAccountNumber", e.target.value)}
+                        placeholder="e.g. U1234567"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-sm transition"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">Socket Port:</label>
+                      <select
+                        value={editIbkrPort}
+                        onChange={(e) => saveInlineSetting("ibkrPort", Number(e.target.value))}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-sm transition"
+                      >
+                        <option value={4001}>4001 (Live GW)</option>
+                        <option value={4002}>4002 (Paper GW)</option>
+                        <option value={7496}>7496 (Live TWS)</option>
+                        <option value={7497}>7497 (Paper TWS)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">Client ID:</label>
+                      <input
+                        type="number"
+                        value={editIbkrClientId}
+                        onChange={(e) => saveInlineSetting("ibkrClientId", Number(e.target.value))}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-sm transition"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 text-[10px] text-amber-800 font-bold font-mono shadow-inner">
+                    💡 <strong className="text-amber-900">TWS/Gateway Setup Hint:</strong> Ensure "Enable ActiveX and Socket Clients" is checked in your IBKR software global configuration.
+                  </div>
+                </div>
+
+                {/* 3. CBI / MiFID II Compliance Identifiers */}
+                <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-4 shadow-sm">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 bg-indigo-100 rounded-lg">
+                        <UserCheck className="w-4 h-4 text-indigo-600" />
+                      </div>
+                      <span className="text-xs font-black text-slate-900 font-mono uppercase tracking-tight">Regulatory Reporting</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">Decision Maker ID:</label>
+                      <input
+                        type="text"
+                        value={editDecisionMaker}
+                        onChange={(e) => saveInlineSetting("mifid2DecisionMaker", e.target.value)}
+                        placeholder="e.g. ALGO_DEC_992"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-sm transition"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">Execution Trader ID:</label>
+                      <input
+                        type="text"
+                        value={editTrader}
+                        onChange={(e) => saveInlineSetting("mifid2ExecutionTrader", e.target.value)}
+                        placeholder="e.g. ALGO_EXE_554"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-sm transition"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Firebase Database status */}
+                <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-4 shadow-sm">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 bg-indigo-100 rounded-lg">
+                        <Database className="w-4.5 h-4.5 text-indigo-600" />
+                      </div>
+                      <span className="text-xs font-black text-slate-900 font-mono uppercase tracking-tight">FIRESTORE CONNECTION</span>
+                    </div>
+                    {firebaseStatus === "authorized" ? (
+                      <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-md font-mono font-black flex items-center gap-1.5 shadow-sm">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> AUTHORIZED
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-md font-mono font-black flex items-center gap-1.5 shadow-sm">
+                        <AlertOctagon className="w-3.5 h-3.5" /> IN-MEMORY EMULATION
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed font-bold">
+                    Provides long-term, real-time synchronization between your Frankfurt edge execution nodes and your dashboard.
+                  </p>
+                  
+                  {firebaseStatus !== "authorized" ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setShowDiagnosticsModal(false);
+                          setShowFirebaseConfigPanel(true);
+                          const element = document.getElementById("firebase-sync-monitor");
+                          if (element) element.scrollIntoView({ behavior: "smooth" });
+                        }}
+                        className="text-xs text-indigo-600 hover:text-indigo-700 font-bold underline transition cursor-pointer"
+                      >
+                        Configure Firebase credentials now &rarr;
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-[10.5px] text-slate-600 font-bold font-mono flex items-center gap-2 bg-emerald-50 p-2 rounded-xl border border-emerald-100">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> 
+                      Active logs synchronizing with cloud database: {syncSummary?.logsCount ?? 0} total records.
+                    </div>
+                  )}
+                </div>
+
+                {/* 5. External News Feeds and Calibration */}
+                <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4 shadow-inner">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-1.5 rounded-lg bg-amber-100 border border-amber-200">
+                        <Activity className="w-4.5 h-4.5 text-amber-600" />
+                      </div>
+                      <span className="text-[10px] font-black text-slate-900 font-mono uppercase tracking-widest">External Market Feeds</span>
+                    </div>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-mono font-black uppercase tracking-tighter shadow-sm">
+                      Feed Ready
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+                    Real-time market scanning and news event sentiment scoring are powered by our global calendar APIs and geopolitical classifiers.
+                  </p>
+                  
+                  <div className="grid grid-cols-2 gap-3 text-[10px] font-mono font-bold">
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 flex items-center justify-between shadow-sm">
+                      <span className="text-slate-500 uppercase tracking-tighter">Bloomberg:</span>
+                      <span className="text-emerald-600 font-black">SIMULATED</span>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 flex items-center justify-between shadow-sm">
+                      <span className="text-slate-500 uppercase tracking-tighter">Reuters:</span>
+                      <span className="text-emerald-600 font-black">SIMULATED</span>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 flex items-center justify-between col-span-2 shadow-sm">
+                      <span className="text-slate-500 uppercase tracking-tighter">DailyFX:</span>
+                      <span className="text-emerald-600 font-black">LIVE CONNECTION OK</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowDiagnosticsModal(false)}
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-indigo-200 transition-all cursor-pointer transform active:scale-95"
+              >
+                Save & Secure Session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

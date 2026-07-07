@@ -12,6 +12,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAllowedUser() {
+      return isSignedIn() && (request.auth.token.email == "mstouff@gmail.com" || request.auth.uid == "XAu50UavvnRSXvh7i52NmKoDQOy2");
+    }
+
     function isValidId(id) {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
@@ -60,46 +64,24 @@ service cloud.firestore {
 
     // 2. Active Trades collection (Session Holdings)
     match /active_trades/{tradeId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn()
-        && isValidId(tradeId)
-        && isValidTrade(incoming());
-      allow update: if isSignedIn()
-        && isValidId(tradeId)
-        && isValidTrade(incoming())
-        && incoming().id == existing().id // Immutable fields
-        && incoming().symbol == existing().symbol
-        && incoming().direction == existing().direction
-        && incoming().entryPrice == existing().entryPrice
-        && incoming().diff(existing()).affectedKeys().hasOnly(['stopPrice', 'currentPrice', 'unrealizedPnL', 'quantity', 'timestamp', 'mifidDecisionMaker', 'mifidExecutionTrader']);
-      allow delete: if isSignedIn()
-        && isValidId(tradeId);
+      allow read, write: if isAllowedUser();
     }
 
     // 3. Historical logs collection
     match /historical_logs/{logId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn()
-        && isValidId(logId)
-        && isValidTradeLog(incoming());
-      // Updates and deletes strictly forbidden to preserve immutable historic transaction trails (MiFIR Audit compliance)
+      allow read, create: if isAllowedUser();
       allow update, delete: if false;
     }
 
     // 4. System Risk State config collection
     match /system_risk_state/{stateId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn()
-        && isValidId(stateId)
-        && isValidRiskState(incoming());
-      allow update: if isSignedIn()
-        && isValidId(stateId)
-        && isValidRiskState(incoming())
-        && (
-          // Allow toggle of the lock during drawdown breaches and state syncing
-          incoming().diff(existing()).affectedKeys().hasOnly(['routerLocked', 'netLiquidation', 'maintenanceMargin', 'dailyRealizedPnL', 'dailyUnrealizedPnL', 'lastUpdated'])
-        );
-      allow delete: if false; // System state cannot be purged
+      allow read, create, update: if isAllowedUser();
+      allow delete: if false;
+    }
+
+    // 5. System Config collection (Persistent Settings)
+    match /system_config/{configId} {
+      allow read, write: if isAllowedUser();
     }
   }
 }

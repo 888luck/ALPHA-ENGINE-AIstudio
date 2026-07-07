@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Dashboard from "./components/Dashboard";
-import { Sun, Moon, Activity, Tag, Globe, HelpCircle } from "lucide-react";
+import Launchpad from "./components/Launchpad";
+import { Sun, Moon, Activity, Tag, Globe, HelpCircle, LayoutGrid, Home } from "lucide-react";
 
 export default function App() {
   // Safe default persistent theme
@@ -9,6 +10,23 @@ export default function App() {
     return (saved as "dark" | "light") || "dark";
   });
 
+  const [view, setView] = useState<"launchpad" | "dashboard">(() => {
+    const saved = localStorage.getItem("alpha_dashboard_view");
+    return (saved as "launchpad" | "dashboard") || "launchpad";
+  });
+  const [navTarget, setNavTarget] = useState<string | null>(null);
+
+  const handleNavigate = (newView: "launchpad" | "dashboard", target?: string) => {
+    setView(newView);
+    localStorage.setItem("alpha_dashboard_view", newView);
+    if (target) {
+      setNavTarget(target);
+      // Reset target after a short delay so it can be re-triggered
+      setTimeout(() => setNavTarget(null), 100);
+    }
+  };
+
+  const [systemState, setSystemState] = useState<any>(null);
   const [showHelpModal, setShowHelpModal] = useState(false);
 
   const toggleTheme = () => {
@@ -18,6 +36,43 @@ export default function App() {
       return next;
     });
   };
+
+  const toggleView = () => {
+    setView((prev) => {
+      const next = prev === "launchpad" ? "dashboard" : "launchpad";
+      localStorage.setItem("alpha_dashboard_view", next);
+      return next;
+    });
+  };
+
+  // Fetch initial state for launchpad badges
+  useEffect(() => {
+    const fetchState = async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        
+        const res = await fetch("/api/state", { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        if (!res.ok) {
+          throw new Error(`Server responded with status: ${res.status}`);
+        }
+        
+        const data = await res.json();
+        setSystemState(data);
+      } catch (e: any) {
+        if (e.name === "AbortError") {
+          console.error("System state fetch timed out");
+        } else {
+          console.error("Failed to fetch system state for launchpad:", e.message || e);
+        }
+      }
+    };
+    fetchState();
+    const interval = setInterval(fetchState, 15000); // Polling every 15s
+    return () => clearInterval(interval);
+  }, []);
 
   // Sync theme with body class
   useEffect(() => {
@@ -330,12 +385,31 @@ export default function App() {
             {theme === "dark" ? (
               <>
                 <Sun className="w-3.5 h-3.5 text-amber-400" />
-                <span>LIGHT SYSTEM</span>
+                <span>LIGHT</span>
               </>
             ) : (
               <>
                 <Moon className="w-3.5 h-3.5 text-blue-500" />
-                <span>CYBER SLATE DARK</span>
+                <span>DARK</span>
+              </>
+            )}
+          </button>
+
+          {/* View Switcher Button */}
+          <button 
+            type="button"
+            onClick={toggleView}
+            className="p-2 rounded-md transition-all duration-200 cursor-pointer text-[#00ff88] hover:text-[#00ff88]/80 border border-[#00ff88]/20 bg-[#00ff88]/5 hover:bg-[#00ff88]/10 flex items-center gap-2 text-[10px] font-mono tracking-wider font-semibold"
+          >
+            {view === "launchpad" ? (
+              <>
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>DASHBOARD</span>
+              </>
+            ) : (
+              <>
+                <Home className="w-3.5 h-3.5" />
+                <span>LAUNCHPAD</span>
               </>
             )}
           </button>
@@ -354,7 +428,11 @@ export default function App() {
 
       {/* Render the full Slate & Cyber-Green interactive dashboard element */}
       <main className="max-w-7xl mx-auto p-4 sm:p-6 transition-all duration-200">
-        <Dashboard />
+        {view === "launchpad" ? (
+          <Launchpad systemState={systemState} onNavigate={handleNavigate} />
+        ) : (
+          <Dashboard onNavigate={handleNavigate} navTarget={navTarget} />
+        )}
       </main>
 
       {/* Modern, Highly Graphic Onboarding Modal Overlay */}
