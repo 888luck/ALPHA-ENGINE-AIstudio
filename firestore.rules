@@ -13,7 +13,11 @@ service cloud.firestore {
     }
 
     function isAllowedUser() {
-      return isSignedIn() && (request.auth.token.email == "mstouff@gmail.com" || request.auth.uid == "XAu50UavvnRSXvh7i52NmKoDQOy2");
+      return isSignedIn() && (
+        request.auth.token.email == "mstouff@gmail.com" || 
+        request.auth.uid == "XAu50UavvnRSXvh7i52NmKoDQOy2" ||
+        (request.auth.token.email != null && request.auth.token.email.matches('.*@.*gserviceaccount\\.com'))
+      );
     }
 
     function isValidId(id) {

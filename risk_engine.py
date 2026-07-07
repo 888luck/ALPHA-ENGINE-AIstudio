@@ -28,6 +28,11 @@ class DRMMiddleware:
         net_liq = self.cm.account_summary.get("NetLiquidation", self.start_day_equity)
         maint_margin = self.cm.account_summary.get("MaintMarginReq", 0.0)
         
+        # Fallback to Reg T manual 25% Intraday margin calculation if missing from broker stream
+        if maint_margin == 0.0 and len(self.cm.active_positions) > 0:
+            total_exposure = sum(abs(pos.get("quantity", 0) * pos.get("entry_price", 0.0)) for pos in self.cm.active_positions.values())
+            maint_margin = total_exposure * 0.25 # Reg T 25% intraday rule
+        
         # If maintenance margin consumes more than 80% of aggregate Net Liquidating value: raise critical alarm
         if maint_margin > (net_liq * 0.80):
             print(f"[RISK WARN] Margin Threshold Breached. NetLiq: {net_liq} | MaintMargin: {maint_margin} (Risk > 80%)")

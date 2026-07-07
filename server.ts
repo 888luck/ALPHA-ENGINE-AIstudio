@@ -7,19 +7,37 @@ import { pushToGithub } from "./github_sync";
 import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-import { exec } from "child_process";
+import { execFile } from "child_process";
 
-import { initializeApp, getApps } from "firebase-admin/app";
+import { initializeApp, getApps, applicationDefault } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import * as admin from "firebase-admin";
 
 console.log("[ALPHA SERVER] Initializing engine...");
+
+let firebaseProjectId: string | undefined = undefined;
+let databaseId: string | undefined = undefined;
+try {
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    if (config.firestoreDatabaseId) {
+      databaseId = config.firestoreDatabaseId;
+    }
+    if (config.projectId) {
+      firebaseProjectId = config.projectId;
+    }
+    console.log(`[FIREBASE] Using Firestore database ID: ${databaseId}, Project ID: ${firebaseProjectId}`);
+  }
+} catch (err: any) {
+  console.warn("[FIREBASE] Could not read firebase-applet-config.json:", err.message);
+}
 
 // Initialize Firebase Admin for persistent settings storage
 try {
   if (getApps().length === 0) {
     initializeApp({
-      credential: (admin as any).credential.applicationDefault()
+      credential: applicationDefault(),
+      ...(firebaseProjectId ? { projectId: firebaseProjectId } : {})
     });
     console.log("[FIREBASE] Admin SDK initialized for settings persistence.");
   }
@@ -27,7 +45,7 @@ try {
   console.warn("[FIREBASE] Admin initialization skipped or failed. Settings will be transient in memory. Error:", e.message);
 }
 
-const db_fs = getApps().length > 0 ? getFirestore() : null;
+const db_fs = getApps().length > 0 ? (databaseId ? getFirestore(getApps()[0], databaseId) : getFirestore()) : null;
 const SETTINGS_DOC_PATH = "system_config/alpha_engine_v1";
 
 const app = express();
@@ -42,7 +60,7 @@ process.on("uncaughtException", (err) => {
   console.error("[SERVER] Uncaught Exception:", err);
 });
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = 3000;
 
 // ==========================================
 // UNIVERSAL AI AGNOSTIC ROUTER (ALPHA-GEN)
@@ -281,6 +299,37 @@ async function loadPersistentSettings() {
       console.log("[FIREBASE] No existing settings found in Firestore. Using defaults.");
       await persistSettings(); // Create initial doc
     }
+
+    // Set up listeners to keep memory arrays synced with Python Edge Node via Firestore
+    db_fs.collection("active_trades").onSnapshot(snapshot => {
+      const trades: any[] = [];
+      snapshot.forEach(doc => {
+        trades.push({ id: doc.id, ...doc.data() });
+      });
+      activeTrades = trades;
+    });
+
+    db_fs.collection("historical_logs").orderBy("timestamp", "desc").limit(50).onSnapshot(snapshot => {
+      const logs: any[] = [];
+      snapshot.forEach(doc => {
+        logs.push({ id: doc.id, ...doc.data() });
+      });
+      historicalLogs = logs;
+    });
+
+    db_fs.doc("system_risk_state/current_state").onSnapshot(snapshot => {
+      if (snapshot.exists) {
+        const data = snapshot.data();
+        if (data) {
+          systemSettings.netLiquidation = data.netLiquidation ?? systemSettings.netLiquidation;
+          systemSettings.maintenanceMargin = data.maintenanceMargin ?? systemSettings.maintenanceMargin;
+          if (data.routerLocked !== undefined) {
+             systemSettings.routerLocked = data.routerLocked;
+          }
+        }
+      }
+    });
+
   } catch (err) {
     console.error("[FIREBASE] Error loading persistent settings:", err);
   }
@@ -412,241 +461,15 @@ setTimeout(() => {
   console.log(`[SCANNER DISCOVERY FEED] Ingested ${Object.keys(marketBooks).length} dynamic multi-exchange targets.`);
 }, 500);
 
-// Background simulation ticker loop: ticks book dynamics to evaluate real-time OFI
-setInterval(() => {
-  if (systemSettings.routerLocked) return;
-
-  // 1. Progress simulated clock time
-  let [hours, minutes] = systemSettings.marketTime.split(":").map(Number);
-  minutes += 1;
-  if (minutes >= 60) {
-    hours += 1;
-    minutes = 0;
-  }
-  if (hours >= 24) hours = 0;
-  systemSettings.marketTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-
-  // Update market phases automatically
-  if (systemSettings.marketTime >= "04:00" && systemSettings.marketTime < "09:30") {
-    systemSettings.marketPhase = "CALIBRATION";
-  } else if (systemSettings.marketTime >= "09:30" && systemSettings.marketTime < "15:50") {
-    systemSettings.marketPhase = "EXECUTION";
-  } else if (systemSettings.marketTime >= "15:50" && systemSettings.marketTime < "16:00") {
-    // EOD Flat Flush sequence automatically triggers if state is not already flat
-    if (activeTrades.length > 0 && systemSettings.marketPhase !== "FLUSH") {
-      executeEmergencyFlush("AUTOMATED INTRA-DAY SESSION LOCK (EOD TIMEOUT)");
-    }
-    systemSettings.marketPhase = "FLUSH";
-  } else if (systemSettings.marketTime >= "16:00" && systemSettings.marketTime < "16:20") {
-    systemSettings.marketPhase = "SYNC";
-  } else {
-    systemSettings.marketPhase = "POST-MARKET";
-  }
-
-  // 2. Perform live price and book fluctuation ticks
-  Object.keys(marketBooks).forEach((symbol) => {
-    const book = marketBooks[symbol];
-    const side = Math.random() > 0.48 ? 1 : -1; // Subtle upward trend
-    const increment = Number((Math.random() * 0.04).toFixed(2)) * side;
-    
-    // Process price update
-    const oldPrice = book.lastPrice;
-    book.lastPrice = Number((book.lastPrice + increment).toFixed(2));
-    
-    // Shift Level 2 depth lists relative to price
-    book.bids = book.bids.map((item, idx) => {
-      const basePrice = Number((book.lastPrice - 0.01 - idx * 0.02 * (Math.random() * 0.5 + 0.8)).toFixed(2));
-      const sizeShift = Math.floor(Math.random() * 80) * (Math.random() > 0.5 ? 1 : -1);
-      const newSize = Math.max(80, item.size + sizeShift);
-      return { price: basePrice, size: newSize, impliedOfi: 0 };
-    });
-
-    book.asks = book.asks.map((item, idx) => {
-      const basePrice = Number((book.lastPrice + 0.01 + idx * 0.02 * (Math.random() * 0.5 + 0.8)).toFixed(2));
-      const sizeShift = Math.floor(Math.random() * 80) * (Math.random() > 0.5 ? 1 : -1);
-      const newSize = Math.max(80, item.size + sizeShift);
-      return { price: basePrice, size: newSize, impliedOfi: 0 };
-    });
-
-    // 3. Compute real-time Order Flow Imbalance (OFI)
-    // Formula check: evaluate volume differences between matching price slots
-    const currentBidPrice = book.bids[0].price;
-    const currentBidSize = book.bids[0].size;
-    const currentAskPrice = book.asks[0].price;
-    const currentAskSize = book.asks[0].size;
-
-    // We emulate OFI calculations on top level bid/ask changes
-    const ofiNoise = Math.floor(Math.random() * 120) * side;
-    book.lastOfi = Math.min(1000, Math.max(-1000, book.lastOfi + ofiNoise));
-
-    // Update prices inside current active trade indexes with advanced tactical management rules
-    let exitedTradeIds = new Set<string>();
-    activeTrades.forEach((trade) => {
-      if (trade.symbol === symbol) {
-        trade.currentPrice = book.lastPrice;
-        trade.barsHeld = (trade.barsHeld || 0) + 1;
-        const multiplier = trade.direction === "BUY" ? 1 : -1;
-        trade.unrealizedPnL = Number(((trade.currentPrice - trade.entryPrice) * trade.quantity * multiplier).toFixed(2));
-        
-        const stopDistanceVal = Math.abs(trade.entryPrice - (trade.initialStop || trade.stopPrice));
-        const pipsInFavor = (trade.currentPrice - trade.entryPrice) * multiplier;
-        
-        // A. Partial Profit Taking Scale-Out (Tranche Scaling)
-        if (systemSettings.partialProfit && !trade.tranche1ScaledOut) {
-          let target1Hit = false;
-          if (trade.direction === "BUY" && book.lastPrice >= trade.entryPrice + stopDistanceVal) {
-            target1Hit = true;
-          } else if (trade.direction === "SELL" && book.lastPrice <= trade.entryPrice - stopDistanceVal) {
-            target1Hit = true;
-          }
-          
-          if (target1Hit) {
-            const q1 = Math.floor(trade.quantity / 2);
-            if (q1 > 0) {
-              const exitPriceT1 = trade.direction === "BUY" ? trade.entryPrice + stopDistanceVal : trade.entryPrice - stopDistanceVal;
-              const t1_gross = (exitPriceT1 - trade.entryPrice) * q1 * multiplier;
-              const t1_comm = calculateIBIECommission(trade.symbol, book.primaryExchange || "SMART", q1, exitPriceT1);
-              const t1_net = Number((t1_gross - t1_comm).toFixed(2));
-              
-              trade.scaleOutProfit = (trade.scaleOutProfit || 0) + t1_net;
-              trade.quantity -= q1;
-              trade.tranche1ScaledOut = true;
-              trade.stopPrice = trade.entryPrice; // Drag stop to breakeven immediately
-            }
-          }
-        }
-        
-        // B. Breakeven locking for remaining or standard position
-        if (systemSettings.breakevenLock && !trade.breakevenApplied && !trade.tranche1ScaledOut) {
-          if (pipsInFavor >= stopDistanceVal * 0.8) {
-            trade.stopPrice = trade.entryPrice;
-            trade.breakevenApplied = true;
-          }
-        }
-        
-        // C. Check target and stop price violations
-        let triggeredExit = false;
-        let exitPrice = trade.currentPrice;
-        let exitReason = "";
-        
-        if (trade.direction === "BUY") {
-          if (book.lastPrice <= trade.stopPrice) {
-            exitPrice = trade.stopPrice;
-            triggeredExit = true;
-            exitReason = trade.tranche1ScaledOut ? "BREAKEVEN TRANCHE EXIT" : "STOP LOSS BREACH";
-          } else if (trade.targetPrice && book.lastPrice >= trade.targetPrice) {
-            exitPrice = trade.targetPrice;
-            triggeredExit = true;
-            exitReason = "PROFIT TARGET ACHIEVED";
-          }
-        } else { // SELL
-          if (book.lastPrice >= trade.stopPrice) {
-            exitPrice = trade.stopPrice;
-            triggeredExit = true;
-            exitReason = trade.tranche1ScaledOut ? "BREAKEVEN TRANCHE EXIT" : "STOP LOSS BREACH";
-          } else if (trade.targetPrice && book.lastPrice <= trade.targetPrice) {
-            exitPrice = trade.targetPrice;
-            triggeredExit = true;
-            exitReason = "PROFIT TARGET ACHIEVED";
-          }
-        }
-        
-        // D. Time-based decay exit rule
-        if (!triggeredExit && trade.barsHeld >= systemSettings.maxHoldBars) {
-          exitPrice = book.lastPrice;
-          triggeredExit = true;
-          exitReason = `TIME-BASED EXPIRE (${systemSettings.maxHoldBars} BARS)`;
-        }
-        
-        if (triggeredExit) {
-          const gross_exit_pnl = (exitPrice - trade.entryPrice) * trade.quantity * multiplier;
-          const exitComm = calculateIBIECommission(trade.symbol, book.primaryExchange || "SMART", trade.quantity, exitPrice);
-          const netExitPnL = Number((gross_exit_pnl - exitComm).toFixed(2));
-          const totalTradePnL = Number((netExitPnL + (trade.scaleOutProfit || 0)).toFixed(2));
-          
-          // Calculate entry commission for the total trade
-          const entryComm = calculateIBIECommission(trade.symbol, book.primaryExchange || "SMART", trade.initialQuantity || trade.quantity, trade.entryPrice);
-          const totalComm = Number((entryComm + exitComm).toFixed(2));
-          
-          historicalLogs.unshift({
-            id: `LOG_${Math.floor(Math.random() * 1000) + 200}`,
-            symbol: trade.symbol,
-            quantity: trade.initialQuantity || trade.quantity,
-            direction: trade.direction,
-            entryPrice: trade.entryPrice,
-            exitPrice: Number(exitPrice.toFixed(2)),
-            realizedPnL: totalTradePnL,
-            commission: totalComm,
-            efficiencyRatio: trade.efficiencyRatio || 12.0,
-            timestamp: new Date().toISOString()
-          });
-          
-          exitedTradeIds.add(trade.id);
-        }
-      }
-    });
-    
-    if (exitedTradeIds.size > 0) {
-      activeTrades = activeTrades.filter(t => !exitedTradeIds.has(t.id));
-    }
-  });
-
-  // Calculate live daily portfolio stats
-  let totalUnrealized = activeTrades.reduce((acc, curr) => acc + curr.unrealizedPnL, 0);
-  let totalRealized = historicalLogs.reduce((acc, curr) => acc + curr.realizedPnL, 0);
-  
-  systemSettings.netLiquidation = Number((systemSettings.referenceEquity + totalUnrealized + totalRealized).toFixed(2));
-  systemSettings.maintenanceMargin = activeTrades.length * 12400.00; // Multiplied under typical leverage ratios
-
-  // Monitor dynamic daily drawdown circuit breaker
-  const aggregatedPnL = totalUnrealized + totalRealized;
-  const drawdownThresholdPercent = -(systemSettings.referenceEquity * ((systemSettings.dailyDrawdownLimitPercent || 2.5) / 100));
-  const drawdownThresholdCash = -(systemSettings.dailyDrawdownLimitCash || 3000.0);
-  
-  const percentBreached = aggregatedPnL <= drawdownThresholdPercent;
-  const cashBreached = aggregatedPnL <= drawdownThresholdCash;
-  
-  if ((percentBreached || cashBreached) && !systemSettings.routerLocked) {
-    const reason = percentBreached
-      ? `DRAWDOWN PERCENT BREACHED: ${systemSettings.dailyDrawdownLimitPercent}% Limit Exceeded`
-      : `DRAWDOWN CASH BREACHED: €${systemSettings.dailyDrawdownLimitCash} Limit Exceeded`;
-    executeEmergencyFlush(reason);
-  }
-
-}, 4000);
-
-// Helper function implementing emergency liquidation and lock operations (DRM)
-function executeEmergencyFlush(reason: string) {
-  systemSettings.routerLocked = true;
-  console.log(`!!! RISK ENFORCED DRIVER: EMERGENCY FLUSH TRIGGERED. Reason: ${reason} !!!`);
-  
-  // Flatten all positions to historic logs instantly with current prices
-  activeTrades.forEach((trade) => {
-    const multiplier = trade.direction === "BUY" ? 1 : -1;
-    const realized = Number(((trade.currentPrice - trade.entryPrice) * trade.quantity * multiplier).toFixed(2));
-    const commission = calculateIBIECommission(trade.symbol, "", trade.quantity, trade.entryPrice); // Use European/US aware IBIE commission Model
-    
-    // Assess spread cost
-    const spreadCost = 0.02 * trade.quantity;
-    const totalFriction = spreadCost + commission;
-    const ratio = Number(((totalFriction / Math.abs(realized || 1)) * 100).toFixed(1));
-
-    historicalLogs.unshift({
-      id: `LOG_${Math.floor(Math.random() * 1000) + 200}`,
-      symbol: trade.symbol,
-      quantity: trade.quantity,
-      direction: trade.direction,
-      entryPrice: trade.entryPrice,
-      exitPrice: trade.currentPrice,
-      realizedPnL: realized,
-      commission,
-      efficiencyRatio: Number.isNaN(ratio) ? 0.2 : Math.min(100, ratio),
-      timestamp: new Date().toISOString()
-    });
-  });
-
+// Removed simulation loop but retained executeEmergencyFlush helper to prevent compile errors.
+// The web server now acts as a read-only dashboard reflecting the actual Python Edge Node state from Firestore.
+export function executeEmergencyFlush(reason: string) {
+  console.log(`[EMERGENCY FLUSH] ${reason}`);
   activeTrades = [];
+  systemSettings.routerLocked = true;
+  persistSettings();
 }
+
 
 // ==========================================
 // REST FULL-STACK ENDPOINTS FOR PORTFOLIO CONTROL
@@ -2237,15 +2060,14 @@ app.post("/api/backtest", (req, res) => {
   const cleanOfi = ofiFilter !== undefined ? (ofiFilter ? "true" : "false") : "true";
   const cleanAdaptive = adaptiveStop !== undefined ? (adaptiveStop ? "true" : "false") : "true";
 
-  const commandArgs = `"${cleanSymbol}" "${cleanTimeframe}" "${cleanStartDate}" "${cleanEndDate}" "${cleanStopAtr}" "${cleanPartial}" "${cleanBreakeven}" "${cleanMaxHold}" "${cleanOfi}" "${cleanAdaptive}"`;
-  const command = `python3 backtester.py ${commandArgs}`;
+  const commandArgs = [cleanSymbol, cleanTimeframe, cleanStartDate, cleanEndDate, String(cleanStopAtr), cleanPartial, cleanBreakeven, String(cleanMaxHold), cleanOfi, cleanAdaptive];
+  const command = "python3";
 
-  exec(command, (error, stdout, stderr) => {
+  execFile(command, ["backtester.py", ...commandArgs], (error, stdout, stderr) => {
     if (error) {
       console.error(`Backtest executable error: ${error.message}`);
       // Try fallback with simple "python" if python3 lacks binary association
-      const fallbackCommand = `python backtester.py ${commandArgs}`;
-      exec(fallbackCommand, (fallbackError, fallbackStdout, fallbackStderr) => {
+      execFile("python", ["backtester.py", ...commandArgs], (fallbackError, fallbackStdout, fallbackStderr) => {
         if (fallbackError) {
           console.warn("[SERVER] Python executables absent. Executing native backtest fallback logic...");
           try {
@@ -2289,6 +2111,8 @@ app.post("/api/backtest", (req, res) => {
 // Setup backend with static or dev mode bundler configurations
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    // Delete PORT to prevent Vite from auto-binding to Cloud Run's injected 8080 port
+    delete process.env.PORT;
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

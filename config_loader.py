@@ -10,7 +10,7 @@ def load_config():
     load_dotenv()
     
     config = {
-        "IBKR_ACCOUNT_NUMBER": os.getenv("IBKR_ACCOUNT_NUMBER", "U8129384"),
+        "IBKR_ACCOUNT_NUMBER": os.getenv("IBKR_ACCOUNT_NUMBER", ""),
         "IBKR_HOST": os.getenv("IBKR_HOST", "127.0.0.1"),
         "IBKR_PORT": int(os.getenv("IBKR_PORT", "4002")),  # 4001, 4002 (IB Gateway), 7496, 7497 (TWS)
         "IBKR_CLIENT_ID": int(os.getenv("IBKR_CLIENT_ID", "10")),

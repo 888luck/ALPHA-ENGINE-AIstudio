@@ -1,0 +1,8 @@
+{
+  "firestore": [
+    {
+      "database": "ai-studio-alphaengine-94d6c309-5a24-4eb3-b5fc-aed88e51a000",
+      "rules": "firestore.rules"
+    }
+  ]
+}

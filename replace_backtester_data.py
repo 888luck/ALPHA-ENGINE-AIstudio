@@ -1,0 +1,96 @@
+import re
+
+with open('backtester.py', 'r') as f:
+    content = f.read()
+
+new_func = """    def _generate_synthetic_data(self, symbol: str, timeframe: str, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
+        '''
+        Fetches REAL historical OHLCV data from Yahoo Finance instead of generating synthetic data.
+        If Yahoo Finance fails, falls back to basic deterministic generation.
+        '''
+        import urllib.request, json
+        
+        # Determine interval for YF
+        interval = "1d"
+        tf_lower = timeframe.lower()
+        if "1m" in tf_lower:
+            interval = "1m"
+        elif "5m" in tf_lower:
+            interval = "5m"
+        elif "15m" in tf_lower:
+            interval = "15m"
+        elif "1h" in tf_lower:
+            interval = "60m"
+            
+        start_ts = int(start_date.timestamp())
+        end_ts = int(end_date.timestamp())
+        
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval={interval}&period1={start_ts}&period2={end_ts}"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        
+        bars = []
+        try:
+            with urllib.request.urlopen(req, timeout=5) as response:
+                data = json.loads(response.read())
+                result = data.get("chart", {}).get("result", [])
+                if result:
+                    timestamps = result[0].get("timestamp", [])
+                    indicators = result[0].get("indicators", {}).get("quote", [{}])[0]
+                    opens = indicators.get("open", [])
+                    highs = indicators.get("high", [])
+                    lows = indicators.get("low", [])
+                    closes = indicators.get("close", [])
+                    volumes = indicators.get("volume", [])
+                    
+                    for i in range(len(timestamps)):
+                        if opens[i] is None:
+                            continue
+                        bars.append({
+                            "date": datetime.fromtimestamp(timestamps[i]).isoformat() + "Z",
+                            "open": round(float(opens[i]), 2),
+                            "high": round(float(highs[i]), 2),
+                            "low": round(float(lows[i]), 2),
+                            "close": round(float(closes[i]), 2),
+                            "volume": int(volumes[i])
+                        })
+            
+            if len(bars) > 0:
+                print(f"[BACKTESTER] Fetched {len(bars)} real historical bars for {symbol} from Yahoo Finance.")
+                return bars
+        except Exception as e:
+            print(f"[BACKTESTER] Failed to fetch real data from Yahoo Finance: {e}. Falling back to synthetic generation.")
+            pass
+            
+        # Fallback basic generation if real data fails
+        current_time = start_date
+        current_price = 100.0
+        delta_minutes = 60 if interval != "1d" else 1440
+        random.seed(hash(symbol))
+        
+        while current_time <= end_date:
+            if current_time.weekday() < 5:
+                chg = current_price * random.normalvariate(0.0002, 0.015)
+                op = current_price
+                cl = op + chg
+                bars.append({
+                    "date": current_time.isoformat() + "Z",
+                    "open": round(op, 2),
+                    "high": round(max(op, cl) * 1.01, 2),
+                    "low": round(min(op, cl) * 0.99, 2),
+                    "close": round(cl, 2),
+                    "volume": int(1000000 * random.uniform(0.5, 1.5))
+                })
+                current_price = cl
+            current_time += timedelta(minutes=delta_minutes)
+        return bars
+"""
+
+# Find the start of _generate_synthetic_data
+start_idx = content.find("    def _generate_synthetic_data")
+# Find the end by looking for the next method "    def _calculate_efficiency_ratio"
+end_idx = content.find("    def _calculate_efficiency_ratio")
+
+new_content = content[:start_idx] + new_func + "\n" + content[end_idx:]
+
+with open('backtester.py', 'w') as f:
+    f.write(new_content)

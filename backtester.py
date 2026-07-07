@@ -7,7 +7,6 @@ from typing import List, Dict, Any
 # Standard mock-ready classes matching connection.py structure
 try:
     from connection import ConnectionManager
-    from contract_helper import setup_contract_for_symbol
 except ImportError:
     pass
 
@@ -24,129 +23,6 @@ class AlphaBacktestingEngine:
         self.balance_history = []
         self.trades_history = []
         
-    def generate_synthetic_history(self, symbol: str, timeframe: str, start_date_str: str, end_date_str: str) -> List[Dict[str, Any]]:
-        """
-        Generates realistic synthetic OHLCV intraday or daily historical bars
-        for testing, incorporating ticker-specific volatility, trend bias, and average volumes.
-        """
-        # Parse dates
-        try:
-            start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
-        except:
-            start_date = datetime.now() - timedelta(days=30)
-            
-        try:
-            end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
-        except:
-            end_date = datetime.now()
-            
-        if end_date < start_date:
-            end_date = start_date + timedelta(days=30)
-
-        # Establish ticker profile biases (representing real performance traits)
-        sym = symbol.upper()
-        base_price = 100.0
-        drift = 0.0002       # Standard steady upward trend
-        volatility = 0.015   # 1.5% standard dev
-        avg_volume = 1500000
-        
-        if sym == "XLE":
-            base_price = 93.15
-            drift = 0.0004
-            volatility = 0.018  # Oil volatility
-        elif sym == "NEE":
-            base_price = 73.10
-            drift = -0.0001     # Defensive/utilities rangebound
-            volatility = 0.008
-        elif sym == "ENPH":
-            base_price = 114.20
-            drift = 0.0012      # High momentum tech
-            volatility = 0.038  # Clean-tech massive high-vol swingy
-        elif sym == "SAP":
-            base_price = 178.50
-            drift = 0.0006
-            volatility = 0.012
-        elif sym == "RWE":
-            base_price = 33.40
-            drift = -0.0002
-            volatility = 0.014
-        else:
-            # Generic random ticker
-            random.seed(hash(sym))
-            base_price = random.uniform(20.0, 200.0)
-            drift = random.uniform(-0.0005, 0.001)
-            volatility = random.uniform(0.01, 0.03)
-
-        # Decide bar frequency in minutes
-        delta_minutes = 60
-        tf_lower = timeframe.lower()
-        if "1m" in tf_lower:
-            delta_minutes = 1
-        elif "5m" in tf_lower:
-            delta_minutes = 5
-        elif "15m" in tf_lower:
-            delta_minutes = 15
-        elif "1h" in tf_lower:
-            delta_minutes = 60
-        elif "1d" in tf_lower or "daily" in tf_lower:
-            delta_minutes = 1440
-            
-        bars = []
-        current_time = start_date
-        current_price = base_price
-        
-        # Build list of datetime steps (excluding weekends)
-        date_steps = []
-        while current_time <= end_date:
-            # Weekday check
-            if current_time.weekday() < 5:
-                # Intraday hours session logic (9:30 AM to 4:00 PM NYC) if timeframe is intraday
-                if delta_minutes < 1440:
-                    session_start = current_time.replace(hour=9, minute=30, second=0, microsecond=0)
-                    session_end = current_time.replace(hour=16, minute=0, second=0, microsecond=0)
-                    
-                    bar_time = session_start
-                    while bar_time <= session_end:
-                        date_steps.append(bar_time)
-                        bar_time += timedelta(minutes=delta_minutes)
-                else:
-                    # Daily timeframe has 1 bar per day at 4:00 PM
-                    date_steps.append(current_time.replace(hour=16, minute=0, second=0))
-                    
-            current_time += timedelta(days=1)
-            
-        # Re-initialize deterministic sequence seed for safety and consistent testing curves
-        random.seed(91283 + hash(sym))
-        
-        for idx, t in enumerate(date_steps):
-            chg = current_price * (random.normalvariate(drift, volatility))
-            op = current_price
-            cl = op + chg
-            
-            # Clamp prices to > 1
-            if cl < 1.0: cl = 1.0
-            if op < 1.0: op = 1.0
-            
-            high = max(op, cl) + (current_price * abs(random.normalvariate(0, volatility * 0.5)))
-            low = min(op, cl) - (current_price * abs(random.normalvariate(0, volatility * 0.5)))
-            
-            if low < 0.5: low = 0.5
-            
-            vol = int(avg_volume * random.uniform(0.5, 1.8) * (1.5 if abs(chg)/cl > volatility else 0.8))
-            
-            bars.append({
-                "date": t.isoformat() + "Z",
-                "open": round(op, 2),
-                "high": round(high, 2),
-                "low": round(low, 2),
-                "close": round(cl, 2),
-                "volume": vol
-            })
-            
-            current_price = cl
-            
-        return bars
-
     def calculate_ibie_commission(self, symbol: str, quantity: float, price: float) -> float:
         """
         Calculates realistic IBIE commissions:
@@ -162,7 +38,9 @@ class AlphaBacktestingEngine:
             return max(1.25, base_comm)
         else:
             base_comm = quantity * 0.005
-            return max(1.00, base_comm)    def run_backtest(self, symbol: str, timeframe: str, start_date: str, end_date: str,
+            return max(1.00, base_comm)
+            
+    def run_backtest(self, symbol: str, timeframe: str, start_date: str, end_date: str,
                      stop_atr: float = 1.8, partial_profit: bool = True, breakeven_lock: bool = True,
                      max_hold: int = 15, ofi_filter: bool = True, adaptive_stop: bool = True) -> Dict[str, Any]:
         """
@@ -472,6 +350,91 @@ class AlphaBacktestingEngine:
             "breakevenApplied": breakeven_lock,
             "maxHoldApplied": max_hold
         }
+
+    def generate_synthetic_history(self, symbol: str, timeframe: str, start_date_str: str, end_date_str: str) -> List[Dict[str, Any]]:
+        '''
+        Fetches REAL historical OHLCV data from Yahoo Finance instead of generating synthetic data.
+        If Yahoo Finance fails, falls back to basic deterministic generation.
+        '''
+        import urllib.request, json
+        
+        start_date = datetime.fromisoformat(start_date_str.replace("Z", "+00:00"))
+        end_date = datetime.fromisoformat(end_date_str.replace("Z", "+00:00"))
+
+        # Determine interval for YF
+        interval = "1d"
+        tf_lower = timeframe.lower()
+        if "1m" in tf_lower:
+            interval = "1m"
+        elif "5m" in tf_lower:
+            interval = "5m"
+        elif "15m" in tf_lower:
+            interval = "15m"
+        elif "1h" in tf_lower:
+            interval = "60m"
+            
+        start_ts = int(start_date.timestamp())
+        end_ts = int(end_date.timestamp())
+        
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval={interval}&period1={start_ts}&period2={end_ts}"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        
+        bars = []
+        try:
+            with urllib.request.urlopen(req, timeout=5) as response:
+                data = json.loads(response.read())
+                result = data.get("chart", {}).get("result", [])
+                if result:
+                    timestamps = result[0].get("timestamp", [])
+                    indicators = result[0].get("indicators", {}).get("quote", [{}])[0]
+                    opens = indicators.get("open", [])
+                    highs = indicators.get("high", [])
+                    lows = indicators.get("low", [])
+                    closes = indicators.get("close", [])
+                    volumes = indicators.get("volume", [])
+                    
+                    for i in range(len(timestamps)):
+                        if opens[i] is None:
+                            continue
+                        bars.append({
+                            "date": datetime.fromtimestamp(timestamps[i]).isoformat() + "Z",
+                            "open": round(float(opens[i]), 2),
+                            "high": round(float(highs[i]), 2),
+                            "low": round(float(lows[i]), 2),
+                            "close": round(float(closes[i]), 2),
+                            "volume": int(volumes[i])
+                        })
+            
+            if len(bars) > 0:
+                print(f"[BACKTESTER] Fetched {len(bars)} real historical bars for {symbol} from Yahoo Finance.")
+                return bars
+        except Exception as e:
+            import sys
+            print(f"[BACKTESTER] Failed to fetch real data from Yahoo Finance: {e}. Falling back to synthetic generation.", file=sys.stderr)
+            pass
+            
+        # Fallback basic generation if real data fails
+        current_time = start_date
+        current_price = 100.0
+        delta_minutes = 60 if interval != "1d" else 1440
+        random.seed(hash(symbol))
+        
+        while current_time <= end_date:
+            if current_time.weekday() < 5:
+                chg = current_price * random.normalvariate(0.0002, 0.015)
+                op = current_price
+                cl = op + chg
+                bars.append({
+                    "date": current_time.isoformat() + "Z",
+                    "open": round(op, 2),
+                    "high": round(max(op, cl) * 1.01, 2),
+                    "low": round(min(op, cl) * 0.99, 2),
+                    "close": round(cl, 2),
+                    "volume": int(1000000 * random.uniform(0.5, 1.5))
+                })
+                current_price = cl
+            current_time += timedelta(minutes=delta_minutes)
+        return bars
 
 if __name__ == "__main__":
     # Command line runner fallback to dump results directly into JSON streams

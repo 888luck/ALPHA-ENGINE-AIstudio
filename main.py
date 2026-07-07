@@ -6,9 +6,11 @@ from risk_engine import DRMMiddleware
 from alpha_strategy import AlphaStrategy, ProactiveSimulator
 from firebase_sync import FirebaseSyncTunnel
 
+import zoneinfo
+
 def get_current_ny_time():
-    """Returns local intraday timestamp simulation."""
-    now = datetime.datetime.now()
+    """Returns actual US Eastern Time intraday timestamp simulation."""
+    now = datetime.datetime.now(zoneinfo.ZoneInfo("America/New_York"))
     return now.strftime("%H:%M")
 
 def main_loop():

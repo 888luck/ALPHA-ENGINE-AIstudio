@@ -89,27 +89,8 @@ class FirebaseSyncTunnel:
         return None
 
     def _authenticate(self):
-        """Authenticates anonymously with Firebase Auth to get an ID token."""
-        if not self.api_key:
-            return None
-        
-        url = f"https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={self.api_key}"
-        headers = {"Content-Type": "application/json"}
-        body = json.dumps({"returnSecureToken": True}).encode("utf-8")
-        
-        req = urllib.request.Request(url, data=body, headers=headers, method="POST")
-        try:
-            with urllib.request.urlopen(req, timeout=8) as response:
-                res_data = response.read().decode("utf-8")
-                res_json = json.loads(res_data)
-                self.id_token = res_json.get("idToken")
-                print("[FIREBASE TUNNEL] Dynamic Auth Successful. Obtained secure session ID token.")
-                return self.id_token
-        except Exception as e:
-            print(f"[FIREBASE TUNNEL AUTH ERROR] Failed to authenticate: {e}")
-            self.id_token = None
-            return None
-
+        print("[FIREBASE TUNNEL] Anonymous authentication disabled. Only GCE Service Account metadata tokens are permitted for Edge Node security.")
+        return None
     def _dict_to_firestore_fields(self, d: Dict[str, Any]) -> Dict[str, Any]:
         """Converts standard Python dictionary to Firestore Document REST payload format."""
         fields = {}
@@ -152,7 +133,7 @@ class FirebaseSyncTunnel:
             if gce_token:
                 self.id_token = gce_token
             else:
-                self._authenticate()
+                pass # Only GCE token allowed
 
         url = f"https://firestore.googleapis.com/v1/projects/{self.project_id}/databases/{self.database_id}/documents/{path}?key={self.api_key}"
         
@@ -182,10 +163,10 @@ class FirebaseSyncTunnel:
                 return self._request(method, path, body, is_retry=True)
             err_msg = e.read().decode("utf-8")
             print(f"[FIREBASE TUNNEL API ERROR] {method} {path} failed: {e.code} - {err_msg}")
-            return {}
+            raise Exception(f"Firestore API Error: {e.code} - {err_msg}")
         except Exception as e:
             print(f"[FIREBASE TUNNEL CONN ERROR] Connection failed: {e}")
-            return {}
+            raise e
 
     def push_active_trade(self, trade_id: str, trade_data: Dict[str, Any]):
         """Pushes an active session holding to Firestore (/active_trades/{tradeId})."""

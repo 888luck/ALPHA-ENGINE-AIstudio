@@ -50,7 +50,7 @@ export default function App() {
     const fetchState = async () => {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
         
         const res = await fetch("/api/state", { signal: controller.signal });
         clearTimeout(timeoutId);
