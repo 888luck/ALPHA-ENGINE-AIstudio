@@ -18,6 +18,7 @@ from llm_ensemble import MultiModelEnsemble
 from universe_builder import UniverseBuilder
 from reasoning_auditor import ReasoningAuditor
 from local_edge_node import LocalEdgeNode
+from market_hours_resolver import MarketHoursResolver, MarketSessionPhase
 
 def get_current_ny_time():
     """Returns actual US Eastern Time intraday timestamp simulation."""
@@ -122,9 +123,10 @@ def main_loop():
         print("[CALIBRATION COMPLETE] Successfully generated active candidate universe. Exiting cleanly.")
         return
         
-    # 7. Synthesize Strategy Engine
+    # 7. Synthesize Strategy Engine & Market Hours Resolver
     strategy = AlphaStrategy(cm, config["MIFID2_DECISION_MAKER_ID"], config["MIFID2_EXECUTION_TRADER_ID"])
     simulator = ProactiveSimulator()
+    market_hours = MarketHoursResolver(default_observation_buffer_mins=15)
     
     # Run pre-flight calibration simulator
     print("[INIT] Initializing Proactive Sector Expectancy Calibration...")
@@ -187,25 +189,59 @@ def main_loop():
                     print("[FIREBASE OVERRIDE] Cloud panel requested router unlocking. Resetting circuit breaker...")
                     drm.router_locked = False
 
-        # Scenario A: Pre-market Window (04:00 - 09:30 NY / 07:00 - 09:00 CET)
-        if "04:00" <= current_ny_time < "09:30":
-            print("[PHASE - CALIBRATION] Performing pre-market sector calibration and margin queries.")
+        # Dynamic Per-Candidate Session Clock & Opening Reality Verification
+        for cand in list(active_basket.candidates):
+            spec = universe_builder.resolve_contract(cand.symbol)
+            sess = market_hours.resolve_session(spec.liquidHours, spec.timeZoneId, spec.isEuropean)
+            phase, countdown = market_hours.determine_phase(sess)
+            cand.sessionPhase = phase
+            cand.countdownStr = countdown
+
+            # --- DYNAMIC OPENING OBSERVATION BUFFER & REALITY VERIFIER ---
+            if phase == MarketSessionPhase.OPENING_OBSERVATION:
+                print(f"[OPENING DISCOVERY] {cand.symbol} ({spec.primaryExchange}) in price discovery buffer: {countdown}")
+                sim_spread = 0.03 if cand.isEuropean else 0.02
+                opening_snapshot = {
+                    "realized_spread": sim_spread,
+                    "stock_price": 100.0,
+                    "price_change_from_open_pct": 0.35,
+                    "opening_volume_ratio": 1.35,
+                    "ofi_ratio": 0.25 if cand.direction == "BUY" else -0.25
+                }
+                challenge = ensemble.challenge_opening_thesis(
+                    cand.symbol, cand.direction, cand.catalyst, cand.expectedMovePct, opening_snapshot
+                )
+                if not challenge.get("thesis_valid", True):
+                    inval_reason = challenge.get("invalidation_reason", "Opening prints contradicted catalyst.")
+                    print(f"[REALITY VERIFIER INVALIDATION] {cand.symbol} invalidated at open! Triggering recursive swap...")
+                    active_basket, new_cand = universe_builder.recursive_replace_candidate(
+                        active_basket, cand.symbol, inval_reason, ensemble=ensemble
+                    )
+                else:
+                    cand.challengeStatus = "VALIDATED"
+                    print(f"[REALITY VERIFIER CONFIRMED] {cand.symbol} thesis validated by opening auction.")
+
+        # Enforce daily cumulative drawdown circuit breaker
+        if not drm.check_daily_drawdown(cm.pnl_updates):
+            print("[RISK ALERT] Daily drawdown circuit breaker active. Blocking new entries.")
+        elif drm.router_locked:
+            print("[WARN] Router locked due to circuit breaker trigger.")
+        else:
             drm.query_margin_safety()
             
-        # Scenario B: Tactical Execution Window (09:30 - 15:50 NY / 09:00 - 17:30 CET)
-        elif "09:30" <= current_ny_time < "15:50" or ("09:00" <= current_cet_time < "17:30"):
-            # Enforce daily cumulative drawdown circuit breaker
-            if not drm.check_daily_drawdown(cm.pnl_updates):
-                print("[RISK ALERT] Daily drawdown circuit breaker active. Blocking new entries.")
-            elif drm.router_locked:
-                print("[WARN] Router locked due to circuit breaker trigger.")
-            else:
-                drm.query_margin_safety()
+            # Iterate over dynamically calibrated candidates from Top N universe
+            for cand in active_basket.candidates:
+                sym = cand.symbol
+                direction = cand.direction
                 
-                # Iterate over dynamically calibrated candidates from Top N universe
-                for cand in active_basket.candidates:
-                    sym = cand.symbol
-                    direction = cand.direction
+                # Check if candidate's specific market is open for active execution
+                spec = universe_builder.resolve_contract(sym)
+                sess = market_hours.resolve_session(spec.liquidHours, spec.timeZoneId, spec.isEuropean)
+                cand_phase, _ = market_hours.determine_phase(sess)
+                
+                # Only route orders during ACTIVE_EXECUTION phase
+                if cand_phase != MarketSessionPhase.ACTIVE_EXECUTION and cm.is_connected:
+                    continue
                     
                     if cm.is_connected:
                         # Real gateway active positions sync

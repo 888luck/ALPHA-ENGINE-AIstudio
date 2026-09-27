@@ -154,6 +154,97 @@ class TestAlphaEnginePipeline(unittest.TestCase):
         self.assertIn("macro", metrics.by_category)
         self.assertIn("geopolitical", metrics.by_category)
 
+    def test_market_hours_resolver(self):
+        """Validates dynamic parsing of IBKR liquidHours and opening observation buffers."""
+        from market_hours_resolver import MarketHoursResolver, MarketSessionPhase
+        from datetime import date
+        
+        resolver = MarketHoursResolver(default_observation_buffer_mins=15)
+        
+        # Test standard open string
+        today = date(2026, 9, 28)
+        lh_str = "20260928:0900-1730;20260929:0900-1730"
+        session = resolver.parse_liquid_hours_string(lh_str, "Europe/Paris", target_date=today)
+        self.assertIsNotNone(session)
+        self.assertTrue(session["is_open"])
+        self.assertEqual(session["open_time_str"], "09:00")
+        self.assertEqual(session["close_time_str"], "17:30")
+        
+        # Test closed/holiday string
+        closed_str = "20260928:CLOSED;20260929:0900-1730"
+        closed_session = resolver.parse_liquid_hours_string(closed_str, "Europe/Paris", target_date=today)
+        self.assertIsNotNone(closed_session)
+        self.assertFalse(closed_session["is_open"])
+        self.assertEqual(closed_session["status"], MarketSessionPhase.CLOSED_HOLIDAY)
+
+    def test_opening_reality_verifier(self):
+        """Validates OpeningRealityVerifier challenges against spread blowouts and gap-and-fade traps."""
+        # 1. Valid setup
+        valid_snap = {
+            "realized_spread": 0.02,
+            "stock_price": 100.0,
+            "price_change_from_open_pct": 0.45,
+            "opening_volume_ratio": 1.5,
+            "ofi_ratio": 0.35
+        }
+        res_valid = self.ensemble.challenge_opening_thesis("XLE", "BUY", "Oil supply cuts", 2.0, valid_snap)
+        self.assertTrue(res_valid["thesis_valid"])
+        self.assertEqual(res_valid["action"], "EXECUTE")
+        self.assertLessEqual(res_valid["realized_friction_pct"], 15.0)
+
+        # 2. Spread blowout (>15% friction)
+        blowout_snap = {
+            "realized_spread": 0.35, # Wide spread
+            "stock_price": 50.0,
+            "price_change_from_open_pct": 0.1,
+            "opening_volume_ratio": 0.5,
+            "ofi_ratio": 0.0
+        }
+        res_blowout = self.ensemble.challenge_opening_thesis("XLE", "BUY", "Oil supply cuts", 1.5, blowout_snap)
+        self.assertFalse(res_blowout["thesis_valid"])
+        self.assertEqual(res_blowout["action"], "RECURSIVE_REPLACE")
+        self.assertGreater(res_blowout["realized_friction_pct"], 15.0)
+
+        # 3. Gap-and-fade trap
+        fade_snap = {
+            "realized_spread": 0.03,
+            "stock_price": 100.0,
+            "price_change_from_open_pct": -1.2, # Slipped -1.2%
+            "opening_volume_ratio": 2.2,
+            "ofi_ratio": -0.45 # Heavy sell flow
+        }
+        res_fade = self.ensemble.challenge_opening_thesis("XLE", "BUY", "Oil supply cuts", 2.0, fade_snap)
+        self.assertFalse(res_fade["thesis_valid"])
+        self.assertEqual(res_fade["action"], "RECURSIVE_REPLACE")
+
+    def test_recursive_candidate_replacement(self):
+        """Validates that UniverseBuilder drops invalidated candidate and slots in verified substitute."""
+        event = NewsEvent(
+            event_id="TEST_REC_01",
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            source="TEST",
+            headline="Energy sector active",
+            body="Oil rally continuing.",
+            symbols_mentioned=["XLE"]
+        )
+        res = self.ensemble.evaluate_event(event)
+        basket = self.universe_builder.build_ranked_universe([res], max_instruments=1)
+        self.assertEqual(len(basket.candidates), 1)
+        initial_sym = basket.candidates[0].symbol
+
+        # Trigger recursive replacement
+        updated_basket, replacement = self.universe_builder.recursive_replace_candidate(
+            basket=basket,
+            rejected_symbol=initial_sym,
+            invalidation_reason="Opening spread exceeded 15% friction ceiling"
+        )
+        self.assertIsNotNone(replacement)
+        self.assertNotEqual(replacement.symbol, initial_sym)
+        self.assertTrue(replacement.isRecursiveSwap)
+        self.assertIn("friction", replacement.invalidationReason.lower())
+        self.assertEqual(len(updated_basket.candidates), 1)
+        self.assertEqual(updated_basket.candidates[0].symbol, replacement.symbol)
+
 
 if __name__ == "__main__":
     unittest.main()

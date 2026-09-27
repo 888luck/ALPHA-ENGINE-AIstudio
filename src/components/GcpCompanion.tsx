@@ -169,12 +169,13 @@ export default function GcpCompanion(props: GcpCompanionProps) {
   const [adminLiveToken, setAdminLiveToken] = useState<string>("");
   const [isLiveUnlocked, setIsLiveUnlocked] = useState<boolean>(false);
   const [liveConfirmModal, setLiveConfirmModal] = useState<boolean>(false);
+  const [activeGeoDesk, setActiveGeoDesk] = useState<"ALL" | "EUROPE" | "US">("ALL");
   const [dynamicCandidates, setDynamicCandidates] = useState<any[]>([
-    { rank: 1, symbol: "XLE", direction: "SELL", winRate: 56.0, friction: 1.25, catalyst: "Energy supply/demand dynamics: crude oil reserves low", isEuropean: false, status: "ACTIVE" },
-    { rank: 2, symbol: "COP", direction: "SELL", winRate: 56.0, friction: 1.46, catalyst: "Energy supply/demand dynamics: upstream oil sensitivity", isEuropean: false, status: "ACTIVE" },
-    { rank: 3, symbol: "VLO", direction: "SELL", winRate: 56.0, friction: 1.67, catalyst: "Refining margins under crack spread compression", isEuropean: false, status: "ACTIVE" },
-    { rank: 4, symbol: "SAP", direction: "BUY", winRate: 54.0, friction: 2.10, catalyst: "ECB monetary easing benefiting enterprise software", isEuropean: true, status: "STANDBY" },
-    { rank: 5, symbol: "AIR", direction: "BUY", winRate: 52.0, friction: 2.45, catalyst: "European defense procurement contract renewals", isEuropean: true, status: "STANDBY" }
+    { rank: 1, symbol: "TTE", direction: "BUY", winRate: 64.0, friction: 1.85, catalyst: "European Energy margin resilience & crude stability", isEuropean: true, status: "ACTIVE", challengeStatus: "VALIDATED", sessionPhase: "ACTIVE_EXECUTION", countdownStr: "Closes in 3h 12m", isRecursiveSwap: false },
+    { rank: 2, symbol: "SAP", direction: "BUY", winRate: 61.0, friction: 2.10, catalyst: "Enterprise cloud software revenue expansion", isEuropean: true, status: "ACTIVE", challengeStatus: "VALIDATED", sessionPhase: "ACTIVE_EXECUTION", countdownStr: "Closes in 3h 12m", isRecursiveSwap: false },
+    { rank: 3, symbol: "NVDA", direction: "BUY", winRate: 68.0, friction: 1.45, catalyst: "Semiconductor institutional order flow acceleration", isEuropean: false, status: "ACTIVE", challengeStatus: "PENDING_OPEN", sessionPhase: "PRE_MARKET", countdownStr: "Opens in 42m", isRecursiveSwap: false },
+    { rank: 4, symbol: "VLO", direction: "BUY", winRate: 59.0, friction: 2.30, catalyst: "Recursive opening substitute: verified momentum swap for XLE", isEuropean: false, status: "STANDBY", challengeStatus: "VALIDATED", sessionPhase: "PRE_MARKET", countdownStr: "Opens in 42m", isRecursiveSwap: true, invalidationReason: "Replaced XLE: Opening spread blowout exceeded 15% friction ceiling." },
+    { rank: 5, symbol: "AIR", direction: "BUY", winRate: 55.0, friction: 2.45, catalyst: "European aerospace multi-year commercial fleet deliveries", isEuropean: true, status: "STANDBY", challengeStatus: "VALIDATED", sessionPhase: "ACTIVE_EXECUTION", countdownStr: "Closes in 3h 12m", isRecursiveSwap: false }
   ]);
 
   // New Hybrid Failsafe API Delivery and Onboarding States
@@ -2861,68 +2862,185 @@ journalctl -u alpha-engine.service -f</pre>
                 </div>
               </div>
 
-              {/* Dynamic Focus Universe Table */}
-              <div className="bg-[#141a29] border border-white/10 rounded-xl overflow-hidden shadow-lg">
-                <div className="p-4 border-b border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-indigo-400" />
-                    <h4 className="text-sm font-bold text-white font-mono">
-                      DYNAMIC CALIBRATED FOCUS UNIVERSE (TOP {basketSizeToggle})
-                    </h4>
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    Updated Daily at 04:00 NY / 10:00 CET Pre-Market
+              {/* Live Multi-Exchange Sessions Ribbon */}
+              <div className="bg-[#101626] border border-indigo-500/20 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                  <span className="text-xs font-bold text-white font-mono flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-cyan-400" />
+                    GLOBAL EXCHANGE SESSIONS & DYNAMIC CLOCKS (IBIE PRO IRELAND CO-LOCATION)
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    REAL-TIME SYNC
                   </span>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 font-mono text-xs">
+                  {/* Euronext */}
+                  <div className="bg-black/30 border border-emerald-500/20 p-2.5 rounded-lg space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-emerald-300 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> 🇪🇺 EURONEXT (PARIS/AMST)
+                      </span>
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 rounded">DMA LIVE</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300">Session: 09:00 - 17:30 CET</p>
+                    <p className="text-[10px] text-slate-400">Auto-Flatten: 17:25 CET (3h 12m remaining)</p>
+                  </div>
+                  {/* XETRA */}
+                  <div className="bg-black/30 border border-amber-500/20 p-2.5 rounded-lg space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-amber-300 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" /> 🇩🇪 XETRA (FRANKFURT)
+                      </span>
+                      <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 rounded">DMA LIVE</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300">Session: 09:00 - 17:30 CET</p>
+                    <p className="text-[10px] text-slate-400">Auto-Flatten: 17:25 CET (3h 12m remaining)</p>
+                  </div>
+                  {/* US NYSE / NASDAQ */}
+                  <div className="bg-black/30 border border-blue-500/20 p-2.5 rounded-lg space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-blue-300 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-blue-400" /> 🇺🇸 NYSE / NASDAQ (WALL ST)
+                      </span>
+                      <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 rounded">PRE-MARKET</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300">Session: 09:30 - 16:00 EST (15:30 CET)</p>
+                    <p className="text-[10px] text-blue-400 font-bold">Opens in: 42m (Discovery buffer armed)</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Focus Universe Table with Geo Desks Filter */}
+              <div className="bg-[#141a29] border border-white/10 rounded-xl overflow-hidden shadow-lg space-y-0">
+                <div className="p-4 border-b border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-indigo-400" />
+                    <div>
+                      <h4 className="text-sm font-bold text-white font-mono">
+                        DYNAMIC CALIBRATED FOCUS UNIVERSE (TOP {basketSizeToggle})
+                      </h4>
+                      <p className="text-[10px] text-slate-400 font-mono">
+                        Filtered via 15% friction ceiling & Critic-Verifier opening challenge
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Geo Desk Filter Pills */}
+                  <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-lg border border-white/10 font-mono text-xs">
+                    <button
+                      onClick={() => setActiveGeoDesk("ALL")}
+                      className={`px-2.5 py-1 rounded transition cursor-pointer font-bold ${
+                        activeGeoDesk === "ALL" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      🌐 ALL DESKS
+                    </button>
+                    <button
+                      onClick={() => setActiveGeoDesk("EUROPE")}
+                      className={`px-2.5 py-1 rounded transition cursor-pointer font-bold ${
+                        activeGeoDesk === "EUROPE" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      🇪🇺 EUROPE (EUR)
+                    </button>
+                    <button
+                      onClick={() => setActiveGeoDesk("US")}
+                      className={`px-2.5 py-1 rounded transition cursor-pointer font-bold ${
+                        activeGeoDesk === "US" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      🇺🇸 US (USD)
+                    </button>
+                  </div>
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="w-full text-left font-mono text-xs">
                     <thead className="bg-black/40 text-slate-400 text-[10px] uppercase border-b border-white/5">
                       <tr>
                         <th className="py-2.5 px-3">Rank</th>
                         <th className="py-2.5 px-3">Symbol</th>
-                        <th className="py-2.5 px-3">Market</th>
+                        <th className="py-2.5 px-3">Exchange & Market</th>
+                        <th className="py-2.5 px-3">Session Phase</th>
                         <th className="py-2.5 px-3">Direction</th>
                         <th className="py-2.5 px-3">Win Rate</th>
-                        <th className="py-2.5 px-3">Est. Friction</th>
+                        <th className="py-2.5 px-3">Friction</th>
+                        <th className="py-2.5 px-3">Reality Challenge</th>
                         <th className="py-2.5 px-3">Primary Catalyst</th>
                         <th className="py-2.5 px-3">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {dynamicCandidates.map((cand) => {
-                        const isActive = cand.rank <= basketSizeToggle;
-                        return (
-                          <tr key={cand.symbol} className={`hover:bg-white/[0.02] transition ${isActive ? "bg-indigo-950/15" : "opacity-50"}`}>
-                            <td className="py-2.5 px-3 font-bold text-indigo-400">#{cand.rank}</td>
-                            <td className="py-2.5 px-3 font-bold text-white flex items-center gap-1.5">
-                              {cand.symbol}
-                              {cand.isEuropean ? (
-                                <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1 rounded">EU</span>
-                              ) : (
-                                <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 rounded">US</span>
-                              )}
-                            </td>
-                            <td className="py-2.5 px-3 text-slate-400">{cand.isEuropean ? "Euronext / XETRA" : "NYSE / ARCA"}</td>
-                            <td className="py-2.5 px-3">
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                cand.direction === "BUY" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
-                              }`}>
-                                {cand.direction}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 text-slate-300">{cand.winRate}%</td>
-                            <td className="py-2.5 px-3 text-emerald-400 font-bold">{cand.friction}%</td>
-                            <td className="py-2.5 px-3 text-slate-300 max-w-xs truncate" title={cand.catalyst}>{cand.catalyst}</td>
-                            <td className="py-2.5 px-3">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                isActive ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-slate-700/30 text-slate-500"
-                              }`}>
-                                {isActive ? "ACTIVE" : "STANDBY"}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {dynamicCandidates
+                        .filter((c) => {
+                          if (activeGeoDesk === "EUROPE") return c.isEuropean;
+                          if (activeGeoDesk === "US") return !c.isEuropean;
+                          return true;
+                        })
+                        .map((cand) => {
+                          const isActive = cand.rank <= basketSizeToggle;
+                          return (
+                            <tr key={cand.symbol} className={`hover:bg-white/[0.02] transition ${isActive ? "bg-indigo-950/15" : "opacity-50"}`}>
+                              <td className="py-2.5 px-3 font-bold text-indigo-400">#{cand.rank}</td>
+                              <td className="py-2.5 px-3 font-bold text-white flex items-center gap-1.5">
+                                {cand.symbol}
+                                {cand.isEuropean ? (
+                                  <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1 rounded font-bold">EUR</span>
+                                ) : (
+                                  <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1 rounded font-bold">USD</span>
+                                )}
+                                {cand.isRecursiveSwap && (
+                                  <span 
+                                    className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.2 rounded font-bold flex items-center gap-0.5 cursor-help"
+                                    title={cand.invalidationReason || "Recursively substituted after opening reality challenge refuted original candidate."}
+                                  >
+                                    🔄 RECURSIVE SWAP
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-400">
+                                {cand.isEuropean ? "Euronext / XETRA" : "NYSE / NASDAQ"}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                                  cand.sessionPhase === "ACTIVE_EXECUTION"
+                                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                    : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                                }`}>
+                                  {cand.countdownStr || cand.sessionPhase}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                  cand.direction === "BUY" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+                                }`}>
+                                  {cand.direction}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-300">{cand.winRate}%</td>
+                              <td className="py-2.5 px-3 text-emerald-400 font-bold">{cand.friction}%</td>
+                              <td className="py-2.5 px-3">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                  cand.challengeStatus === "VALIDATED"
+                                    ? "bg-emerald-500/20 text-emerald-400"
+                                    : cand.challengeStatus === "PENDING_OPEN"
+                                    ? "bg-cyan-500/20 text-cyan-300"
+                                    : "bg-amber-500/20 text-amber-300"
+                                }`}>
+                                  {cand.challengeStatus === "VALIDATED" ? "✓ VALIDATED" : cand.challengeStatus === "PENDING_OPEN" ? "○ OBSERVING" : "⚠️ REPLACED"}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-300 max-w-xs truncate" title={cand.catalyst}>{cand.catalyst}</td>
+                              <td className="py-2.5 px-3">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  isActive ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-slate-700/30 text-slate-500"
+                                }`}>
+                                  {isActive ? "ARMED" : "STANDBY"}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
                     </tbody>
                   </table>
                 </div>

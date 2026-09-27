@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-27T05:33:40.467511+00:00",
+  "generatedAt": "2026-09-27T09:13:52.907927+00:00",
   "maxActiveInstruments": 3,
   "macroContext": "Dynamic multi-exchange universe calibrated from overnight news and event flow.",
   "sourceEvents": [
@@ -22,7 +22,12 @@
       "primaryExchange": "ARCA",
       "currency": "USD",
       "isEuropean": false,
-      "expectedMovePct": 1.8
+      "expectedMovePct": 1.8,
+      "isRecursiveSwap": false,
+      "invalidationReason": "",
+      "challengeStatus": "PENDING_OPEN",
+      "sessionPhase": "CLOSED_HOLIDAY",
+      "countdownStr": "Market Closed (Weekend / Holiday)"
     },
     {
       "rank": 2,
@@ -40,7 +45,12 @@
       "primaryExchange": "NYSE",
       "currency": "USD",
       "isEuropean": false,
-      "expectedMovePct": 2.0
+      "expectedMovePct": 2.0,
+      "isRecursiveSwap": false,
+      "invalidationReason": "",
+      "challengeStatus": "PENDING_OPEN",
+      "sessionPhase": "CLOSED_HOLIDAY",
+      "countdownStr": "Market Closed (Weekend / Holiday)"
     },
     {
       "rank": 3,
@@ -58,7 +68,12 @@
       "primaryExchange": "NYSE",
       "currency": "USD",
       "isEuropean": false,
-      "expectedMovePct": 2.2
+      "expectedMovePct": 2.2,
+      "isRecursiveSwap": false,
+      "invalidationReason": "",
+      "challengeStatus": "PENDING_OPEN",
+      "sessionPhase": "CLOSED_HOLIDAY",
+      "countdownStr": "Market Closed (Weekend / Holiday)"
     }
   ]
 }

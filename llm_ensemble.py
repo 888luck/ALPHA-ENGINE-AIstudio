@@ -188,6 +188,21 @@ VERIFICATION_JSON_SCHEMA = {
     "required": ["verified", "confidence", "issues", "corrections", "missing_sectors", "hallucinated_tickers"]
 }
 
+OPENING_REALITY_CHALLENGE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "symbol": {"type": "string"},
+        "thesis_valid": {"type": "boolean"},
+        "confidence": {"type": "number"},
+        "action": {"type": "string", "enum": ["EXECUTE", "STAND_DOWN", "RECURSIVE_REPLACE"]},
+        "realized_friction_pct": {"type": "number"},
+        "invalidation_reason": {"type": "string"},
+        "challenges": {"type": "array", "items": {"type": "string"}},
+        "order_flow_assessment": {"type": "string"}
+    },
+    "required": ["symbol", "thesis_valid", "confidence", "action", "realized_friction_pct", "challenges"]
+}
+
 
 # =============================================================================
 # STANDARDIZED API CLIENT
@@ -630,3 +645,110 @@ Produce a corrected, validated JSON classification. Strip out any hallucinated t
             accepted=True,
             requires_human_review=False
         )
+
+    def challenge_opening_thesis(
+        self,
+        candidate_symbol: str,
+        direction: str,
+        pre_market_catalyst: str,
+        expected_move_pct: float,
+        opening_snapshot: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Agentic Opening Reality Verifier:
+        Challenges the pre-market trading hypothesis against live opening price action,
+        realized bid-ask spread, opening volume imbalance, and gap behavior.
+        Returns challenge dict indicating whether thesis is intact or requires recursive replacement.
+        """
+        realized_spread = float(opening_snapshot.get("realized_spread", 0.04))
+        stock_price = float(opening_snapshot.get("stock_price", 100.0))
+        price_change_pct = float(opening_snapshot.get("price_change_from_open_pct", 0.0))
+        volume_ratio = float(opening_snapshot.get("opening_volume_ratio", 1.0))
+        ofi_ratio = float(opening_snapshot.get("ofi_ratio", 0.0))
+
+        # 1. Check Realized Friction
+        profit_target = max(0.20, stock_price * (expected_move_pct / 100.0))
+        half_spread = realized_spread / 2.0
+        comm_est = max(0.01, stock_price * 0.0005) * 2.0
+        realized_friction_pct = round(((half_spread + comm_est) / profit_target) * 100.0, 2)
+
+        # 2. Check if Critic Model is available and Quota Guard permits
+        critic_pair = self._create_client("verifier_1") or self._create_client("judge")
+        if critic_pair and self.quota_guard.allow(critic_pair[1]):
+            critic_client, critic_provider = critic_pair
+            prompt = f"""You are the Institutional Reality Verifier for Alpha Engine.
+Challenge this pre-market trading thesis against actual market opening prints:
+
+SYMBOL: {candidate_symbol}
+PROPOSED DIRECTION: {direction}
+PRE-MARKET CATALYST: {pre_market_catalyst}
+EXPECTED MOVE: +{expected_move_pct}%
+
+OPENING MARKET REALITY (15m BUFFER):
+- Current Stock Price: ${stock_price:.2f}
+- Realized Bid-Ask Spread: ${realized_spread:.3f}
+- Calculated Realized Friction: {realized_friction_pct}% (Max allowable ceiling is 15.0%)
+- Opening Price Action Change: {price_change_pct:+.2f}%
+- Opening Volume vs 20-Day Average: {volume_ratio:.2f}x
+- Order Flow Imbalance (OFI): {ofi_ratio:+.2f} (-1.0 heavy sell pressure, +1.0 heavy buy pressure)
+
+INSTRUCTIONS:
+1. Is the pre-market thesis validated or refuted by actual opening prints?
+2. If Realized Friction > 15.0%, you MUST refute and set action to 'RECURSIVE_REPLACE'.
+3. If direction is BUY but price is dropping with negative OFI (gap-and-fade trap), set action to 'RECURSIVE_REPLACE'.
+4. If direction is SELL but price is surging with positive OFI (short squeeze), set action to 'RECURSIVE_REPLACE'.
+5. If thesis is sound, liquidity is tight, and volume confirms, set action to 'EXECUTE'.
+"""
+            try:
+                raw_challenge = critic_client.complete(prompt, schema=OPENING_REALITY_CHALLENGE_SCHEMA)
+                self.quota_guard.record(critic_provider)
+                return {
+                    "symbol": candidate_symbol,
+                    "thesis_valid": bool(raw_challenge.get("thesis_valid", False)),
+                    "confidence": float(raw_challenge.get("confidence", 0.75)),
+                    "action": str(raw_challenge.get("action", "EXECUTE")),
+                    "realized_friction_pct": realized_friction_pct,
+                    "invalidation_reason": str(raw_challenge.get("invalidation_reason", "")),
+                    "challenges": list(raw_challenge.get("challenges", [])),
+                    "order_flow_assessment": str(raw_challenge.get("order_flow_assessment", "Opening auction verified."))
+                }
+            except Exception as e:
+                logger.warning(f"[REALITY VERIFIER ERROR] Critic failed: {e}. Running deterministic challenge.")
+
+        # 3. Deterministic Quantitative Reality Challenge (Quota Guard Safe Fallback)
+        challenges = []
+        is_valid = True
+        inval_reason = ""
+        action = "EXECUTE"
+
+        if realized_friction_pct > 15.0:
+            is_valid = False
+            action = "RECURSIVE_REPLACE"
+            inval_reason = f"Opening bid-ask spread (${realized_spread:.3f}) blew out friction to {realized_friction_pct}%, exceeding 15% ceiling."
+            challenges.append("EXCESSIVE_FRICTION_SPREAD_BLOWOUT")
+
+        if direction == "BUY" and (price_change_pct < -0.8 or ofi_ratio < -0.3):
+            is_valid = False
+            action = "RECURSIVE_REPLACE"
+            inval_reason = f"Bullish catalyst rejected at open: price slipped {price_change_pct:.2f}% under negative order flow (OFI {ofi_ratio:.2f})."
+            challenges.append("GAP_AND_FADE_BEARISH_PRESSURE")
+        elif direction == "SELL" and (price_change_pct > 0.8 or ofi_ratio > 0.3):
+            is_valid = False
+            action = "RECURSIVE_REPLACE"
+            inval_reason = f"Bearish catalyst rejected at open: price surged {price_change_pct:.2f}% under positive order flow (OFI {ofi_ratio:.2f})."
+            challenges.append("SHORT_SQUEEZE_BULLISH_PRESSURE")
+
+        if is_valid:
+            challenges.append("OPENING_LIQUIDITY_TIGHT")
+            challenges.append("ORDER_FLOW_CONFIRMS_DIRECTION")
+
+        return {
+            "symbol": candidate_symbol,
+            "thesis_valid": is_valid,
+            "confidence": 0.80 if is_valid else 0.40,
+            "action": action,
+            "realized_friction_pct": realized_friction_pct,
+            "invalidation_reason": inval_reason,
+            "challenges": challenges,
+            "order_flow_assessment": "Deterministic quantitative order flow analysis."
+        }

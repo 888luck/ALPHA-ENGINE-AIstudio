@@ -40,3 +40,6 @@ dist/
 # Test output
 test_lessons_learned.json
 test_performance.json
+
+# Firebase
+.firebase/

@@ -108,6 +108,11 @@ class RankedCandidate:
     currency: str = "USD"
     isEuropean: bool = False
     expiryHours: int = 24
+    isRecursiveSwap: bool = False
+    invalidationReason: str = ""
+    challengeStatus: str = "PENDING_OPEN"
+    sessionPhase: str = "PRE_MARKET"
+    countdownStr: str = ""
 
 
 @dataclass
