@@ -34,8 +34,9 @@ RUN npm ci --only=production
 # Copy the compiled artifacts from the builder context
 COPY --from=builder /app/dist ./dist
 
-# Document that the application processes traffic on port 3000 by default (local) or $PORT (on Cloud Run)
-EXPOSE 3000
+# Google Cloud Run injects PORT (default 8080)
+ENV PORT=8080
+EXPOSE 8080
 
 # Start modern hybrid low-latency server
 CMD ["node", "dist/server.cjs"]

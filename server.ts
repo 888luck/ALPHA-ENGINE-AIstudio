@@ -51,6 +51,11 @@ const SETTINGS_DOC_PATH = "system_config/alpha_engine_v1";
 const app = express();
 app.use(express.json());
 
+// Cloud Run health check endpoint
+app.get("/healthz", (req, res) => {
+  res.status(200).send("OK");
+});
+
 // Global error handler
 process.on("unhandledRejection", (reason, promise) => {
   console.error("[SERVER] Unhandled Rejection at:", promise, "reason:", reason);
@@ -60,7 +65,7 @@ process.on("uncaughtException", (err) => {
   console.error("[SERVER] Uncaught Exception:", err);
 });
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // ==========================================
 // UNIVERSAL AI AGNOSTIC ROUTER (ALPHA-GEN)
@@ -2126,8 +2131,9 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[ALPHA SERVER] Running successfully on local container: http://0.0.0.0:${PORT}`);
+  const listenPort = Number(process.env.PORT) || PORT || 8080;
+  app.listen(listenPort, "0.0.0.0", () => {
+    console.log(`[ALPHA SERVER] Running successfully on port: http://0.0.0.0:${listenPort}`);
   });
 }
 
