@@ -465,59 +465,94 @@ export default function App() {
             </div>
 
             {/* Modal Content */}
-            <div className="p-6 space-y-6 text-slate-300 text-xs leading-relaxed">
+            <div className="p-6 space-y-6 text-slate-300 text-xs leading-relaxed max-h-[75vh] overflow-y-auto">
               
               {/* Question 1: Can the current GCP machine handle the improved system? */}
               <div className="bg-[#141d30] rounded-lg border border-indigo-500/15 p-4 space-y-2.5">
                 <span className="text-[11px] text-indigo-400 font-extrabold uppercase tracking-wider block font-mono">
-                  🖥️ Question 1: Can our current GCE e2-micro instance handle this improved system?
+                  🖥️ Question 1: Can our Frankfurt GCP Spot VM handle this upgraded architecture?
                 </span>
                 <p>
-                  <strong>Yes, absolutely and with massive headroom!</strong> You might think that a small machine like an <code className="bg-black/30 px-1 py-0.2 rounded text-indigo-300">e2-micro</code> (2 vCPUs, 1GB RAM) would struggle, but our architecture is specifically optimized for this:
+                  <strong>Yes, with massive headroom at ~$1.64/month!</strong> Running an <code className="bg-black/30 px-1 py-0.2 rounded text-indigo-300">e2-micro</code> or Spot VM instance (2 vCPUs, 1GB RAM) in Frankfurt (<code className="bg-black/30 px-1 py-0.2 rounded text-indigo-300">europe-west3</code>) provides sub-millisecond proximity to Interactive Brokers (IBIE / IBKR Ireland):
                 </p>
                 <ul className="list-disc pl-5 space-y-1.5 text-[11.5px] text-slate-300">
                   <li>
-                    <strong className="text-white">Zero Overhead Socket Listening:</strong> The edge node daemon (<code className="bg-black/30 px-1 py-0.2 rounded text-emerald-400">main.py</code> & <code className="bg-black/30 px-1 py-0.2 rounded text-emerald-400">local_edge_node.py</code>) is written in highly optimized, single-threaded asynchronous Python. It acts purely as a traffic router. It typically consumes **less than 50MB of RAM** and **under 2% CPU load** under active market ticks.
+                    <strong className="text-white">Zero Overhead Socket Listening:</strong> The edge node daemon (<code className="bg-black/30 px-1 py-0.2 rounded text-emerald-400">main.py</code> & <code className="bg-black/30 px-1 py-0.2 rounded text-emerald-400">local_edge_node.py</code>) operates as an async Python event router, consuming **under 50MB RAM** and **&lt;2% CPU**.
                   </li>
                   <li>
-                    <strong className="text-white">No CPU-intensive Backtesting on GCE:</strong> Quantitative strategy backtests can be computationally heavy. To prevent edge node degradation, backtesting calculations are executed in the cloud on demand by the **Google Cloud Run container**, completely offloading the GCE machine.
+                    <strong className="text-white">Cloud Run Backtesting Offload:</strong> Computational backtesting and simulation workloads run serverlessly in Cloud Run on demand, keeping the co-located VM 100% responsive for order execution.
                   </li>
                   <li>
-                    <strong className="text-white">External AI Evaluation:</strong> All deep intelligence reviews and geopolitical calibrations are dispatched directly to Google's supercomputing API nodes via the **Gemini API**. The local edge node does not run heavy neural networks locally.
-                  </li>
-                  <li>
-                    <strong className="text-white">Asynchronous Database Syncing:</strong> Dynamic state synchronization operates via light Firestore API bridges, removing heavy polling loops or local SQL server workloads.
+                    <strong className="text-white">Asynchronous Firestore Sync:</strong> State updates, risk telemetry, and audit logs synchronize over non-blocking Firestore REST/gRPC bridges.
                   </li>
                 </ul>
               </div>
 
-              {/* Question 2: How are credentials and API keys fed to the system? */}
-              <div className="bg-[#141d30] rounded-lg border border-amber-500/15 p-4 space-y-2.5">
-                <span className="text-[11px] text-amber-400 font-extrabold uppercase tracking-wider block font-mono">
-                  🔑 Question 2: How do User Credentials, APIs, and Identifiers feed into the system?
+              {/* Question 2: Multi-Model Critic-Verifier Consensus & Quota Guard */}
+              <div className="bg-[#141d30] rounded-lg border border-cyan-500/15 p-4 space-y-2.5">
+                <span className="text-[11px] text-cyan-400 font-extrabold uppercase tracking-wider block font-mono">
+                  🧠 Question 2: How does the AI Intelligence Pipeline & Multi-Model Consensus Work?
                 </span>
                 <p>
-                  Security is critical when dealing with live capital routing. Alpha Engine feeds parameters dynamically to two distinct execution zones:
+                  Trading signals are never based on naive single-prompt AI. Alpha Engine employs an institutional **Critic-Verifier Consensus Pipeline**:
                 </p>
-                
-                <div className="space-y-3 pl-1">
+                <ul className="list-disc pl-5 space-y-1.5 text-[11.5px] text-slate-300">
+                  <li>
+                    <strong className="text-white">Critic-Verifier Duo:</strong> A primary analyst model generates quantitative trade hypotheses, while an adversarial critic model evaluates liquidity, news catalysts, and regime risks. Orders require <strong>&ge;75% consensus</strong>.
+                  </li>
+                  <li>
+                    <strong className="text-white">Zero-Crash Quota Guard:</strong> If API limits are approached, the rolling-window rate limiter engages automatically and transitions smoothly to the deterministic quantitative engine — guaranteeing zero runtime crashes and uninterrupted risk monitoring.
+                  </li>
+                  <li>
+                    <strong className="text-white">Attribution & Audit Logging:</strong> Every AI inference, rationale, and confidence score is permanently logged to Firestore (<code className="bg-black/30 px-1 py-0.2 rounded text-cyan-300">historical_logs</code>) for post-market calibration.
+                  </li>
+                </ul>
+              </div>
+
+              {/* Question 3: Dynamic Universe Discovery & Friction Screening */}
+              <div className="bg-[#141d30] rounded-lg border border-purple-500/15 p-4 space-y-2.5">
+                <span className="text-[11px] text-purple-400 font-extrabold uppercase tracking-wider block font-mono">
+                  🌐 Question 3: How does the Dynamic Universe Discovery and Friction Filter Work?
+                </span>
+                <p>
+                  Hardcoded tickers are strictly avoided. Alpha Engine discovers opportunities dynamically each morning:
+                </p>
+                <ul className="list-disc pl-5 space-y-1.5 text-[11.5px] text-slate-300">
+                  <li>
+                    <strong className="text-white">Dynamic Scanner:</strong> Fetches high-volume market movers and sector catalysts directly from IBKR scanners and feed registries.
+                  </li>
+                  <li>
+                    <strong className="text-white">Strict &lt;15% Friction Gate:</strong> Before ranking, every candidate undergoes friction screening: <code className="bg-black/30 px-1 py-0.2 rounded text-purple-300">Spread / ATR &le; 15%</code>. Illiquid tickers that would erode alpha through bid-ask slippage are automatically discarded.
+                  </li>
+                  <li>
+                    <strong className="text-white">Top N Focus Selector:</strong> You can select to trade between <strong>1 and 5</strong> top-ranked instruments simultaneously in the dashboard to concentrate risk.
+                  </li>
+                </ul>
+              </div>
+
+              {/* Question 4: Credentials, APIs, and Live Safety */}
+              <div className="bg-[#141d30] rounded-lg border border-amber-500/15 p-4 space-y-2.5">
+                <span className="text-[11px] text-amber-400 font-extrabold uppercase tracking-wider block font-mono">
+                  🔑 Question 4: How are Credentials Fed and Live Trading Protected?
+                </span>
+                <div className="space-y-2 pl-1 text-[11.5px]">
                   <div>
-                    <span className="text-[10px] text-slate-200 block font-bold font-mono uppercase">🎯 Tier 1: Express Web API Control Plane (Cloud Run)</span>
-                    <p className="text-slate-400 pt-0.5">
-                      Your <strong className="text-slate-200">Gemini API Key</strong> operates strictly server-side inside Cloud Run. This ensures your key is never visible to web browsers. When migrating to Vertex AI in production, you can completely remove standard keys and let Google Cloud authenticate using keyless **Service Accounts** (IAM roles).
+                    <span className="text-[10.5px] text-slate-200 block font-bold font-mono uppercase">🎯 Tier 1: Cloud Run Control Plane</span>
+                    <p className="text-slate-400">
+                      Your Gemini API key and Firebase credentials remain strictly server-side inside Cloud Run or authenticated via IAM Service Accounts.
                     </p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-200 block font-bold font-mono uppercase">📡 Tier 2: Edge Node VM (GCE Frankfurt)</span>
-                    <p className="text-slate-400 pt-0.5">
-                      At startup, the Python script imports configurations via <code className="bg-black/30 px-1 py-0.2 rounded">config_loader.py</code> from a secure local <code className="bg-black/30 px-1 py-0.2 rounded text-amber-300">.env</code> file stored on the VM. This file houses:
+                    <span className="text-[10.5px] text-slate-200 block font-bold font-mono uppercase">📡 Tier 2: Edge Node VM (.env file)</span>
+                    <p className="text-slate-400">
+                      Configured via <code className="bg-black/30 px-1 py-0.2 rounded text-amber-300">.env</code>: Account ID, Port (default <code className="bg-white/10 px-1 rounded text-emerald-400">4002</code> for Paper, <code className="bg-white/10 px-1 rounded text-rose-400">4001</code> for Live), and MiFID-II trader shortcodes.
                     </p>
-                    <ul className="list-disc pl-5 mt-1 text-slate-400 space-y-1">
-                      <li><strong className="text-slate-300">IBKR_ACCOUNT_NUMBER:</strong> Target Interactive Brokers account ID.</li>
-                      <li><strong className="text-slate-300">IBKR_PORT:</strong> Port <code className="bg-white/10 px-1 py-0.1 rounded text-[10px]">4002</code> for simulated paper, or <code className="bg-white/10 px-1 py-0.1 rounded text-[10px]">4001</code> for live production.</li>
-                      <li><strong className="text-slate-300">Regulatory Shortcodes:</strong> MiFID-II required compliance identifiers (<code className="bg-black/30 px-1 py-0.1 rounded">DECISION_MAKER_ID</code> & <code className="bg-black/30 px-1 py-0.1 rounded">EXECUTION_TRADER_ID</code>).</li>
-                      <li><strong className="text-slate-300">FIREBASE_API_KEY:</strong> Token used to securely bridge telemetry into your Firestore collections.</li>
-                    </ul>
+                  </div>
+                  <div>
+                    <span className="text-[10.5px] text-rose-300 block font-bold font-mono uppercase">🛡️ Two-Step Live Safety Gate</span>
+                    <p className="text-slate-400">
+                      Live trading cannot be toggled accidentally. To arm live execution, the operator must type the exact safety phrase: <code className="bg-black/40 px-1.5 py-0.5 rounded text-rose-400 font-mono font-bold">ALPHA_LIVE_CONFIRMED_2026</code>.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -534,8 +569,8 @@ export default function App() {
                   <div className="flex gap-3">
                     <span className="bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/30 w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 font-mono">1</span>
                     <div>
-                      <strong className="text-white block font-semibold">Verify Strategy with a Backtest:</strong>
-                      <span className="text-slate-400">Before risking any funds (even simulated ones), test the algorithm. Go to the <strong className="text-slate-200">📊 QUANT BACKTESTER</strong> tab in the GCP Control Companion panel below, pick a ticker (e.g., <code className="bg-black/30 px-1 py-0.2 rounded text-emerald-400">XLE</code>), select a timeframe, and hit <strong className="text-slate-200">RUN SIMULATION</strong>. Recharts will instantly plot the dynamic equity curves, transaction costs, and signal accuracy.</span>
+                      <strong className="text-white block font-semibold">Verify Strategy with Event-Study Backtesting:</strong>
+                      <span className="text-slate-400">Go to the <strong className="text-slate-200">📊 QUANT BACKTESTER</strong> tab in the GCP Companion panel. Run simulations across historical market regimes to inspect Directional Hit Rate, Maximum Adverse/Favorable Excursion (MAE/MFE), and Brier calibration scores.</span>
                     </div>
                   </div>
 
@@ -543,8 +578,8 @@ export default function App() {
                   <div className="flex gap-3">
                     <span className="bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/30 w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 font-mono">2</span>
                     <div>
-                      <strong className="text-white block font-semibold">Set Up Risk Boundaries & Stop Multipliers:</strong>
-                      <span className="text-slate-400">In the <strong className="text-slate-200">⚙️ RISK BOUNDARY CONFIGURATOR</strong> panel, specify your Stop ATR Multipliers (typically 1.8 ATR), dynamic Stop Limits, and toggle adaptive stop settings. This aligns with standard institutional rules.</span>
+                      <strong className="text-white block font-semibold">Inspect Dynamic Universe & AI Consensus:</strong>
+                      <span className="text-slate-400">Switch to the <strong className="text-cyan-400">🧠 AI INTELLIGENCE & UNIVERSE</strong> tab. Review discovered market movers, confirm the &lt;15% friction filter is passing, select your <strong>Top Focus Tickers</strong> (1 to 5), and review real-time Quota Guard health.</span>
                     </div>
                   </div>
 
@@ -552,8 +587,8 @@ export default function App() {
                   <div className="flex gap-3">
                     <span className="bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/30 w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 font-mono">3</span>
                     <div>
-                      <strong className="text-white block font-semibold">Configure Drawdown Circuit Breakers (Essential Protection):</strong>
-                      <span className="text-slate-400">Use <strong className="text-slate-200">Option 3 (Drawdown Hard-Locks)</strong> to set your Daily Drawdown Limit Percent (e.g. 2.5%) and Cash Drawdown threshold (e.g. €1,500.00). If cumulative losses touch these boundaries, the system instantly engages a hard lock on the router to preserve capital.</span>
+                      <strong className="text-white block font-semibold">Set Up Risk Boundaries & Stop Multipliers:</strong>
+                      <span className="text-slate-400">In the <strong className="text-slate-200">⚙️ RISK BOUNDARY CONFIGURATOR</strong>, verify your Stop ATR Multipliers (typically 1.8 ATR), dynamic Stop Limits, and toggle adaptive trailing stops.</span>
                     </div>
                   </div>
 
@@ -561,8 +596,8 @@ export default function App() {
                   <div className="flex gap-3">
                     <span className="bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/30 w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 font-mono">4</span>
                     <div>
-                      <strong className="text-white block font-semibold">Deploy and Run on Paper (Simulated Account):</strong>
-                      <span className="text-slate-400">To test on paper securely without paying, configure your local VM config loop port to <code className="bg-black/30 px-1 py-0.2 rounded text-emerald-400">4002</code> (which connects directly to the IBKR Paper gateway). Run the companion script <code className="bg-black/30 px-1 py-0.2 rounded text-slate-300">./deploy_to_gcp.sh</code> to spin up your Frankfurt VM node. Check the Live Telemetry Stream panel to see real-time latency (less than 2.0ms) co-location in action!</span>
+                      <strong className="text-white block font-semibold">Configure Drawdown Circuit Breakers (Essential Protection):</strong>
+                      <span className="text-slate-400">Set your Daily Drawdown Limit Percent (e.g. 2.5%) and Cash Drawdown threshold (e.g. €1,500.00). If cumulative losses hit these boundaries, the system engages a hard lock on the router immediately to protect capital.</span>
                     </div>
                   </div>
 
@@ -570,8 +605,17 @@ export default function App() {
                   <div className="flex gap-3">
                     <span className="bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/30 w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 font-mono">5</span>
                     <div>
-                      <strong className="text-white block font-semibold">Monitoring & Overrides:</strong>
-                      <span className="text-slate-400">If a circuit breaker hard locks, click <strong className="text-amber-400">ADMIN UNLOCK</strong> to override and restore the router manually once risk is evaluated. Use <strong className="text-rose-400">PANIC FLUSH</strong> to instantly liquidate all open positions in an emergency.</span>
+                      <strong className="text-white block font-semibold">Deploy and Run on Paper (Simulated Gateway):</strong>
+                      <span className="text-slate-400">Ensure the VM loop port is set to <code className="bg-black/30 px-1 py-0.2 rounded text-emerald-400">4002</code> (IBKR Paper gateway). Run the deployment script <code className="bg-black/30 px-1 py-0.2 rounded text-slate-300">./deploy_to_gcp.sh</code>. Check the Live Telemetry Stream panel to see sub-millisecond co-location in action!</span>
+                    </div>
+                  </div>
+
+                  {/* Step 6 */}
+                  <div className="flex gap-3">
+                    <span className="bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/30 w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 font-mono">6</span>
+                    <div>
+                      <strong className="text-white block font-semibold">Emergency Monitoring & Overrides:</strong>
+                      <span className="text-slate-400">If a circuit breaker engages, click <strong className="text-amber-400">ADMIN UNLOCK</strong> to restore routing after assessing market conditions. Click <strong className="text-rose-400">PANIC FLUSH</strong> to instantly liquidate all open positions in an emergency.</span>
                     </div>
                   </div>
 
