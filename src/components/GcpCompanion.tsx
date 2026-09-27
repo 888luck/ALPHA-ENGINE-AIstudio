@@ -24,7 +24,13 @@ import {
   LineChart as ChartIcon,
   TrendingUp,
   Sliders,
-  Calendar
+  Calendar,
+  Bot,
+  Brain,
+  Database,
+  Layers,
+  Radio,
+  Award
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -46,7 +52,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
   const activeFirebaseConfig = getActiveFirebaseConfig();
   const projectId = activeFirebaseConfig?.projectId || "";
 
-  const [activeTab, setActiveTab] = useState<"github" | "orchestrator" | "backtest" | "auto" | "specs" | "forge">("forge");
+  const [activeTab, setActiveTab] = useState<"github" | "orchestrator" | "backtest" | "auto" | "specs" | "forge" | "ai">("forge");
   const [instanceType, setInstanceType] = useState<"spot" | "standard">("spot");
   const [copiedText, setCopiedText] = useState(false);
   const [cloudProvider, setCloudProvider] = useState<"gcp" | "hetzner" | "aws" | "universal">(() => (localStorage.getItem("alpha_cloud_provider") as any) || "gcp");
@@ -150,6 +156,26 @@ export default function GcpCompanion(props: GcpCompanionProps) {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [selectedRouterLane, setSelectedRouterLane] = useState<"live" | "paper">("paper");
   const [isSavingOnboarding, setIsSavingOnboarding] = useState(false);
+
+  // AI Intelligence Tab & Dynamic Universe Controls
+  const [basketSizeToggle, setBasketSizeToggle] = useState<number>(() => {
+    try {
+      const stored = localStorage.getItem("alpha_basket_size");
+      return stored ? parseInt(stored) : 3;
+    } catch {
+      return 3;
+    }
+  });
+  const [adminLiveToken, setAdminLiveToken] = useState<string>("");
+  const [isLiveUnlocked, setIsLiveUnlocked] = useState<boolean>(false);
+  const [liveConfirmModal, setLiveConfirmModal] = useState<boolean>(false);
+  const [dynamicCandidates, setDynamicCandidates] = useState<any[]>([
+    { rank: 1, symbol: "XLE", direction: "SELL", winRate: 56.0, friction: 1.25, catalyst: "Energy supply/demand dynamics: crude oil reserves low", isEuropean: false, status: "ACTIVE" },
+    { rank: 2, symbol: "COP", direction: "SELL", winRate: 56.0, friction: 1.46, catalyst: "Energy supply/demand dynamics: upstream oil sensitivity", isEuropean: false, status: "ACTIVE" },
+    { rank: 3, symbol: "VLO", direction: "SELL", winRate: 56.0, friction: 1.67, catalyst: "Refining margins under crack spread compression", isEuropean: false, status: "ACTIVE" },
+    { rank: 4, symbol: "SAP", direction: "BUY", winRate: 54.0, friction: 2.10, catalyst: "ECB monetary easing benefiting enterprise software", isEuropean: true, status: "STANDBY" },
+    { rank: 5, symbol: "AIR", direction: "BUY", winRate: 52.0, friction: 2.45, catalyst: "European defense procurement contract renewals", isEuropean: true, status: "STANDBY" }
+  ]);
 
   // New Hybrid Failsafe API Delivery and Onboarding States
   const [vmConfigured, setVmConfigured] = useState<boolean>(() => {
@@ -661,8 +687,20 @@ export default function GcpCompanion(props: GcpCompanionProps) {
           >
             <Zap className="w-3.5 h-3.5" /> ⚒️ AI STRATEGY FORGE
           </button>
+
+          <button
+            onClick={() => setActiveTab("ai")}
+            className={`px-3 py-1.5 rounded transition flex items-center gap-1 cursor-pointer ${
+              activeTab === "ai"
+                ? "bg-purple-500/25 text-purple-300 border border-purple-500/40 font-bold"
+                : "text-slate-400 hover:text-purple-300"
+            }`}
+          >
+            <Brain className="w-3.5 h-3.5 text-purple-400" /> 🧠 AI INTELLIGENCE & UNIVERSE
+          </button>
         </div>
       </div>
+
 
       {/* 🖥️ CO-LOCATION ACTIVE SYSTEM BANNER / ONBOARDING CONTROL PLANE */}
       {vmConfigured ? (
@@ -2723,8 +2761,238 @@ journalctl -u alpha-engine.service -f</pre>
             </div>
           )}
 
+          {/* ============================================================== */}
+          {/* TAB 7: 🧠 AI INTELLIGENCE, DYNAMIC UNIVERSE & REASONING AUDIT  */}
+          {/* ============================================================== */}
+          {activeTab === "ai" && (
+            <div className="space-y-6 animate-fadeIn font-sans">
+              {/* Header Banner */}
+              <div className="bg-gradient-to-r from-purple-950/40 via-indigo-950/30 to-[#0c101d] border border-purple-500/25 p-5 rounded-xl shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Brain className="w-5 h-5 text-purple-400" />
+                    <h3 className="text-base font-bold text-white font-mono tracking-tight">
+                      MULTI-AGENT INTELLIGENCE PIPELINE & DYNAMIC UNIVERSE
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1 max-w-2xl">
+                    Critic-Verifier consensus architecture across NVIDIA NIM, Groq LLaMA, and Google Gemini.
+                    Screens market catalysts against a 15% friction ceiling and dynamically ranks Top N intraday instruments.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 px-3 py-1.5 rounded-lg text-purple-300 font-mono text-xs">
+                  <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+                  <span>PRE-MARKET CALIBRATION: ONLINE</span>
+                </div>
+              </div>
+
+              {/* Top Controls: Basket Size Toggle & Live Trading Gate */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 1. Basket Size Toggle (1-5 Instruments) */}
+                <div className="bg-[#141a29] border border-white/10 p-4 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-200 font-mono flex items-center gap-1.5">
+                      <Sliders className="w-4 h-4 text-indigo-400" /> FOCUS BASKET SIZE (TOP N)
+                    </span>
+                    <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded font-mono">
+                      {basketSizeToggle} {basketSizeToggle === 1 ? "INSTRUMENT" : "INSTRUMENTS"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Configures maximum simultaneous active instruments traded. Conforms to IBKR basic Level 2 depth limit (~3 streams).
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    {[1, 2, 3, 4, 5].map((size) => (
+                      <button
+                        key={size}
+                        onClick={() => {
+                          setBasketSizeToggle(size);
+                          localStorage.setItem("alpha_basket_size", size.toString());
+                        }}
+                        className={`flex-1 py-1.5 rounded font-mono text-xs font-bold transition cursor-pointer ${
+                          basketSizeToggle === size
+                            ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/30 border border-indigo-400"
+                            : "bg-black/30 text-slate-400 border border-white/5 hover:text-white hover:border-white/20"
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. Paper / Live Trading Safety Gate */}
+                <div className="bg-[#141a29] border border-white/10 p-4 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-200 font-mono flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" /> EXECUTION ENVIRONMENT GATE
+                    </span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono ${
+                      isLiveUnlocked ? "bg-red-500/20 text-red-400 border border-red-500/30" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                    }`}>
+                      {isLiveUnlocked ? "🔴 LIVE DMA ROUTING" : "🟢 PAPER SIMULATION (PORT 4002)"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Paper trading is active by default. Live real-capital execution requires manual administrator confirmation token.
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="password"
+                      placeholder="Enter Admin Confirmation Token..."
+                      value={adminLiveToken}
+                      onChange={(e) => setAdminLiveToken(e.target.value)}
+                      className="flex-1 bg-black/40 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-indigo-500"
+                    />
+                    <button
+                      onClick={() => {
+                        if (adminLiveToken === "ALPHA_LIVE_CONFIRMED_2026") {
+                          setIsLiveUnlocked(!isLiveUnlocked);
+                          setAdminLiveToken("");
+                        } else {
+                          alert("Invalid Admin Token. Paper trading remains strictly enforced.");
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded font-mono text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition cursor-pointer"
+                    >
+                      {isLiveUnlocked ? "LOCK TO PAPER" : "UNLOCK LIVE"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Focus Universe Table */}
+              <div className="bg-[#141a29] border border-white/10 rounded-xl overflow-hidden shadow-lg">
+                <div className="p-4 border-b border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-indigo-400" />
+                    <h4 className="text-sm font-bold text-white font-mono">
+                      DYNAMIC CALIBRATED FOCUS UNIVERSE (TOP {basketSizeToggle})
+                    </h4>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Updated Daily at 04:00 NY / 10:00 CET Pre-Market
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left font-mono text-xs">
+                    <thead className="bg-black/40 text-slate-400 text-[10px] uppercase border-b border-white/5">
+                      <tr>
+                        <th className="py-2.5 px-3">Rank</th>
+                        <th className="py-2.5 px-3">Symbol</th>
+                        <th className="py-2.5 px-3">Market</th>
+                        <th className="py-2.5 px-3">Direction</th>
+                        <th className="py-2.5 px-3">Win Rate</th>
+                        <th className="py-2.5 px-3">Est. Friction</th>
+                        <th className="py-2.5 px-3">Primary Catalyst</th>
+                        <th className="py-2.5 px-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {dynamicCandidates.map((cand) => {
+                        const isActive = cand.rank <= basketSizeToggle;
+                        return (
+                          <tr key={cand.symbol} className={`hover:bg-white/[0.02] transition ${isActive ? "bg-indigo-950/15" : "opacity-50"}`}>
+                            <td className="py-2.5 px-3 font-bold text-indigo-400">#{cand.rank}</td>
+                            <td className="py-2.5 px-3 font-bold text-white flex items-center gap-1.5">
+                              {cand.symbol}
+                              {cand.isEuropean ? (
+                                <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1 rounded">EU</span>
+                              ) : (
+                                <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 rounded">US</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-400">{cand.isEuropean ? "Euronext / XETRA" : "NYSE / ARCA"}</td>
+                            <td className="py-2.5 px-3">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                cand.direction === "BUY" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+                              }`}>
+                                {cand.direction}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-300">{cand.winRate}%</td>
+                            <td className="py-2.5 px-3 text-emerald-400 font-bold">{cand.friction}%</td>
+                            <td className="py-2.5 px-3 text-slate-300 max-w-xs truncate" title={cand.catalyst}>{cand.catalyst}</td>
+                            <td className="py-2.5 px-3">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                isActive ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-slate-700/30 text-slate-500"
+                              }`}>
+                                {isActive ? "ACTIVE" : "STANDBY"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Multi-Model Ensemble Architecture & Quota Overview */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-[#141a29] border border-white/10 p-4 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-200 font-mono flex items-center gap-1.5">
+                      <Bot className="w-3.5 h-3.5 text-green-400" /> GENERATOR (NVIDIA NIM)
+                    </span>
+                    <span className="text-[10px] text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded font-mono">PRIMARY</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Model: <code className="text-indigo-300">nemotron-3-ultra</code>
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Role: Event extraction, GICS sector mapping, initial candidate proposals.
+                  </p>
+                  <div className="pt-1 text-[10px] text-slate-500 flex justify-between font-mono">
+                    <span>Daily Quota Guard:</span>
+                    <span className="text-slate-300">500 calls/day (5/min)</span>
+                  </div>
+                </div>
+
+                <div className="bg-[#141a29] border border-white/10 p-4 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-200 font-mono flex items-center gap-1.5">
+                      <ShieldAlert className="w-3.5 h-3.5 text-orange-400" /> VERIFIER 1 (GROQ)
+                    </span>
+                    <span className="text-[10px] text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded font-mono">CRITIC</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Model: <code className="text-indigo-300">llama-3.1-70b-versatile</code>
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Role: Anti-hallucination screening, economic validity check, ticker verification.
+                  </p>
+                  <div className="pt-1 text-[10px] text-slate-500 flex justify-between font-mono">
+                    <span>Daily Quota Guard:</span>
+                    <span className="text-slate-300">5,000 calls/day (30/min)</span>
+                  </div>
+                </div>
+
+                <div className="bg-[#141a29] border border-white/10 p-4 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-200 font-mono flex items-center gap-1.5">
+                      <Award className="w-3.5 h-3.5 text-purple-400" /> JUDGE (GEMINI 1.5 PRO)
+                    </span>
+                    <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded font-mono">SYNTHESIS</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Model: <code className="text-indigo-300">gemini-1.5-pro</code>
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Role: Tie-breaker adjudication, conflict synthesis, final universe sign-off.
+                  </p>
+                  <div className="pt-1 text-[10px] text-slate-500 flex justify-between font-mono">
+                    <span>Daily Quota Guard:</span>
+                    <span className="text-slate-300">1,400 calls/day (15/min)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
+
     </div>
   );
 }

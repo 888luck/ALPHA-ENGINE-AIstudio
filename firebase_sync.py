@@ -195,8 +195,8 @@ class FirebaseSyncTunnel:
         self._request("PATCH", path, body)
         print(f"[FIREBASE TUNNEL] Archived regulatory trade log {log_id} ({log_data['symbol']}) dynamically.")
 
-    def push_system_risk_state(self, net_liq: float, maint_margin: float, realized_pnl: float, unrealized_pnl: float, router_locked: bool):
-        """Pushes system pool equity, risk metrics, and circuit breaker status to Firestore."""
+    def push_system_risk_state(self, net_liq: float, maint_margin: float, realized_pnl: float, unrealized_pnl: float, router_locked: bool, model_accuracy: float = 0.0, extra_metrics: Dict[str, Any] = None):
+        """Pushes system pool equity, risk metrics, circuit breaker status, and model accuracy to Firestore."""
         if not self.enabled:
             return
         import datetime
@@ -206,12 +206,18 @@ class FirebaseSyncTunnel:
             "dailyRealizedPnL": realized_pnl,
             "dailyUnrealizedPnL": unrealized_pnl,
             "routerLocked": router_locked,
+            "modelAccuracy": float(model_accuracy),
             "lastUpdated": datetime.datetime.utcnow().isoformat() + "Z"
         }
+        if extra_metrics:
+            for k, v in extra_metrics.items():
+                if isinstance(v, (bool, int, float, str)) or v is None:
+                    state_data[k] = v
         body = self._dict_to_firestore_fields(state_data)
         path = "system_risk_state/current_state"
         self._request("PATCH", path, body)
-        print(f"[FIREBASE TUNNEL] Sync'd system risk state: NetLiq={net_liq:.2f}, RouterLocked={router_locked}")
+        print(f"[FIREBASE TUNNEL] Sync'd system risk state: NetLiq={net_liq:.2f}, RouterLocked={router_locked}, ModelAccuracy={model_accuracy:.1f}%")
+
 
     def get_system_risk_state(self) -> Dict[str, Any]:
         """Pulls settings and lock toggles from Firestore to override local parameters."""

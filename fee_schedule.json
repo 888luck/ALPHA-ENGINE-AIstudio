@@ -1,0 +1,25 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-09-27T00:00:00Z",
+  "broker": "Interactive Brokers Ireland (IBIE)",
+  "account_tier": "IBKR Pro",
+  "us_equities": {
+    "commission_per_share": 0.005,
+    "min_commission": 1.00,
+    "max_commission_pct": 0.01,
+    "sec_fee_rate": 0.0000278,
+    "finra_taf_per_share": 0.000166,
+    "finra_taf_max": 8.30
+  },
+  "european_equities": {
+    "commission_pct": 0.0005,
+    "min_commission_eur": 1.25,
+    "max_commission_eur": 29.00,
+    "french_ftt_pct": 0.003,
+    "italian_ftt_pct": 0.001
+  },
+  "friction_filter": {
+    "max_friction_ratio": 0.15,
+    "spread_penalty_factor": 0.5
+  }
+}

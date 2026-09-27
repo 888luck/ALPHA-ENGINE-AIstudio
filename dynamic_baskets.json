@@ -1,40 +1,64 @@
 {
+  "generatedAt": "2026-09-27T05:33:40.467511+00:00",
+  "maxActiveInstruments": 3,
+  "macroContext": "Dynamic multi-exchange universe calibrated from overnight news and event flow.",
+  "sourceEvents": [
+    "TEST_002"
+  ],
   "baskets": [
     {
-      "sector": "AI Calibrated Strategic Energy Portfolio (Fallback)",
+      "rank": 1,
+      "sector": "Energy (Oil & Gas)",
       "tickers": [
-        "XLE",
-        "VLO",
+        "XLE"
+      ],
+      "direction": "BUY",
+      "catalyst": "Energy supply/demand dynamics",
+      "impliedOfiTrend": "BUY (Energy supply/demand dynamics)",
+      "winRate": 56.0,
+      "profitFactor": 1.54,
+      "avgFrictionConsumed": 1.25,
+      "conId": 593796,
+      "primaryExchange": "ARCA",
+      "currency": "USD",
+      "isEuropean": false,
+      "expectedMovePct": 1.8
+    },
+    {
+      "rank": 2,
+      "sector": "Energy (Oil & Gas)",
+      "tickers": [
         "COP"
       ],
-      "impliedOfiTrend": "BULLISH (Middle-East Sea Lane Concerns)",
-      "winRate": 64,
-      "profitFactor": 1.58,
-      "avgFrictionConsumed": 5.4
+      "direction": "BUY",
+      "catalyst": "Energy supply/demand dynamics",
+      "impliedOfiTrend": "BUY (Energy supply/demand dynamics)",
+      "winRate": 56.0,
+      "profitFactor": 1.54,
+      "avgFrictionConsumed": 1.46,
+      "conId": 4658,
+      "primaryExchange": "NYSE",
+      "currency": "USD",
+      "isEuropean": false,
+      "expectedMovePct": 2.0
     },
     {
-      "sector": "AI Calibrated High-Vol Defence Basket (Fallback)",
+      "rank": 3,
+      "sector": "Energy (Oil & Gas)",
       "tickers": [
-        "ITA",
-        "NOC",
-        "RTX"
+        "VLO"
       ],
-      "impliedOfiTrend": "BULLISH (Strategic Posturing)",
-      "winRate": 61,
-      "profitFactor": 1.48,
-      "avgFrictionConsumed": 6.8
-    },
-    {
-      "sector": "AI Calibrated Tech Sovereignty Portfolio (Fallback)",
-      "tickers": [
-        "SAP",
-        "RWE",
-        "ENPH"
-      ],
-      "impliedOfiTrend": "NEUTRAL / MIXED",
-      "winRate": 53,
-      "profitFactor": 1.22,
-      "avgFrictionConsumed": 10.5
+      "direction": "BUY",
+      "catalyst": "Energy supply/demand dynamics",
+      "impliedOfiTrend": "BUY (Energy supply/demand dynamics)",
+      "winRate": 56.0,
+      "profitFactor": 1.54,
+      "avgFrictionConsumed": 1.67,
+      "conId": 12836,
+      "primaryExchange": "NYSE",
+      "currency": "USD",
+      "isEuropean": false,
+      "expectedMovePct": 2.2
     }
   ]
 }

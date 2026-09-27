@@ -1,25 +1,96 @@
+import sys
 import time
 import datetime
+import argparse
+import zoneinfo
+from typing import List, Dict, Any, Optional
+
 from config_loader import load_config
 from connection import ConnectionManager
 from risk_engine import DRMMiddleware
 from alpha_strategy import AlphaStrategy, ProactiveSimulator
 from firebase_sync import FirebaseSyncTunnel
 
-import zoneinfo
+# Dynamic Multi-Agent Intelligence Modules
+from universe_models import NewsEvent, DynamicBasket
+from news_ingestor import NewsIngestor
+from llm_ensemble import MultiModelEnsemble
+from universe_builder import UniverseBuilder
+from reasoning_auditor import ReasoningAuditor
+from local_edge_node import LocalEdgeNode
 
 def get_current_ny_time():
     """Returns actual US Eastern Time intraday timestamp simulation."""
     now = datetime.datetime.now(zoneinfo.ZoneInfo("America/New_York"))
     return now.strftime("%H:%M")
 
+def get_current_cet_time():
+    """Returns actual European Central Time (CET/CEST) timestamp."""
+    now = datetime.datetime.now(zoneinfo.ZoneInfo("Europe/Paris"))
+    return now.strftime("%H:%M")
+
+def run_premarket_calibration(news_ingestor: NewsIngestor, ensemble: MultiModelEnsemble, universe_builder: UniverseBuilder, edge_node: Optional[LocalEdgeNode] = None, basket_size: int = 3) -> DynamicBasket:
+    """
+    Executes the Pre-Market Intelligence Pipeline:
+    1. Discovers active exchange momentum symbols via LocalEdgeNode scanners.
+    2. Ingests overnight news bulletins & macro releases.
+    3. Runs Critic-Verifier multi-model ensemble consensus.
+    4. Builds ranked Top N basket with 15% friction screening.
+    """
+    print("\n==============================================================")
+    print("      [PRE-MARKET CALIBRATION] RUNNING MULTI-AGENT PIPELINE   ")
+    print("==============================================================")
+    
+    # 0. Dynamic Market Discovery via IBKR Multi-Exchange Scanner
+    if edge_node:
+        try:
+            print("[SCANNER DISCOVERY] Polling multi-exchange scanner subscriptions for top volume assets...")
+            discovered_symbols = edge_node.aggregate_top_symbols(target_limit=15)
+            if discovered_symbols:
+                print(f"[SCANNER DISCOVERY] Ingested {len(discovered_symbols)} dynamic candidate symbols: {discovered_symbols[:8]}...")
+        except Exception as e:
+            print(f"[SCANNER DISCOVERY WARN] Scanner aggregation bypassed: {e}")
+
+    # 1. Ingest Events
+    events = news_ingestor.poll_macro_economic_calendar()
+    # Inject overnight news batch
+    news_ingestor.inject_sample_premarket_events()
+    pending = news_ingestor.get_pending_events()
+    print(f"[INGESTION] Ingested {len(pending)} event catalysts for evaluation.")
+    
+    # 2. Multi-Model Ensemble Analysis
+    print(f"[ENSEMBLE] Evaluating {len(pending)} events across Critic-Verifier models...")
+    ensemble_results = []
+    for ev in pending:
+        res = ensemble.evaluate_event(ev)
+        ensemble_results.append(res)
+        status_sym = "✓ ACCEPTED" if res.accepted else "⚠ PENDING/REVIEW"
+        print(f"  • [{res.event.event_id}] {status_sym} (Conf: {res.final_confidence:.2f}) -> {res.event.headline[:60]}...")
+        
+    # 3. Dynamic Universe Construction
+    print(f"[UNIVERSE] Ranking candidates with Active Basket Limit = {basket_size}...")
+    basket = universe_builder.build_ranked_universe(ensemble_results, max_instruments=basket_size)
+    
+    print("\n[ACTIVE FOCUS UNIVERSE ESTABLISHED]")
+    for cand in basket.candidates:
+        eu_tag = "[EURONEXT/XETRA]" if cand.isEuropean else "[US ARCA/NYSE]"
+        print(f"  #{cand.rank} {cand.symbol} {eu_tag} | Bias: {cand.direction} | WinRate: {cand.projectedWinRate}% | Friction: {cand.estimatedFrictionPct}% | Catalyst: {cand.catalyst[:50]}...")
+    print("==============================================================\n")
+    return basket
+
 def main_loop():
     print("==============================================================")
     print("           ALPHA ENGINE INTRADAY TRADING PLATFORM             ")
     print("==============================================================")
     
+    parser = argparse.ArgumentParser(description="Alpha Engine Execution Daemon")
+    parser.add_argument("--calibration-only", action="store_true", help="Run pre-market multi-agent calibration and exit")
+    parser.add_argument("--basket-size", type=int, default=0, help="Override active basket focus limit (1-5)")
+    args, unknown = parser.parse_known_args()
+
     # 1. Load System Variables
     config = load_config()
+    basket_size = args.basket_size if args.basket_size > 0 else config.get("MAX_ACTIVE_INSTRUMENTS", 3)
     
     # 2. Initialize Secure Firebase Sync Tunnel
     firebase_tunnel = FirebaseSyncTunnel()
@@ -27,10 +98,31 @@ def main_loop():
     # 3. Setup Connectivity Manager (IBKR IBIE Compliance Router)
     cm = ConnectionManager()
     
-    # 4. Bind DRM Protection Module
+    # 4. Initialize Multi-Agent Intelligence Layer
+    news_ingestor = NewsIngestor(connection_manager=cm)
+    ensemble = MultiModelEnsemble()
+    universe_builder = UniverseBuilder()
+    auditor = ReasoningAuditor(firebase_tunnel=firebase_tunnel)
+    edge_node = LocalEdgeNode(
+        mifid2_decision_maker=config.get("MIFID2_DECISION_MAKER_ID", "ALGO_DEC_992"),
+        mifid2_execution_trader=config.get("MIFID2_EXECUTION_TRADER_ID", "ALGO_EXE_554")
+    )
+    
+    # Wire incoming broker bulletins to ingestor
+    cm.on_news_bulletin_callback = news_ingestor.ingest_ibkr_bulletin
+    
+    # 5. Bind DRM Protection Module
     drm = DRMMiddleware(cm, config["IBKR_ACCOUNT_NUMBER"])
     
-    # 5. Synthesize Strategy Engine
+    # 6. Execute Pre-Market Calibration Pipeline
+    active_basket = run_premarket_calibration(news_ingestor, ensemble, universe_builder, edge_node=edge_node, basket_size=basket_size)
+    
+    # If called with --calibration-only (e.g. from GCP Cloud Run or unit test), exit cleanly
+    if args.calibration_only:
+        print("[CALIBRATION COMPLETE] Successfully generated active candidate universe. Exiting cleanly.")
+        return
+        
+    # 7. Synthesize Strategy Engine
     strategy = AlphaStrategy(cm, config["MIFID2_DECISION_MAKER_ID"], config["MIFID2_EXECUTION_TRADER_ID"])
     simulator = ProactiveSimulator()
     
@@ -73,22 +165,21 @@ def main_loop():
     print("\n[SCHEDULER] Master loop started. Waiting for tactical session windows...")
     
     # Core loop coordinating the intraday trading session lifecycle
-    # 04:00 Pre-market Calibration, 09:30-15:50 Tactical Execution window, 15:50 Flat Flush, 16:10 Sync
     active_session = True
     iteration = 0
     while active_session:
-        current_time = get_current_ny_time()
-        print(f"[SESSION PULSE] Current Time: {current_time} | Status: RUNNING | Iteration: {iteration}")
+        current_ny_time = get_current_ny_time()
+        current_cet_time = get_current_cet_time()
+        print(f"[SESSION PULSE] NY: {current_ny_time} | CET: {current_cet_time} | Status: RUNNING | Iteration: {iteration}")
         
-        # Pull latest risk state overrides from Firestore to check for manual emergency kills from web dashboard
-        if iteration % 2 == 0:  # Check remote locks every 2 iterations to optimize quota limits
+        # Pull latest risk state overrides from Firestore
+        if iteration % 2 == 0:
             remote_state = firebase_tunnel.get_system_risk_state()
             if remote_state:
                 remote_lock = remote_state.get("routerLocked", False)
                 if remote_lock and not drm.router_locked:
                     print("[FIREBASE OVERRIDE] EMERGENCY MANUAL KILL DETECTED FROM CLOUD PORTFOLIO PANEL!")
                     drm.emergency_flush()
-                    # Delete all active trades from firestore
                     for symbol in list(cm.active_positions.keys()):
                         trade_id = f"TRD_{symbol}"
                         firebase_tunnel.delete_active_trade(trade_id)
@@ -96,109 +187,78 @@ def main_loop():
                     print("[FIREBASE OVERRIDE] Cloud panel requested router unlocking. Resetting circuit breaker...")
                     drm.router_locked = False
 
-        # Scenario A: 04:00 - Pre-market Calibration (Seeding limits/params)
-        if "04:00" <= current_time < "09:30":
+        # Scenario A: Pre-market Window (04:00 - 09:30 NY / 07:00 - 09:00 CET)
+        if "04:00" <= current_ny_time < "09:30":
             print("[PHASE - CALIBRATION] Performing pre-market sector calibration and margin queries.")
             drm.query_margin_safety()
             
-        # Scenario B: 09:30 - 15:50 (Intraday Live Execution Router Active)
-        elif "09:30" <= current_time < "15:50":
-            if drm.router_locked:
-                print("[WARN] Router locked due to previous session circuit breaker trigger.")
+        # Scenario B: Tactical Execution Window (09:30 - 15:50 NY / 09:00 - 17:30 CET)
+        elif "09:30" <= current_ny_time < "15:50" or ("09:00" <= current_cet_time < "17:30"):
+            # Enforce daily cumulative drawdown circuit breaker
+            if not drm.check_daily_drawdown(cm.pnl_updates):
+                print("[RISK ALERT] Daily drawdown circuit breaker active. Blocking new entries.")
+            elif drm.router_locked:
+                print("[WARN] Router locked due to circuit breaker trigger.")
             else:
-                if cm.is_connected:
-                    print(f"[PHASE - EXECUTION] Active connected trading window. Monitoring real IBKR positions & account telemetry.")
+                drm.query_margin_safety()
+                
+                # Iterate over dynamically calibrated candidates from Top N universe
+                for cand in active_basket.candidates:
+                    sym = cand.symbol
+                    direction = cand.direction
                     
-                    # 1. Update margin parameters from connection metrics
-                    drm.query_margin_safety()
-                    
-                    # 2. Iterate and sync dynamic positions from the IBKR gateway socket
-                    if cm.active_positions:
-                        for symbol, pos in list(cm.active_positions.items()):
-                            qty_val = float(pos.get("qty", 0.0))
-                            if abs(qty_val) > 0:
-                                trade_id = f"TRD_{symbol}_EDGE"
-                                is_buy = qty_val > 0
-                                avg_cost = float(pos.get("avgCost", 0.0))
-                                unrealized_val = float(cm.pnl_updates.get("unrealized", 0.0))
-                                
-                                live_trade = {
-                                    "id": trade_id,
-                                    "symbol": symbol,
-                                    "quantity": float(abs(qty_val)),
-                                    "direction": "BUY" if is_buy else "SELL",
-                                    "entryPrice": avg_cost,
-                                    "stopPrice": float(avg_cost * 0.982 if is_buy else avg_cost * 1.018), 
-                                    "currentPrice": avg_cost, # Filled as average cost placeholder if tick feed is buffering
-                                    "unrealizedPnL": unrealized_val,
-                                    "mifidDecisionMaker": config["MIFID2_DECISION_MAKER_ID"],
-                                    "mifidExecutionTrader": config["MIFID2_EXECUTION_TRADER_ID"],
-                                    "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
-                                }
-                                firebase_tunnel.push_active_trade(trade_id, live_trade)
-                            else:
-                                # Clean up zeroed out dynamic positions from Firestore
-                                firebase_tunnel.delete_active_trade(f"TRD_{symbol}_EDGE")
+                    if cm.is_connected:
+                        # Real gateway active positions sync
+                        pos = cm.active_positions.get(sym, {})
+                        qty_val = float(pos.get("qty", 0.0))
+                        if abs(qty_val) > 0:
+                            trade_id = f"TRD_{sym}_EDGE"
+                            avg_cost = float(pos.get("avgCost", 0.0))
+                            unrealized_val = float(cm.pnl_updates.get("unrealized", 0.0))
+                            live_trade = {
+                                "id": trade_id,
+                                "symbol": sym,
+                                "quantity": float(abs(qty_val)),
+                                "direction": "BUY" if qty_val > 0 else "SELL",
+                                "entryPrice": avg_cost,
+                                "stopPrice": float(avg_cost * 0.982 if qty_val > 0 else avg_cost * 1.018),
+                                "currentPrice": avg_cost,
+                                "unrealizedPnL": unrealized_val,
+                                "mifidDecisionMaker": config["MIFID2_DECISION_MAKER_ID"],
+                                "mifidExecutionTrader": config["MIFID2_EXECUTION_TRADER_ID"],
+                                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+                            }
+                            firebase_tunnel.push_active_trade(trade_id, live_trade)
                     else:
-                        # Clear sample fallback trades during passive connection states
-                        firebase_tunnel.delete_active_trade("TRD_XLE_EDGE")
-                else:
-                    print(f"[PHASE - EXECUTION] Active trading window. Streaming Level 2 tickers & calculating OFI.")
-                    # Perform basic risk evaluations on each iteration
-                    drm.query_margin_safety()
-                    
-                    # Mock a trade sizing setup loop
-                    sim_entry = 52.40
-                    sim_stop = 51.90
-                    pos_qty = drm.calculate_position_size(sim_entry, sim_stop)
-                    
-                    # Log active strategy parameters pulled from Firestore for complete system parity
-                    stop_atr = remote_state.get('stopAtrMultiplier', 1.8)
-                    partial_profit = remote_state.get('partialProfit', True)
-                    breakeven_lock = remote_state.get('breakevenLock', True)
-                    max_hold = remote_state.get('maxHoldBars', 15)
-                    ofi_filter = remote_state.get('ofiFilter', True)
-                    adaptive_stop = remote_state.get('adaptiveStop', True)
-                    
-                    print(f"[EDGE NODE SIM] Active strategy params in sync: "
-                          f"ATR_Stop={stop_atr}, PartialProfit={partial_profit}, "
-                          f"BreakevenLock={breakeven_lock}, MaxHold={max_hold}, "
-                          f"OFI_Filter={ofi_filter}, AdaptiveStop={adaptive_stop}")
-                    
-                    # Simulate MiFIR metadata tagging on Order Class
-                    class MockOrder:
-                        def __init__(self):
-                            self.mifid2DecisionMaker = ""
-                    o = MockOrder()
-                    drm.enforce_mifid2_reporting(o, config["MIFID2_DECISION_MAKER_ID"], config["MIFID2_EXECUTION_TRADER_ID"])
-                    
-                    # Sync simulated live trade to Firestore active trades list
-                    # This feeds the frontend dashboard with active trades streamed from the VPS node
-                    trade_id = "TRD_XLE_EDGE"
-                    sim_trade = {
-                        "id": trade_id,
-                        "symbol": "XLE",
-                        "quantity": float(pos_qty or 100),
-                        "direction": "BUY",
-                        "entryPrice": float(sim_entry),
-                        "stopPrice": float(sim_stop),
-                        "currentPrice": float(sim_entry + 0.35),
-                        "unrealizedPnL": float((0.35) * (pos_qty or 100)),
-                        "mifidDecisionMaker": config["MIFID2_DECISION_MAKER_ID"],
-                        "mifidExecutionTrader": config["MIFID2_EXECUTION_TRADER_ID"],
-                        "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
-                    }
-                    firebase_tunnel.push_active_trade(trade_id, sim_trade)
-                    
-                    # Update connection manager positions tracking
-                    cm.active_positions["XLE"] = {"qty": pos_qty or 100, "avgCost": sim_entry}
-                    cm.pnl_updates["unrealized"] = (0.35) * (pos_qty or 100)
-                    cm.pnl_updates["total"] = cm.pnl_updates["realized"] + cm.pnl_updates["unrealized"]
+                        # Simulation sandbox mode: evaluate candidate setup
+                        sim_entry = 100.0 if cand.isEuropean else 52.40
+                        stop_offset = sim_entry * 0.012
+                        sim_stop = sim_entry - stop_offset if direction == "BUY" else sim_entry + stop_offset
+                        pos_qty = drm.calculate_position_size(sim_entry, sim_stop)
+                        
+                        trade_id = f"TRD_{sym}_EDGE"
+                        unrealized_pnl = float(0.35 * (pos_qty or 50)) if direction == "BUY" else float(-0.20 * (pos_qty or 50))
+                        
+                        sim_trade = {
+                            "id": trade_id,
+                            "symbol": sym,
+                            "quantity": float(pos_qty or 50),
+                            "direction": direction,
+                            "entryPrice": float(sim_entry),
+                            "stopPrice": float(sim_stop),
+                            "currentPrice": float(sim_entry + 0.35),
+                            "unrealizedPnL": unrealized_pnl,
+                            "catalyst": cand.catalyst,
+                            "mifidDecisionMaker": config["MIFID2_DECISION_MAKER_ID"],
+                            "mifidExecutionTrader": config["MIFID2_EXECUTION_TRADER_ID"],
+                            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+                        }
+                        firebase_tunnel.push_active_trade(trade_id, sim_trade)
+                        cm.active_positions[sym] = {"qty": (pos_qty or 50) if direction == "BUY" else -(pos_qty or 50), "avgCost": sim_entry}
 
-        # Scenario C: 15:50 (EOD Flush Window - 10 minutes prior to close)
-        elif "15:50" <= current_time < "16:00":
+        # Scenario C: EOD Flattening Window (15:50 - 16:00 NY / 17:25 - 17:30 CET)
+        elif "15:50" <= current_ny_time < "16:00":
             print("[PHASE - HARD TERMINATION] Initiating automated Flat EOD Flush. Flattening all positions.")
-            # Record historical log upon closing
             for symbol, pos in list(cm.active_positions.items()):
                 pos_qty = float(pos.get("qty", 0.0))
                 if abs(pos_qty) > 0:
@@ -214,26 +274,23 @@ def main_loop():
                         "realizedPnL": float(0.40 * abs(pos_qty)),
                         "commission": 1.50,
                         "efficiencyRatio": 4.5,
-                        "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
+                        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
                     }
                     firebase_tunnel.push_historical_log(log_id, log_data)
-                    # Purge from active trades
                     firebase_tunnel.delete_active_trade(f"TRD_{symbol}_EDGE")
-            
             drm.emergency_flush()
             
-        # Scenario D: 16:10 (Post-Market Synchronization and database export)
-        elif "16:10" <= current_time:
-            print("[PHASE - POST-SESSION REPORT] Triggering final database synchronization to FireStore.")
+        # Scenario D: Post-Market Audit & Attribution Window (16:10 NY / 17:35 CET)
+        elif "16:10" <= current_ny_time:
+            print("[PHASE - POST-SESSION REPORT & REASONING AUDIT]")
+            auditor.audit_daily_predictions(dynamic_basket_path="dynamic_baskets.json")
             print("[SYNC] Transferring session logs and performance reports to secure Firebase server...")
             active_session = False  # Terminate standard session
             
-        # 6. Synchronize current engine risk state and margins to Firestore in real-time
+        # Synchronize risk state to Firestore in real-time
         net_liq = float(cm.account_summary.get("NetLiquidation", drm.start_day_equity))
-        # Keep net liq in sync with total P&L in simulation
         if not cm.is_connected:
             net_liq = float(drm.start_day_equity + cm.pnl_updates["total"])
-
         maint_margin = float(cm.account_summary.get("MaintMarginReq", 0.0)) if cm.is_connected else float(len(cm.active_positions) * 12400.00)
         firebase_tunnel.push_system_risk_state(
             net_liq=net_liq,
@@ -243,7 +300,6 @@ def main_loop():
             router_locked=bool(drm.router_locked)
         )
             
-        # Pulse speed
         time.sleep(12)
         iteration += 1
 

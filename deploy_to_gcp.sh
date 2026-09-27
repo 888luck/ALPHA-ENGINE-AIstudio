@@ -88,6 +88,17 @@ echo "[VM] Ensuring required system packages & Docker are installed..."
 sudo apt-get update
 sudo apt-get install -y python3 python3-pip git docker.io
 
+# Safeguard 1GB e2-micro instance against OOM killer by establishing a 2GB swapfile
+if ! swapon --show | grep -q "/swapfile"; then
+    echo "[VM] Establishing 2GB swapfile to prevent OOM killer on 1GB e2-micro VM..."
+    if [ ! -f /swapfile ]; then
+        sudo fallocate -l 2G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+    fi
+    sudo swapon /swapfile || true
+fi
+
 echo "[VM] Initializing Docker service and setting up permissions..."
 sudo systemctl enable docker
 sudo systemctl start docker
@@ -103,10 +114,12 @@ tar -xzf ~/alpha-workspace-bundle.tar.gz -C /opt/alpha-engine/
 
 # Dynamic env seeding
 cat <<ENV > /opt/alpha-engine/.env
-IBKR_ACCOUNT_NUMBER="U8129384"
+IBKR_ACCOUNT_NUMBER="DU1234567"
 IBKR_HOST="127.0.0.1"
 IBKR_PORT=4002
 IBKR_CLIENT_ID=10
+MAX_ACTIVE_INSTRUMENTS=3
+ALLOW_LIVE_TRADING=false
 MIFID2_DECISION_MAKER_ID="ALGO_DEC_992"
 MIFID2_EXECUTION_TRADER_ID="ALGO_EXE_554"
 FIREBASE_PROJECT_ID="$FIREBASE_PROJECT"

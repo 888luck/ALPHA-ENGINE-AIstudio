@@ -100,6 +100,78 @@ class ConnectionManager(EWrapper, EClient):
         Required by DRM to audit net spreads and regulatory fees.
         """
         print(f"[TRANSACTION FRICTION] Ref: {commissionReport.execId} Cost: {commissionReport.commission} {commissionReport.currency}")
+        if hasattr(self, 'on_commission_callback') and self.on_commission_callback:
+            self.on_commission_callback(commissionReport)
+
+    # --- NEWS & REGULATORY BULLETINS CALLBACKS ---
+    def newsBulletin(self, msgId: int, msgType: int, message: str, origExchange: str):
+        """Receives live broker news bulletins, regulatory notices, and exchange alerts."""
+        print(f"[IBKR NEWS BULLETIN] ID:{msgId} Type:{msgType} Exch:{origExchange} Msg:{message[:80]}...")
+        if hasattr(self, 'on_news_bulletin_callback') and self.on_news_bulletin_callback:
+            self.on_news_bulletin_callback(msgId, msgType, message, origExchange)
+
+    def newsProviders(self, newsProviders: Any):
+        """Receives active news providers subscribed on the account."""
+        providers = []
+        try:
+            for p in newsProviders:
+                providers.append({"code": p.code, "name": p.name})
+        except Exception:
+            pass
+        print(f"[IBKR NEWS PROVIDERS] Subscribed Feeds: {providers}")
+        self.subscribed_news_providers = providers
+
+    # --- CONTRACT DETAILS & LIQUID HOURS CALLBACKS ---
+    def contractDetails(self, reqId: int, contractDetails: Any):
+        """Processes full contract metadata including official liquidHours and primaryExchange."""
+        if not hasattr(self, 'contract_details_cache'):
+            self.contract_details_cache = {}
+            
+        c = contractDetails.contract
+        self.contract_details_cache[c.symbol] = {
+            "conId": c.conId,
+            "symbol": c.symbol,
+            "primaryExchange": getattr(contractDetails, 'primaryExchange', getattr(c, 'primaryExchange', '')),
+            "currency": c.currency,
+            "liquidHours": getattr(contractDetails, 'liquidHours', ''),
+            "tradingHours": getattr(contractDetails, 'tradingHours', ''),
+            "timeZoneId": getattr(contractDetails, 'timeZoneId', 'America/New_York'),
+            "minTick": getattr(contractDetails, 'minTick', 0.01)
+        }
+        print(f"[CONTRACT RESOLVED] {c.symbol} (ConID: {c.conId}) LiquidHours: {getattr(contractDetails, 'liquidHours', 'N/A')[:40]}...")
+
+    def contractDetailsEnd(self, reqId: int):
+        print(f"[CONTRACT DETAILS END] ReqID: {reqId} resolved successfully.")
+
+    # --- WHAT-IF ORDER COMMISSION AUDIT CALLBACK ---
+    def openOrder(self, orderId: int, contract: Any, order: Any, orderState: Any):
+        """Captures real-time commission and margin estimates from What-If orders."""
+        if getattr(order, 'whatIf', False):
+            comm = getattr(orderState, 'commission', 0.0)
+            init_margin = getattr(orderState, 'initMarginChange', '0.0')
+            print(f"[WHAT-IF ESTIMATE] Symbol: {contract.symbol} Projected Fee: {comm} {getattr(orderState, 'commissionCurrency', 'USD')} | InitMarginChange: {init_margin}")
+            if not hasattr(self, 'whatif_order_cache'):
+                self.whatif_order_cache = {}
+            self.whatif_order_cache[contract.symbol] = {
+                "commission": comm,
+                "currency": getattr(orderState, 'commissionCurrency', 'USD'),
+                "initMarginChange": init_margin,
+                "status": getattr(orderState, 'status', '')
+            }
+
+    # --- LEVEL 2 MARKET DEPTH CALLBACKS ---
+    def updateMktDepth(self, reqId: int, position: int, operation: int, side: int, price: float, size: float):
+        """Processes Level 2 order book depth line updates."""
+        # side: 0 = ask, 1 = bid
+        ticker = getattr(self, 'depth_req_map', {}).get(reqId, "UNKNOWN")
+        if ticker not in self.level2_depth:
+            self.level2_depth[ticker] = {"bids": {}, "asks": {}}
+            
+        book_side = "bids" if side == 1 else "asks"
+        if operation == 2: # Delete
+            self.level2_depth[ticker][book_side].pop(position, None)
+        else: # Insert (0) or Update (1)
+            self.level2_depth[ticker][book_side][position] = {"price": price, "size": size}
 
     # --- HISTORICAL DATA RESOLUTION WRAPPERS & CALLBACKS ---
     def historicalData(self, reqId: int, bar: Any):
@@ -112,7 +184,6 @@ class ConnectionManager(EWrapper, EClient):
         if reqId not in self.historical_data_buffer:
             self.historical_data_buffer[reqId] = []
             
-        # Extract bar values (supports native ibapi.common.BarData as well as dictionary fallback)
         try:
             bar_date = bar.date
             bar_open = bar.open
@@ -121,7 +192,6 @@ class ConnectionManager(EWrapper, EClient):
             bar_close = bar.close
             bar_volume = bar.volume
         except AttributeError:
-            # Fallback if bar is dictionary
             bar_date = bar.get("date")
             bar_open = bar.get("open", 0.0)
             bar_high = bar.get("high", 0.0)
@@ -143,4 +213,5 @@ class ConnectionManager(EWrapper, EClient):
         print(f"[HISTORICAL END] ReqID: {reqId} | Completed download {start} to {end}")
         if hasattr(self, 'on_historical_data_complete_callback') and self.on_historical_data_complete_callback:
             self.on_historical_data_complete_callback(reqId, self.historical_data_buffer.get(reqId, []))
+
 

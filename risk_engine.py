@@ -39,10 +39,11 @@ class DRMMiddleware:
             return False
         return True
 
-    def calculate_position_size(self, entry_price: float, initial_stop: float) -> int:
+    def calculate_position_size(self, entry_price: float, initial_stop: float, currency: str = "USD", fx_rate_to_base: float = 1.0) -> int:
         """
-        Dynamic 1% Equity Position Sizer.
-        Formula: Quantity = (Equity * 0.01) / abs(Entry_Price - Initial_Stop)
+        Dynamic 1% Equity Position Sizer with Multi-Currency & FX Normalization.
+        Formula: Quantity = (Equity * 0.01) / (abs(Entry_Price - Initial_Stop) * fx_rate_to_base)
+        For EUR assets when base account is USD, fx_rate_to_base converts EUR risk into USD equity units.
         """
         net_liq = self.cm.account_summary.get("NetLiquidation", self.start_day_equity)
         risk_capital = net_liq * self.max_trade_risk_pct
@@ -52,9 +53,40 @@ class DRMMiddleware:
             print("[RISK ERROR] Invalid initial stop loss distance. Cannot calculate position sizing.")
             return 0
             
-        target_qty = int(risk_capital / stop_distance)
-        print(f"[RISK ENGINE] Pool Equity sizing: NetLiq: ${net_liq:.2f} | RiskCap: ${risk_capital:.2f} | Distance: ${stop_distance:.2f} -> Qty: {target_qty}")
+        unit_risk_in_base = stop_distance * fx_rate_to_base
+        target_qty = int(risk_capital / unit_risk_in_base)
+        print(f"[RISK ENGINE] Pool Equity sizing: NetLiq: ${net_liq:.2f} | RiskCap: ${risk_capital:.2f} | UnitRisk ({currency}): ${unit_risk_in_base:.2f} (FX: {fx_rate_to_base:.4f}) -> Qty: {target_qty}")
         return target_qty
+
+    def query_whatif_commission(self, symbol: str, quantity: float, action: str, price: float, is_european: bool = False) -> Dict[str, Any]:
+        """
+        Queries pre-trade commission and margin impact using IBKR What-If simulation.
+        If connected to live gateway, dispatches whatIf=True order to IBKR and inspects orderState.
+        In offline sandbox mode, returns calculated IBIE schedule fee benchmark.
+        """
+        if self.cm.is_connected and hasattr(self.cm, 'whatif_order_cache'):
+            cached = self.cm.whatif_order_cache.get(symbol)
+            if cached:
+                return cached
+                
+        # Conservative IBIE fee schedule calculation fallback
+        if is_european:
+            # European Euronext/XETRA: 0.05% with 3.00 EUR min
+            est_commission = max(3.00, price * quantity * 0.0005)
+            currency = "EUR"
+        else:
+            # US Equities: $0.005/share with $1.00 min, capped at 1% of trade value
+            est_commission = max(1.00, min(quantity * 0.005, price * quantity * 0.01))
+            currency = "USD"
+            
+        est_margin = price * quantity * 0.25 # Reg T intraday margin
+        return {
+            "commission": round(est_commission, 2),
+            "currency": currency,
+            "initMarginChange": round(est_margin, 2),
+            "status": "Simulated"
+        }
+
 
     def check_daily_drawdown(self, portfolio_pnl_updates: Dict[str, float]) -> bool:
         """

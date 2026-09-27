@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-09-27T00:00:00Z",
+  "feeds": [
+    {
+      "name": "ibkr_news_bulletins",
+      "type": "broker_socket",
+      "enabled": true,
+      "priority": 1,
+      "description": "Interactive Brokers real-time exchange news bulletins and broadtape stream",
+      "poll_interval_sec": 0,
+      "requires_auth": true
+    },
+    {
+      "name": "fred_economic_calendar",
+      "type": "official_macro_api",
+      "enabled": true,
+      "priority": 2,
+      "description": "Federal Reserve Bank of St. Louis economic release calendar (FOMC, CPI, NFP, GDP)",
+      "endpoint": "https://api.stlouisfed.org/fred/releases/dates",
+      "poll_interval_sec": 3600,
+      "requires_auth": false
+    },
+    {
+      "name": "ecb_press_releases",
+      "type": "central_bank_rss",
+      "enabled": true,
+      "priority": 3,
+      "description": "European Central Bank monetary policy decisions and rate statements",
+      "endpoint": "https://www.ecb.europa.eu/rss/press.html",
+      "poll_interval_sec": 1800,
+      "requires_auth": false
+    }
+  ]
+}

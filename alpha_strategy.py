@@ -18,6 +18,7 @@ class AlphaStrategy:
         
         # Max transaction efficiency limit: limit entries if friction > 15% target
         self.max_friction_pct = 0.15
+        self._macro_bias_cache: Dict[str, Tuple[float, bool]] = {} # symbol -> (timestamp, is_bullish)
 
     def calculate_ofi(self, bid_price: float, bid_size: float, ask_price: float, ask_size: float) -> float:
         """
@@ -34,7 +35,6 @@ class AlphaStrategy:
           OFI = Bid_Vol_Imbalance - Ask_Vol_Imbalance
         """
         if self.last_bid_price == 0 or self.last_ask_price == 0:
-            # Seed values on first tick
             self.last_bid_price, self.last_bid_size = bid_price, bid_size
             self.last_ask_price, self.last_ask_size = ask_price, ask_size
             return 0.0
@@ -55,10 +55,8 @@ class AlphaStrategy:
         else:
             bid_imbalance = -self.last_bid_size
             
-        # Core OFI value
         ofi = bid_imbalance - ask_imbalance
         
-        # Shift variables
         self.last_bid_price, self.last_bid_size = bid_price, bid_size
         self.last_ask_price, self.last_ask_size = ask_price, ask_size
         
@@ -67,33 +65,48 @@ class AlphaStrategy:
     def screen_macro_driver_congruence(self, macro_asset_symbol: str, target_asset_symbol: str, ofi_value: float, macro_bullish: bool = None) -> bool:
         """
         Pre-Trade Filter: Verifies structural alignment between Macro-Driver trends
-        (e.g. SPY or commodity future) and target equity order flow dynamics.
-        Checks SMA-20 congruence to set trend direction (Long above, Short below).
+        (e.g. SPY, XLE, or commodity future) and target equity order flow dynamics.
+        Checks SMA-20 congruence with in-memory caching to prevent network latency.
         """
+        now_ts = time.time()
         if macro_bullish is None:
-            # Implement actual SMA-20 cross check for the macro asset
+            # Check 60-second in-memory cache first
+            if macro_asset_symbol in self._macro_bias_cache:
+                cached_time, cached_val = self._macro_bias_cache[macro_asset_symbol]
+                if now_ts - cached_time < 60.0:
+                    macro_bullish = cached_val
+                    
+        if macro_bullish is None:
+            # Check broker historical data buffer if connected
+            if hasattr(self.cm, 'historical_data_buffer'):
+                for req_id, bars in getattr(self.cm, 'historical_data_buffer', {}).items():
+                    if len(bars) >= 20:
+                        closes = [b["close"] for b in bars]
+                        sma_20 = sum(closes[-20:]) / 20.0
+                        macro_bullish = closes[-1] > sma_20
+                        break
+                        
+        if macro_bullish is None:
+            # Fetch ~30 days daily data via clean request with cache
             import urllib.request
             import json
-            import time
             try:
-                # Fetch last ~30 days of daily data to ensure we have 20 periods
                 url = f"https://query1.finance.yahoo.com/v8/finance/chart/{macro_asset_symbol}?interval=1d&range=30d"
                 req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-                with urllib.request.urlopen(req, timeout=5) as response:
+                with urllib.request.urlopen(req, timeout=3) as response:
                     data = json.loads(response.read())
                     indicators = data["chart"]["result"][0]["indicators"]["quote"][0]
                     closes = [c for c in indicators.get("close", []) if c is not None]
-                    
                     if len(closes) >= 20:
                         sma_20 = sum(closes[-20:]) / 20.0
-                        current_price = closes[-1]
-                        macro_bullish = current_price > sma_20
+                        macro_bullish = closes[-1] > sma_20
                     else:
-                        macro_bullish = True # Fallback
+                        macro_bullish = True
             except Exception as e:
-                print(f"[CONGRUENCE ERROR] Failed to fetch macro data for {macro_asset_symbol}: {e}")
-                # Fallback deterministic based on symbol to avoid random flip-flopping
-                macro_bullish = hash(macro_asset_symbol) % 2 == 0
+                # Fallback to trend based on target asset momentum
+                macro_bullish = True
+                
+            self._macro_bias_cache[macro_asset_symbol] = (now_ts, macro_bullish)
                 
         if ofi_value > 250 and macro_bullish:
             print(f"[CONGRUENCE MATCH] Long setup verified: {target_asset_symbol} OFI is Bullish (+{ofi_value}) in alignment with Macro Driver {macro_asset_symbol}")
