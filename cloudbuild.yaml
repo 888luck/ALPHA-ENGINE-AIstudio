@@ -1,0 +1,39 @@
+steps:
+  # 1. Run unit test suite
+  - name: 'python:3.11-slim'
+    entrypoint: 'python'
+    args: ['-m', 'unittest', 'discover', '-s', 'tests', '-v']
+
+  # 2. Execute Pre-market calibration dry run
+  - name: 'python:3.11-slim'
+    entrypoint: 'python'
+    args: ['main.py', '--calibration-only']
+
+  # 3. Create or update Spot VM edge node in Frankfurt
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        ZONE="europe-west3-a"
+        VM_NAME="alpha-edge-node"
+        echo "[CLOUDBUILD] Checking if VM $$VM_NAME exists in $$ZONE..."
+        if ! gcloud compute instances describe "$$VM_NAME" --zone="$$ZONE" >/dev/null 2>&1; then
+          echo "[CLOUDBUILD] Creating Spot VM $$VM_NAME in $$ZONE..."
+          gcloud compute instances create "$$VM_NAME" \
+            --zone="$$ZONE" \
+            --machine-type="e2-micro" \
+            --provisioning-model="SPOT" \
+            --instance-termination-action="STOP" \
+            --image-family="debian-11" \
+            --image-project="debian-cloud" \
+            --scopes="https://www.googleapis.com/auth/cloud-platform" \
+            --tags="ib-gateway-target" \
+            --description="Alpha Engine High Frequency Execution node in europe-west3 (Frankfurt)"
+        else
+          echo "[CLOUDBUILD] Spot VM $$VM_NAME already exists in $$ZONE."
+        fi
+
+timeout: '600s'
+options:
+  logging: CLOUD_LOGGING_ONLY
