@@ -1,180 +1,220 @@
-# 🚀 Alpha Engine — Hybrid Quantitative Trading Framework
+# 🚀 Alpha Engine — Institutional Multi-Agent Trading Platform
 
-Alpha Engine is an institutional-grade, **two-tier hybrid trading platform** designed for quantitative intraday market analysis, real-time Order Flow Imbalance (OFI) tracking, and automated multi-layer risk controls. 
+Alpha Engine is an institutional-grade, **hybrid algorithmic trading framework** designed for quantitative intraday market analysis, real-time Order Flow Imbalance (OFI) tracking, multi-exchange dynamic universe discovery, and automated MiFID II / CBI regulatory compliance.
 
-The system couples a visual, real-time React web control dashboard with a co-located Python execution runner situated adjacent to the Interactive Brokers (IBKR) Europe Core Hub in Frankfurt, Germany. The two tiers coordinate securely using a direct, bi-directional NoSQL data tunnel.
+The platform links an interactive React web dashboard with a co-located Python execution runner situated adjacent to the Interactive Brokers (IBKR) Europe Core Hub in **Frankfurt, Germany (`europe-west3`)**, coordinated securely using a direct Google Firestore real-time data tunnel.
 
 ---
 
-## 📈 1. High-Level Architecture (Simplified)
-
-For a beginner, here is how the data flows in real-time without exposing your credentials:
+## 🏗️ 1. Architecture Overview
 
 ```
-+-------------------------------------------------------------+
-|               1. GOOGLE CLOUD RUN (Web UI Dashboard)        |
-|  - Visually configures risk boundaries & parameters         |
-|  - Runs on-demand heavy simulations & backtests in the cloud|
-|  - Keeps your Gemini API Key safely hidden in the backend   |
-+------------------------------+------------------------------+
-                               |
-                   ⚡ Secure REST & WebSockets
-                               |
-                               v
-+------------------------------+------------------------------+
-|            2. GOOGLE FIRESTORE (Secure DB Cloud Tunnel)     |
-|  - Acts as a real-time, zero-latency sync bridge             |
-|  - Securely passes risk states & toggles to the edge node   |
-+------------------------------+------------------------------+
-                               |
-                    📡 Firestore Event Listener
-                               |
-                               v
-+------------------------------+------------------------------+
-|              3. EDGE EXECUTION NODE (Frankfurt GCE VM)      |
-|  - Co-located physically next to the IBKR Europe Exchange    |
-|  - Processes real-time market data ticks under 2ms latency   |
-|  - Handles orders, stops, and emergency circuit breakers    |
-+-------------------------------------------------------------+
+                                    ┌────────────────────────────────────────────────────────┐
+                                    │               MULTI-AGENT INTELLIGENCE                │
+                                    │  • News Ingestor (IBKR Bulletins + Macro Calendars)    │
+                                    │  • Generator: NVIDIA NIM (Nemotron 3 Ultra)            │
+                                    │  • Verifier 1: Groq (LLaMA 3.1 70B)                    │
+                                    │  • Verifier 2: Google Gemini 1.5 Flash                 │
+                                    │  • Synthesis Judge: Google Gemini 1.5 Pro              │
+                                    │  • Quota Guard: Rolling-window Rate Limiter            │
+                                    └───────────────────────────┬────────────────────────────┘
+                                                                │
+                                                                ▼
+┌─────────────────────────────────┐                 ┌────────────────────────────────────────┐
+│     INTERACTIVE WEB DASHBOARD   │                 │        DYNAMIC UNIVERSE BUILDER        │
+│  • Top N Basket Toggle (1–5)    │                 │  • IBKR Scanner Discovery (5 Profiles) │
+│  • Live/Paper Trading Gate      │◄───────────────►│  • 15% Max Friction Screening          │
+│  • Multi-Model Quota Monitor    │    Firestore    │  • Conviction Scoring & Ranking        │
+│  • AI Strategy Forge & Backtest │    Realtime     │  • Generates dynamic_baskets.json      │
+└─────────────────────────────────┘      Tunnel     └───────────────────┬────────────────────┘
+                                                                        │
+                                                                        ▼
+                                                    ┌────────────────────────────────────────┐
+                                                    │         FRANKFURT EDGE NODE (VM)       │
+                                                    │  • Co-located in europe-west3 (<1ms)   │
+                                                    │  • IBKR Pro Ireland (IBIE) TWS / DMA   │
+                                                    │  • Order Flow Imbalance (OFI) Engine   │
+                                                    │  • Dynamic Risk Manager (1% Max Loss)  │
+                                                    │  • What-If Live Commission Audit       │
+                                                    │  • EOD Post-Session Reasoning Auditor  │
+                                                    └────────────────────────────────────────┘
 ```
 
 ---
 
-## ⭐️ 2. The 5-Minute Onboarding Guide (Perfect for Beginners)
+## ⚡ 2. Core Capabilities & Multi-Agent Pipeline
 
-If you are new to the Alpha Engine, here is a simple conceptual translation of how the system operates and how you can run it securely.
+### A. Dynamic Universe Discovery & Friction Filtering
+- **No Hardcoded Tickers**: Discovers tradeable instruments dynamically every morning at **04:00 NY / 10:00 CET** using IBKR native `ScannerSubscription` across 5 profiles:
+  - US Major Equities (`STK.US.MAJOR`, `HOT_BY_VOLUME`)
+  - Euronext Paris (`STK.EU.SBF`, `HOT_BY_VOLUME`)
+  - Euronext Amsterdam (`STK.EU.AEB`, `HOT_BY_VOLUME`)
+  - Euronext Brussels (`STK.EU.SB`, `HOT_BY_VOLUME`)
+  - DAX / XETRA (`STK.EU.IBIS`, `TOP_PERC_GAIN`)
+- **15% Friction Ceiling**: Every candidate's estimated transaction costs (IBIE commissions, exchange fees, and half-spread) must consume **< 15%** of the projected intraday price excursion. High-friction candidates are automatically eliminated.
+- **Configurable Focus Basket (1–5 Instruments)**: Toggle how many instruments the system actively trades to respect IBKR basic Level 2 market depth limits (~3 simultaneous streams).
 
-### Conceptual Translation
-- **The Dashboard (Web UI)**: Think of this as your spacecraft's mission control panel. You use it to set boundaries (like how much money you're willing to lose in a day) and monitor trades.
-- **The Edge Node (Python script)**: This is the pilot inside the spacecraft. It is placed as close to the target destination (Frankfurt) as possible so that it can receive signals instantly and execute trades in milliseconds.
-- **The Circuit Breaker**: This is the emergency parachute. If the market behaves wildly and your daily loss crosses your preset threshold (e.g., 2.5% of your account or €1,500.00 cash), the engine **hard locks the router**, stops trading, and allows you to initiate a **Panic Flush** to exit all risk.
+### B. Evolutive Multi-Model LLM Ensemble & Quota Guard
+- **Critic-Verifier Architecture**:
+  - **Generator** (`nvidia/nemotron-3-ultra`): Extracts events, maps GICS sectors, identifies liquid tradeable tickers.
+  - **Verifier 1** (`groq/llama-3.1-70b`): Anti-hallucination screening, economic validity check.
+  - **Verifier 2** (`google/gemini-1.5-flash`): Cross-validation of catalyst duration and directional bias.
+  - **Judge** (`google/gemini-1.5-pro`): Resolves conflicts and synthesizes final conviction.
+- **Rolling-Window Quota Guard (`SimpleQuotaGuard`)**:
+  - Enforces daily and per-minute sliding window limits declared in `model_registry.json`.
+  - Automatically falls back to secondary models or the zero-latency deterministic rules engine when quotas are reached, preventing any execution downtime.
+
+### C. Regulatory Compliance & Risk Architecture
+- **MiFIR / CBI Compliance**: Automatically appends Central Bank of Ireland regulatory tags (`mifid2DecisionMaker`, `mifid2ExecutionTrader`, algorithm IDs) to all European orders.
+- **Pre-Trade What-If Commission Query**: Checks real-time broker commission and initial margin changes using IBKR `whatIf=True` orders before entering trades.
+- **Multi-Currency FX Risk Parity**: Normalizes EUR and USD instrument volatility and stop distances into base account risk capital units.
+- **Circuit Breakers**: Hard-locks order execution if daily cumulative drawdown reaches **2.5%** of reference equity, triggering an automated emergency flush.
+- **Live Trading Safety Gate**: Live real-capital trading is locked by default (Port `4002` Paper). Requires administrator token confirmation (`ALPHA_LIVE_CONFIRMED_2026`) to unlock live DMA execution (Port `4001`).
+
+### D. Tier A Event Study Reasoning Backtester
+- Located in `event_backtester.py`.
+- Evaluates AI catalyst predictions against historical price excursion metrics:
+  - **Directional Hit Rate** (predicted BUY/SELL bias vs. realized return)
+  - **Maximum Favorable Excursion (MFE)** and **Maximum Adverse Excursion (MAE)**
+  - **Brier Calibration Score** (measuring probability calibration of confidence scores)
+  - Category attribution (macro, central bank, geopolitical, earnings)
 
 ---
 
-## ⏱️ 3. Step-by-Step Setup Runbook
+## 🚀 3. Quick Start Guide
 
-Follow these sequential steps to launch the system.
-
-### Step 1: Fire Up the Local Dashboard
-Before pushing anything to the cloud, run the control panel on your computer to verify the layout:
-1. Ensure Node.js is installed on your machine.
-2. In your terminal, install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the local server:
-   ```bash
-   npm run dev
-   ```
-4. Open your web browser and go to `http://localhost:3000`. You will see the beautiful dark dashboard interface!
-
-### Step 2: Configure Your Environment Credentials
-To feed your settings securely to the system, set up your credentials:
-1. Rename `.env.example` in the root folder to `.env`.
-2. Open the file and enter your values:
-   * **`GEMINI_API_KEY`**: Your Google AI Studio key to handle geopolitical calibrations and market commentary.
-   * **`IBKR_ACCOUNT_NUMBER`**: Your Interactive Brokers Account ID (e.g., `U1234567`).
-3. For the local GCE node, the configuration file resides on the virtual machine and connects securely to Firestore using:
-   * **`FIREBASE_PROJECT_ID`**: Your Google Cloud project ID.
-   * **`FIREBASE_API_KEY`**: Your Web API token used to secure database operations.
-
-### Step 3: Run a Backtest to Validate Strategy
-Never deploy a strategy without validating performance first:
-1. In your dashboard, navigate to the **📊 QUANT BACKTESTER** tab inside the GCP Companion panel.
-2. Pick an asset (e.g., `XLE` or `SPY`), select a timeframe, and hit **RUN SIMULATION**.
-3. Recharts will instantly plot the dynamic equity curve, win-rate metrics, and transaction costs.
-4. If you prefer using terminal commands, you can run:
-   ```bash
-   python3 backtester.py XLE 1h 2026-05-01 2026-06-16
-   ```
-
-### Step 4: Provision Your Frankfurt VM (Edge Node)
-To achieve co-location next to IBKR Europe with ultra-low latency (< 2ms):
-1. Push your local files to your GitHub repository by using the **🦊 GIT DIRECT SYNC** panel on your dashboard.
-2. Open your GCP Cloud Shell and clone your repository:
-   ```bash
-   git clone https://github.com/your-username/alpha-engine.git
-   cd alpha-engine
-   ```
-3. Run the automated setup script:
-   ```bash
-   chmod +x deploy_to_gcp.sh
-   ./deploy_to_gcp.sh
-   ```
-4. This script automatically provisions a lightweight, budget-friendly GCE `e2-micro` VM, sets up system dependencies, secures credentials keylessly via service accounts, and boots up your continuous trading loop as a background service.
-
-### Step 5: Activate Headless IBKR Gateway
-To route orders to the exchange without running heavy desktop software on the VM, spin up the lightweight headless Docker container on the node:
+### Step 1: Run the Interactive Dashboard Locally
 ```bash
-docker run -d --name ibkr-ibc-gateway \
-  -e IB_USER="your_ibkr_username" \
-  -e IB_PASSWORD="your_ibkr_password" \
-  -p 4001:4001 -p 4002:4002 \
-  888luck/ibkr-headless-gateway:latest
+# 1. Install dependencies
+npm install
+
+# 2. Start the local dashboard server
+npm run dev
+
+# 3. Open in your browser:
+# http://localhost:3000
 ```
-* **Port 4002 (PAPER Simulation)**: Active connection endpoint for fake money simulations. (Always start here to test your setup safely!)
-* **Port 4001 (LIVE Production)**: Active connection endpoint for real capital trading.
+Navigate to the **🧠 AI INTELLIGENCE & UNIVERSE** tab to see the live dynamic universe, focus basket toggle (1–5), live trading gate, and quota guard monitors.
+
+### Step 2: Run the Multi-Agent Intelligence Pipeline in Python
+```bash
+# Run pre-market event ingestion, ensemble analysis, and universe construction
+python main.py --calibration-only
+
+# Override active focus universe size (e.g. Top 2 instruments)
+python main.py --calibration-only --basket-size 2
+```
+
+### Step 3: Run the Event Study Backtester
+```bash
+python -c "from event_backtester import EventStudyBacktester; bt = EventStudyBacktester(); res = bt.evaluate_study(bt.generate_synthetic_study_sample()); print(f'Hit Rate: {res.directional_hit_rate}% | Brier Score: {res.brier_score} | Profit Factor: {res.profit_factor}'); print('Categories:', res.by_category)"
+```
+
+### Step 4: Run the Complete Test Suite
+```bash
+python -m unittest discover -s tests -v
+```
+Validates:
+1. Event ingestion and MD5 deduplication
+2. Critic-Verifier ensemble evaluation and fallback
+3. SimpleQuotaGuard rate-limiting
+4. UniverseBuilder contract resolution, 15% friction screening, and Top N toggle
+5. Pre-trade What-If commission calculation (US & European tiers)
+6. EventStudyBacktester directional attribution and Brier scoring
+7. ReasoningAuditor post-session lessons learned memory bank
 
 ---
 
-## 🛡️ 4. Risk Engineering & Compliance Standard
+## ☁️ 4. Google Cloud Deployment
 
-The Alpha Engine complies with strict risk limits. The dashboard offers premium interactive dials for managing capital exposure:
+The repository includes automated CI/CD deployment configurations for Google Cloud:
 
-1. **SMA-20 Congruence**: Restricts signals to trade only in direction of the simple moving average trend (Long above, Short below).
-2. **OFI Breakout Signal**: Breakout triggered only when order book imbalance volume expansion exceeds $1.4\times$ the 10-period volume MA.
-3. **1% Capital Risk Limit**: The position size must be dynamically scaled so that the distance to your Stop-Loss represents at most **1%** of your total cumulative capital.
-4. **ATR-Based Stop-Loss (1.8 ATR)**: Stops are automatically calculated at $1.8\times$ ATR from entry price, with targets configured at $2\times$ that distance.
-5. **15% Transaction Friction Filter**: Protects capital under IBKR regulatory commission structures:
-   $$\text{Efficiency Ratio} = \frac{\text{Projected Friction (Spread Slippage + } 2\times\text{ Commission)}}{\text{Projected Max Profit (2.0 } \times \text{ Stop Distance)}} \times 100$$
-   If the Efficiency Ratio exceeds **15%**, the trade is automatically rejected.
-6. **Daily Drawdown Circuit Breakers**:
-   * **Percentage Limit**: Locks the router if account drawdown exceeds your custom limit (e.g., `2.5%`).
-   * **Cash Limit (EUR)**: Locks the router if absolute cash losses exceed your custom limit (e.g., `€1,500.00`).
-   * **Admin Overrides**: If the router locks, administrators can click the **ADMIN UNLOCK** button on the dashboard to override the circuit breaker and restore the router online once market risks have been assessed.
-   * **Panic Flush Button**: Liquidates all open positions instantly in an emergency.
+### Automated Deployment via Google Cloud Build (`cloudbuild.yaml`)
+Whenever commits are pushed to the `main` branch, Google Cloud Build automatically:
+1. Runs the unit and integration test suite (`tests/test_pipeline.py`).
+2. Executes the pre-market intelligence dry-run (`main.py --calibration-only`).
+3. Provisions or updates the `alpha-edge-node` **Spot VM in Frankfurt (`europe-west3-a`)** with a 2GB swapfile for ~$1.64/month.
+4. Builds and deploys the production dashboard to **Firebase Hosting** (`alpha-engine-ai-studio.web.app`).
+
+### Manual Deployment via Google Cloud Shell
+1. Open [console.cloud.google.com](https://console.cloud.google.com) and activate Cloud Shell (`>_`).
+2. Run the proximity deployer script:
+```bash
+git clone https://github.com/888luck/ALPHA-ENGINE-AIstudio.git
+cd ALPHA-ENGINE-AIstudio
+chmod +x deploy_to_gcp.sh
+./deploy_to_gcp.sh
+```
 
 ---
 
-## 🔌 5. Cloud Environment Variables
+## ⚙️ 5. Configuration & Environment Variables
 
-### A. Web Server Environment (`.env` in Root Directory)
-| Variable Name | Description | Example Target Value |
-| :--- | :--- | :--- |
-| `GEMINI_API_KEY` | Required to process AI geopolitical calibrations and macro commentary. | `AIzaSyD-xxxxxxxxxxxxxx` |
-| `APP_URL` | The current deployment endpoint URL, used for GitHub workspace syncing. | `https://your-cloud-run.a.run.app` |
-| `NODE_ENV` | Mode switch (production vs development). | `production` |
+Create a `.env` file in the root directory:
 
-### B. Python Edge VM Environment (`.env` on Local VM Node)
-| Variable Name | Description | Default / Example Value |
-| :--- | :--- | :--- |
-| `IBKR_ACCOUNT_NUMBER` | Target Interactive Brokers Account ID. | `U8129384` |
-| `IBKR_HOST` | Loopback socket address hosting the local headless IBKR Gateway. | `127.0.0.1` |
-| `IBKR_PORT` | `4002` for simulated paper trading; `4001` for live production. | `4002` |
-| `FIREBASE_PROJECT_ID` | Target GCP project identifier supporting the direct Firestore sync link. | `your-firebase-id` |
-| `FIREBASE_API_KEY` | Public authorization token for Firestore REST interactions. | `AIzaSyA-xxxxxxxxxxxxxx` |
+```env
+# Interactive Brokers Gateway Configuration
+IBKR_ACCOUNT_NUMBER="DU1234567"     # Paper default
+IBKR_HOST="127.0.0.1"
+IBKR_PORT=4002                      # 4002 = Paper, 4001 = Live
+IBKR_CLIENT_ID=10
+MAX_ACTIVE_INSTRUMENTS=3            # Active universe limit (1-5)
+ALLOW_LIVE_TRADING=false            # Safety lock (true requires live token)
+
+# MiFID II / CBI Regulatory Identifiers
+MIFID2_DECISION_MAKER_ID="ALGO_DEC_992"
+MIFID2_EXECUTION_TRADER_ID="ALGO_EXE_554"
+
+# Multi-Model LLM API Keys (Optional - deterministic rules fallback active if absent)
+NVIDIA_API_KEY=""                   # Generator: Nemotron 3 Ultra
+GROQ_API_KEY=""                     # Verifier 1: LLaMA 3.1 70B
+GEMINI_API_KEY=""                   # Verifier 2 & Judge: Gemini 1.5 Flash/Pro
+
+# Google Firebase / Firestore Tunnel
+FIREBASE_PROJECT_ID="alpha-engine-ai-studio"
+FIREBASE_API_KEY="AIzaSyCq4or4zJ70JUEe2CxukxwafGW_CVHSU_Q"
+```
 
 ---
 
-## 📁 6. Codebase Directory Map
+## 📂 6. Repository File Structure
 
 ```
-├── .env.example              # Example environment keys template
-├── AGENTS.md                 # System-wide framework and build rules
-├── backtester.py             # Quantitative backtester python model
-├── config_loader.py          # Environment key loaders for the Edge Node
-├── connection.py             # IBKR execution callbacks wrapper
-├── deploy_to_gcp.sh          # Frankfurt e2-micro Spot deployer shell script
-├── deploy_to_hetzner.sh      # Hetzner Cloud VM provisioner script
-├── MULTI_CLOUD_SETUP_GUIDE.md# Multi-cloud setup guide (Hetzner vs. GCP)
-├── firebase_sync.py          # Direct REST Firestore secure tunnel client
-├── local_edge_node.py        # Co-located daemon loop coordinator
-├── main.py                   # Python entry point runner
-├── package.json              # Front-end build tools & dependencies
-├── server.ts                 # Express control plane & API router
-└── src
-    ├── App.tsx               # Main layout root context & Help runbook
-    └── components
-        ├── Dashboard.tsx     # Performance analytics UI & Circuit Breaker visualization
-        └── GcpCompanion.tsx  # Cloud control & backtester panels
+├── .firebaserc                     # Firebase active project alias bindings
+├── cloudbuild.yaml                 # Google Cloud Build automated CI/CD pipeline
+├── deploy_to_gcp.sh                # Frankfurt europe-west3 Spot VM deployer script
+├── deploy_to_hetzner.sh            # Hetzner Cloud VM provisioner script
+├── dynamic_baskets.json            # Calibrated daily Top N focus universe output
+├── event_backtester.py             # Tier A Event Study Reasoning Backtester
+├── fee_schedule.json               # Cached IBIE European & US fee matrices
+├── feed_registry.json              # Pluggable feed adapter registry (IBKR, FRED, ECB)
+├── firebase.json                   # Firestore database & Firebase Hosting configuration
+├── firebase_sync.py                # Zero-dependency Google Firestore REST client
+├── firestore.rules                 # Hardened Firestore security rules (role-based)
+├── llm_ensemble.py                 # Multi-model Critic-Verifier ensemble & Quota Guard
+├── local_edge_node.py              # Multi-exchange IBKR Scanner & Level 2 OFI collector
+├── main.py                         # Master execution daemon & pre-market calibration
+├── model_registry.json             # Dynamic LLM endpoints, fallbacks & quota limits
+├── news_ingestor.py                # Bulletin ingestion, RSS calendar polling & deduplication
+├── package.json                    # Dashboard React, Vite, and Express dependencies
+├── reasoning_auditor.py            # Post-session attribution & lessons learned memory bank
+├── risk_engine.py                  # Dynamic Risk Management (DRM) & What-If commission query
+├── server.ts                       # Express backend proxy & Vite development server
+├── universe_builder.py             # Contract resolution, 15% friction filter & ranking
+├── universe_models.py              # Strict dataclass schemas for events & universe
+├── src/
+│   ├── App.tsx                     # Main dashboard container & live navigation
+│   └── components/
+│       ├── Dashboard.tsx           # Execution metrics, order flow & circuit breaker UI
+│       └── GcpCompanion.tsx        # AI Intelligence Tab, Universe Manager & Cloud panel
+└── tests/
+    ├── __init__.py
+    └── test_pipeline.py            # Complete 7-part unit and integration test suite
 ```
+
+---
+
+## ⚖️ License & Disclaimers
+
+Alpha Engine is built for quantitative algorithmic research and compliance-first execution. 
+**Trading financial instruments involves significant risk of loss.** Live execution requires explicit administrator confirmation and adherence to broker margin and MiFID II requirements.
