@@ -243,57 +243,57 @@ def main_loop():
                 if cand_phase != MarketSessionPhase.ACTIVE_EXECUTION and cm.is_connected:
                     continue
                     
-                    if cm.is_connected:
-                        # Real gateway active positions sync
-                        pos = cm.active_positions.get(sym, {})
-                        qty_val = float(pos.get("qty", 0.0))
-                        if abs(qty_val) > 0:
-                            trade_id = f"TRD_{sym}_EDGE"
-                            avg_cost = float(pos.get("avgCost", 0.0))
-                            unrealized_val = float(cm.pnl_updates.get("unrealized", 0.0))
-                            live_trade = {
-                                "id": trade_id,
-                                "symbol": sym,
-                                "quantity": float(abs(qty_val)),
-                                "direction": "BUY" if qty_val > 0 else "SELL",
-                                "entryPrice": avg_cost,
-                                "stopPrice": float(avg_cost * 0.982 if qty_val > 0 else avg_cost * 1.018),
-                                "currentPrice": avg_cost,
-                                "unrealizedPnL": unrealized_val,
-                                "mifidDecisionMaker": config["MIFID2_DECISION_MAKER_ID"],
-                                "mifidExecutionTrader": config["MIFID2_EXECUTION_TRADER_ID"],
-                                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
-                            }
-                            firebase_tunnel.push_active_trade(trade_id, live_trade)
-                    else:
-                        # Simulation sandbox mode: evaluate candidate setup
-                        sim_entry = 100.0 if cand.isEuropean else 52.40
-                        stop_offset = sim_entry * 0.012
-                        sim_stop = sim_entry - stop_offset if direction == "BUY" else sim_entry + stop_offset
-                        pos_qty = drm.calculate_position_size(sim_entry, sim_stop)
-                        
+                if cm.is_connected:
+                    # Real gateway active positions sync
+                    pos = cm.active_positions.get(sym, {})
+                    qty_val = float(pos.get("qty", 0.0))
+                    if abs(qty_val) > 0:
                         trade_id = f"TRD_{sym}_EDGE"
-                        unrealized_pnl = float(0.35 * (pos_qty or 50)) if direction == "BUY" else float(-0.20 * (pos_qty or 50))
-                        
-                        sim_trade = {
+                        avg_cost = float(pos.get("avgCost", 0.0))
+                        unrealized_val = float(cm.pnl_updates.get("unrealized", 0.0))
+                        live_trade = {
                             "id": trade_id,
                             "symbol": sym,
-                            "quantity": float(pos_qty or 50),
-                            "direction": direction,
-                            "entryPrice": float(sim_entry),
-                            "stopPrice": float(sim_stop),
-                            "currentPrice": float(sim_entry + 0.35),
-                            "unrealizedPnL": unrealized_pnl,
-                            "catalyst": cand.catalyst,
+                            "quantity": float(abs(qty_val)),
+                            "direction": "BUY" if qty_val > 0 else "SELL",
+                            "entryPrice": avg_cost,
+                            "stopPrice": float(avg_cost * 0.982 if qty_val > 0 else avg_cost * 1.018),
+                            "currentPrice": avg_cost,
+                            "unrealizedPnL": unrealized_val,
                             "mifidDecisionMaker": config["MIFID2_DECISION_MAKER_ID"],
                             "mifidExecutionTrader": config["MIFID2_EXECUTION_TRADER_ID"],
                             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
                         }
-                        firebase_tunnel.push_active_trade(trade_id, sim_trade)
-                        cm.active_positions[sym] = {"qty": (pos_qty or 50) if direction == "BUY" else -(pos_qty or 50), "avgCost": sim_entry}
+                        firebase_tunnel.push_active_trade(trade_id, live_trade)
+                else:
+                    # Simulation sandbox mode: evaluate candidate setup
+                    sim_entry = 100.0 if cand.isEuropean else 52.40
+                    stop_offset = sim_entry * 0.012
+                    sim_stop = sim_entry - stop_offset if direction == "BUY" else sim_entry + stop_offset
+                    pos_qty = drm.calculate_position_size(sim_entry, sim_stop)
+                    
+                    trade_id = f"TRD_{sym}_EDGE"
+                    unrealized_pnl = float(0.35 * (pos_qty or 50)) if direction == "BUY" else float(-0.20 * (pos_qty or 50))
+                    
+                    sim_trade = {
+                        "id": trade_id,
+                        "symbol": sym,
+                        "quantity": float(pos_qty or 50),
+                        "direction": direction,
+                        "entryPrice": float(sim_entry),
+                        "stopPrice": float(sim_stop),
+                        "currentPrice": float(sim_entry + 0.35),
+                        "unrealizedPnL": unrealized_pnl,
+                        "catalyst": cand.catalyst,
+                        "mifidDecisionMaker": config["MIFID2_DECISION_MAKER_ID"],
+                        "mifidExecutionTrader": config["MIFID2_EXECUTION_TRADER_ID"],
+                        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    }
+                    firebase_tunnel.push_active_trade(trade_id, sim_trade)
+                    cm.active_positions[sym] = {"qty": (pos_qty or 50) if direction == "BUY" else -(pos_qty or 50), "avgCost": sim_entry}
 
         # Scenario C: EOD Flattening Window (15:50 - 16:00 NY / 17:25 - 17:30 CET)
-        elif "15:50" <= current_ny_time < "16:00":
+        if "15:50" <= current_ny_time < "16:00":
             print("[PHASE - HARD TERMINATION] Initiating automated Flat EOD Flush. Flattening all positions.")
             for symbol, pos in list(cm.active_positions.items()):
                 pos_qty = float(pos.get("qty", 0.0))

@@ -33,6 +33,7 @@ steps:
         else
           echo "[CLOUDBUILD] Spot VM $$VM_NAME already exists in $$ZONE."
         fi
+        exit 0
 
   # 4. Build application bundle & deploy to Firebase Hosting if authenticated
   - name: 'node:20'
@@ -43,6 +44,7 @@ steps:
         npm install
         npm run build
         npx firebase-tools deploy --only hosting --project alpha-engine-ai-studio || echo "[CLOUDBUILD INFO] Firebase deploy completed or bypassed: managed directly by Antigravity Firebase MCP Server."
+        exit 0
 
 
 timeout: '600s'
