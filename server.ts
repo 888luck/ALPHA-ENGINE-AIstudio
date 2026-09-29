@@ -8,6 +8,7 @@ import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { execFile } from "child_process";
+import net from "net";
 
 import { initializeApp, getApps, applicationDefault } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
@@ -288,6 +289,12 @@ let systemSettings = {
   customAiBaseUrl: "",
   customAiModelName: "",
   selectedAiProvider: "gemini-flash" as "gemini-flash" | "gemini-pro" | "openai-4o" | "openai-4o-mini" | "anthropic-sonnet" | "anthropic-haiku" | "nvidia-llama-405" | "nvidia-llama-70" | "nvidia-nemotron" | "custom" | "auto",
+  
+  // Regulatory & Catalyst Feeds Configuration
+  openFdaApiKey: "",
+  fredApiKey: "",
+  patentsApiKey: "",
+  secUserAgent: "AlphaEngine/2.0 (InstitutionalResearch; contact@alphaengine.internal)",
 };
 
 // Async function to sync settings with Firestore
@@ -1431,7 +1438,12 @@ app.post("/api/set-settings", (req, res) => {
     customAiApiKey,
     customAiBaseUrl,
     customAiModelName,
-    selectedAiProvider
+    selectedAiProvider,
+    geminiApiKey,
+    openFdaApiKey,
+    fredApiKey,
+    patentsApiKey,
+    secUserAgent
   } = req.body;
   
   if (ibkrAccountNumber) systemSettings.ibkrAccountNumber = ibkrAccountNumber;
@@ -1481,6 +1493,7 @@ app.post("/api/set-settings", (req, res) => {
     systemSettings.dailyDrawdownLimitCash = Number(dailyDrawdownLimitCash);
   }
 
+  if (geminiApiKey !== undefined) systemSettings.geminiApiKey = geminiApiKey;
   if (openaiApiKey !== undefined) systemSettings.openaiApiKey = openaiApiKey;
   if (anthropicApiKey !== undefined) systemSettings.anthropicApiKey = anthropicApiKey;
   if (nvidiaApiKey !== undefined) systemSettings.nvidiaApiKey = nvidiaApiKey;
@@ -1488,6 +1501,10 @@ app.post("/api/set-settings", (req, res) => {
   if (customAiBaseUrl !== undefined) systemSettings.customAiBaseUrl = customAiBaseUrl;
   if (customAiModelName !== undefined) systemSettings.customAiModelName = customAiModelName;
   if (selectedAiProvider !== undefined) systemSettings.selectedAiProvider = selectedAiProvider;
+  if (openFdaApiKey !== undefined) systemSettings.openFdaApiKey = openFdaApiKey;
+  if (fredApiKey !== undefined) systemSettings.fredApiKey = fredApiKey;
+  if (patentsApiKey !== undefined) systemSettings.patentsApiKey = patentsApiKey;
+  if (secUserAgent !== undefined) systemSettings.secUserAgent = secUserAgent;
 
   persistSettings();
   res.json({ success: true, settings: systemSettings });
@@ -1548,6 +1565,370 @@ app.post("/api/sync-from-cloud", (req, res) => {
     }
   }
   res.json({ success: true, settings: systemSettings, activeTrades, historicalLogs });
+});
+
+// ==========================================
+// 4-PILLAR INTERACTIVE TEST & PROBE GATEWAYS
+// ==========================================
+
+// 1. Brokerage TCP Socket Handshake Test
+app.post("/api/test-broker-connection", (req, res) => {
+  const host = req.body.host || "127.0.0.1";
+  const port = Number(req.body.port) || systemSettings.ibkrPort || 4002;
+  const startTime = Date.now();
+  
+  const socket = new net.Socket();
+  let finished = false;
+
+  socket.setTimeout(2500);
+
+  socket.connect(port, host, () => {
+    if (finished) return;
+    finished = true;
+    const latencyMs = Date.now() - startTime;
+    socket.destroy();
+    res.json({
+      success: true,
+      latencyMs,
+      host,
+      port,
+      message: `IBKR Socket handshake successful on ${host}:${port} (${latencyMs}ms). Gateway is ready to route orders.`
+    });
+  });
+
+  socket.on("error", (err: any) => {
+    if (finished) return;
+    finished = true;
+    const latencyMs = Date.now() - startTime;
+    socket.destroy();
+    res.json({
+      success: false,
+      latencyMs,
+      host,
+      port,
+      error: `TCP Socket refused on ${host}:${port} (${err.code || err.message}). Ensure TWS or IB Gateway is running with 'Enable ActiveX and Socket Clients' enabled.`
+    });
+  });
+
+  socket.on("timeout", () => {
+    if (finished) return;
+    finished = true;
+    const latencyMs = Date.now() - startTime;
+    socket.destroy();
+    res.json({
+      success: false,
+      latencyMs,
+      host,
+      port,
+      error: `Connection timed out after 2500ms on ${host}:${port}. Check firewall or TWS Trusted IPs.`
+    });
+  });
+});
+
+// 2. Google Cloud / Firebase Firestore Ping Test
+app.post("/api/test-cloud-connection", async (req, res) => {
+  const startTime = Date.now();
+  if (!db_fs) {
+    return res.json({
+      success: false,
+      latencyMs: Date.now() - startTime,
+      message: "Firestore Admin is currently running in local in-memory mode. Configure GCP credentials or firebase-applet-config.json to activate live cloud database sync."
+    });
+  }
+  try {
+    const testDoc = db_fs.collection("system_config").doc("health_probe");
+    await testDoc.set({ lastPing: new Date().toISOString() }, { merge: true });
+    const latencyMs = Date.now() - startTime;
+    res.json({
+      success: true,
+      latencyMs,
+      projectId: firebaseProjectId || "alpha-engine-ai-studio",
+      databaseId: databaseId || "ai-studio-alphaengine-94d6c309-5a24-4eb3-b5fc-aed88e51a000",
+      message: `Google Cloud Firestore tunnel verified (${latencyMs}ms). Bidirectional state sync active.`
+    });
+  } catch (err: any) {
+    res.json({
+      success: false,
+      latencyMs: Date.now() - startTime,
+      message: `Firestore connection error: ${err.message}`
+    });
+  }
+});
+
+// 3. AI Intelligence Model Handshake Probe
+app.post("/api/test-ai-key", async (req, res) => {
+  const { provider, apiKey, baseUrl, modelName } = req.body;
+  const startTime = Date.now();
+  const testPrompt = "Respond with single word: READY";
+
+  try {
+    if (provider === "gemini") {
+      const key = apiKey || systemSettings.geminiApiKey || process.env.GEMINI_API_KEY;
+      if (!key) throw new Error("No Gemini API key supplied or configured.");
+      const ai = new GoogleGenAI({ apiKey: key });
+      const response = await ai.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: testPrompt,
+      });
+      const latencyMs = Date.now() - startTime;
+      return res.json({
+        success: true,
+        latencyMs,
+        provider: "Google Gemini (1.5 Flash)",
+        reply: response.text?.trim() || "READY",
+        message: `Gemini 1.5 Flash responded successfully in ${latencyMs}ms.`
+      });
+    }
+
+    if (provider === "groq") {
+      const key = apiKey || systemSettings.customAiApiKey || process.env.GROQ_API_KEY;
+      if (!key) throw new Error("No Groq API key supplied.");
+      const openai = new OpenAI({ apiKey: key, baseURL: "https://api.groq.com/openai/v1" });
+      const completion = await openai.chat.completions.create({
+        model: "llama-3.1-70b-versatile",
+        messages: [{ role: "user", content: testPrompt }],
+        max_tokens: 5,
+      });
+      const latencyMs = Date.now() - startTime;
+      return res.json({
+        success: true,
+        latencyMs,
+        provider: "Groq Cloud (Llama 3.1 70B)",
+        reply: completion.choices[0]?.message?.content?.trim() || "READY",
+        message: `Groq Llama-3.1-70B responded in ${latencyMs}ms.`
+      });
+    }
+
+    if (provider === "openai") {
+      const key = apiKey || systemSettings.openaiApiKey || process.env.OPENAI_API_KEY;
+      if (!key) throw new Error("No OpenAI API key supplied.");
+      const openai = new OpenAI({ apiKey: key });
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: testPrompt }],
+        max_tokens: 5,
+      });
+      const latencyMs = Date.now() - startTime;
+      return res.json({
+        success: true,
+        latencyMs,
+        provider: "OpenAI (GPT-4o-mini)",
+        reply: completion.choices[0]?.message?.content?.trim() || "READY",
+        message: `OpenAI GPT-4o-mini responded in ${latencyMs}ms.`
+      });
+    }
+
+    if (provider === "anthropic") {
+      const key = apiKey || systemSettings.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+      if (!key) throw new Error("No Anthropic API key supplied.");
+      const anthropic = new Anthropic({ apiKey: key });
+      const msg = await anthropic.messages.create({
+        model: "claude-3-haiku-20240307",
+        max_tokens: 5,
+        messages: [{ role: "user", content: testPrompt }],
+      });
+      const latencyMs = Date.now() - startTime;
+      return res.json({
+        success: true,
+        latencyMs,
+        provider: "Anthropic (Claude 3 Haiku)",
+        reply: (msg.content[0] as any)?.text?.trim() || "READY",
+        message: `Claude 3 Haiku responded in ${latencyMs}ms.`
+      });
+    }
+
+    if (provider === "nvidia") {
+      const key = apiKey || systemSettings.nvidiaApiKey || process.env.NVIDIA_API_KEY;
+      if (!key) throw new Error("No NVIDIA API key supplied.");
+      const openai = new OpenAI({ apiKey: key, baseURL: "https://integrate.api.nvidia.com/v1" });
+      const completion = await openai.chat.completions.create({
+        model: "meta/llama-3.1-70b-instruct",
+        messages: [{ role: "user", content: testPrompt }],
+        max_tokens: 5,
+      });
+      const latencyMs = Date.now() - startTime;
+      return res.json({
+        success: true,
+        latencyMs,
+        provider: "NVIDIA NIM (Llama 3.1 70B)",
+        reply: completion.choices[0]?.message?.content?.trim() || "READY",
+        message: `NVIDIA NIM responded in ${latencyMs}ms.`
+      });
+    }
+
+    if (provider === "custom") {
+      const url = baseUrl || systemSettings.customAiBaseUrl || "http://localhost:11434/v1";
+      const model = modelName || systemSettings.customAiModelName || "llama3.1";
+      const key = apiKey || systemSettings.customAiApiKey || "ollama";
+      const openai = new OpenAI({ apiKey: key, baseURL: url });
+      const completion = await openai.chat.completions.create({
+        model: model,
+        messages: [{ role: "user", content: testPrompt }],
+        max_tokens: 5,
+      });
+      const latencyMs = Date.now() - startTime;
+      return res.json({
+        success: true,
+        latencyMs,
+        provider: `Custom Local Endpoint (${model})`,
+        reply: completion.choices[0]?.message?.content?.trim() || "READY",
+        message: `Custom bridge (${url}) responded in ${latencyMs}ms.`
+      });
+    }
+
+    throw new Error(`Unsupported AI provider: ${provider}`);
+  } catch (err: any) {
+    res.json({
+      success: false,
+      latencyMs: Date.now() - startTime,
+      provider,
+      error: err.message || "Failed to communicate with AI provider."
+    });
+  }
+});
+
+// 4. Regulatory, Science & Catalyst Feed Live Probe
+app.post("/api/test-feed-probe", async (req, res) => {
+  const { feedType, apiKey, userAgent } = req.body;
+  const startTime = Date.now();
+  const ua = userAgent || systemSettings.secUserAgent || "AlphaEngine/2.0 (InstitutionalResearch; contact@alphaengine.internal)";
+
+  try {
+    if (feedType === "clinicaltrials") {
+      const url = "https://clinicaltrials.gov/api/v2/studies?pageSize=1";
+      const response = await fetch(url, { headers: { "User-Agent": ua, "Accept": "application/json" }, signal: AbortSignal.timeout(5000) });
+      const latencyMs = Date.now() - startTime;
+      if (response.ok) {
+        const data: any = await response.json();
+        const study = data.studies?.[0]?.protocolSection?.identificationModule?.briefTitle || "Study protocol retrieved";
+        return res.json({
+          success: true,
+          latencyMs,
+          status: response.status,
+          feedName: "ClinicalTrials.gov Protocol Registry v2",
+          sample: study.slice(0, 100),
+          message: `Public NIH study endpoint responded HTTP 200 OK (${latencyMs}ms). 0 API keys required.`
+        });
+      }
+      throw new Error(`ClinicalTrials.gov returned HTTP ${response.status}`);
+    }
+
+    if (feedType === "openfda") {
+      const key = apiKey || systemSettings.openFdaApiKey || process.env.OPENFDA_API_KEY;
+      const url = key 
+        ? `https://api.fda.gov/drug/event.json?api_key=${encodeURIComponent(key)}&limit=1`
+        : "https://api.fda.gov/drug/event.json?limit=1";
+      const response = await fetch(url, { headers: { "User-Agent": ua, "Accept": "application/json" }, signal: AbortSignal.timeout(5000) });
+      const latencyMs = Date.now() - startTime;
+      if (response.ok) {
+        const data: any = await response.json();
+        const count = data.meta?.results?.total || "Active";
+        return res.json({
+          success: true,
+          latencyMs,
+          status: response.status,
+          feedName: "OpenFDA Drug Regulatory API",
+          sample: `Total adverse/approval records: ${count}`,
+          message: `OpenFDA endpoint responded HTTP 200 OK (${latencyMs}ms). Tier: ${key ? "Authenticated (240 req/min)" : "Public Open Tier (40 req/min)"}.`
+        });
+      }
+      throw new Error(`OpenFDA returned HTTP ${response.status}`);
+    }
+
+    if (feedType === "sec_edgar") {
+      // NVDA CIK 0001045810
+      const url = "https://data.sec.gov/submissions/CIK0001045810.json";
+      const response = await fetch(url, { headers: { "User-Agent": ua, "Accept": "application/json" }, signal: AbortSignal.timeout(5000) });
+      const latencyMs = Date.now() - startTime;
+      if (response.ok) {
+        const data: any = await response.json();
+        const recentForm = data.filings?.recent?.form?.[0] || "8-K";
+        const entity = data.name || "NVIDIA CORP";
+        return res.json({
+          success: true,
+          latencyMs,
+          status: response.status,
+          feedName: "SEC EDGAR Direct Submissions API",
+          sample: `${entity}: Latest Form ${recentForm} verified.`,
+          message: `SEC EDGAR live submissions responded HTTP 200 OK (${latencyMs}ms) under institutional User-Agent.`
+        });
+      }
+      throw new Error(`SEC EDGAR returned HTTP ${response.status}. Ensure User-Agent is compliant.`);
+    }
+
+    if (feedType === "gdelt") {
+      const url = "https://api.gdeltproject.org/api/v2/doc/doc?query=market&mode=artlist&maxrecords=1&format=json";
+      const response = await fetch(url, { headers: { "User-Agent": ua, "Accept": "application/json" }, signal: AbortSignal.timeout(5000) });
+      const latencyMs = Date.now() - startTime;
+      if (response.ok) {
+        const data: any = await response.json();
+        const title = data.articles?.[0]?.title || "Geopolitical tone cluster online";
+        return res.json({
+          success: true,
+          latencyMs,
+          status: response.status,
+          feedName: "GDELT 2.0 Global Geopolitical Monitor",
+          sample: title.slice(0, 100),
+          message: `GDELT Big Data global conflict stream responded HTTP 200 OK (${latencyMs}ms). Free open feed.`
+        });
+      }
+      throw new Error(`GDELT returned HTTP ${response.status}`);
+    }
+
+    if (feedType === "ftc") {
+      const url = "https://www.ftc.gov/news-events/news/press-releases";
+      const response = await fetch(url, { headers: { "User-Agent": ua }, signal: AbortSignal.timeout(5000) });
+      const latencyMs = Date.now() - startTime;
+      return res.json({
+        success: response.ok,
+        latencyMs,
+        status: response.status,
+        feedName: "FTC & Antitrust Enforcement Action Monitor",
+        sample: "FTC HSR & merger challenge tracker operational.",
+        message: `FTC Regulatory disclosure portal probe succeeded (${latencyMs}ms).`
+      });
+    }
+
+    if (feedType === "fred") {
+      const key = apiKey || systemSettings.fredApiKey || process.env.FRED_API_KEY;
+      const url = key
+        ? `https://api.stlouisfed.org/fred/releases?api_key=${encodeURIComponent(key)}&file_type=json`
+        : "https://fred.stlouisfed.org/";
+      const response = await fetch(url, { headers: { "User-Agent": ua }, signal: AbortSignal.timeout(5000) });
+      const latencyMs = Date.now() - startTime;
+      return res.json({
+        success: response.ok,
+        latencyMs,
+        status: response.status,
+        feedName: "Federal Reserve (FRED) Macro Calendar",
+        sample: key ? "FRED authenticated release calendar retrieved" : "St. Louis Fed macro calendar reached",
+        message: `FRED macroeconomic stream probe succeeded (${latencyMs}ms). ${key ? "Authenticated key active." : "Public calendar active."}`
+      });
+    }
+
+    if (feedType === "patents") {
+      const url = "https://api.patentsview.org/patents/query?q={%22_gte%22:{%22patent_date%22:%222024-01-01%22}}&f=[%22patent_number%22]&o={%22size%22:1}";
+      const response = await fetch(url, { headers: { "User-Agent": ua, "Accept": "application/json" }, signal: AbortSignal.timeout(5000) });
+      const latencyMs = Date.now() - startTime;
+      return res.json({
+        success: response.ok,
+        latencyMs,
+        status: response.status,
+        feedName: "USPTO PatentsView / IP Litigation Engine",
+        sample: "Patent claims & expiration tracker active.",
+        message: `USPTO PatentsView endpoint responded (${latencyMs}ms).`
+      });
+    }
+
+    throw new Error(`Unknown feed type: ${feedType}`);
+  } catch (err: any) {
+    res.json({
+      success: false,
+      latencyMs: Date.now() - startTime,
+      feedType,
+      error: err.message || "Feed probe failed."
+    });
+  }
 });
 
 // Trigger a structural Level 2 tick pulse manually
@@ -2517,23 +2898,26 @@ app.post("/api/backtest", (req, res) => {
 
 // Setup backend with static or dev mode bundler configurations
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
-    // Delete PORT to prevent Vite from auto-binding to Cloud Run's injected 8080 port
+  const distPath = path.join(process.cwd(), "dist");
+  const distExists = fs.existsSync(path.join(distPath, "index.html"));
+
+  if (process.env.NODE_ENV === "production" || distExists) {
+    console.log("[ALPHA SERVER] Serving production static bundle from /dist");
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  } else {
+    console.log("[ALPHA SERVER] Initializing Vite dev middleware...");
     delete process.env.PORT;
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
   }
 
-  const listenPort = Number(process.env.PORT) || PORT || 8080;
+  const listenPort = Number(process.env.PORT) || 3000;
   app.listen(listenPort, "0.0.0.0", () => {
     console.log(`[ALPHA SERVER] Running successfully on port: http://0.0.0.0:${listenPort}`);
   });

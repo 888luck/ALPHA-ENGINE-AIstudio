@@ -57,6 +57,7 @@ import {
   CartesianGrid
 } from "recharts";
 import GcpCompanion from "./GcpCompanion";
+import { ApiVaultModal } from "./ApiVaultModal";
 
 const HARDCODED_SECURITY_RULES = `rules_version = '2';
 service cloud.firestore {
@@ -430,6 +431,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
   const [nvidiaConfigured, setNvidiaConfigured] = useState<boolean>(false);
   const [customAiConfigured, setCustomAiConfigured] = useState<boolean>(false);
   const [showDiagnosticsModal, setShowDiagnosticsModal] = useState<boolean>(false);
+  const [showApiVaultModal, setShowApiVaultModal] = useState<boolean>(false);
   const [hasShownStartupCheck, setHasShownStartupCheck] = useState<boolean>(() => {
     return localStorage.getItem("ALPHA_DIAGNOSTICS_SHOWN") === "true";
   });
@@ -1231,6 +1233,16 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 font-mono text-xs">
+            {/* 4-Pillar API Connection & Feed Vault */}
+            <button
+              onClick={() => setShowApiVaultModal(true)}
+              className="px-3 py-2 rounded-lg border border-indigo-300 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-800 hover:from-indigo-100 hover:to-purple-100 flex items-center gap-2 cursor-pointer transition active:scale-95 duration-150 shadow-xs font-bold"
+              title="Open 4-Pillar API Connection & Feed Vault (Broker, Cloud, AI, and Regulatory Feeds)"
+            >
+              <Zap className="w-4 h-4 text-indigo-600 animate-pulse" />
+              <span>API & FEEDS VAULT</span>
+            </button>
+
             {/* Diagnostics and Keys Checker */}
             <button
               onClick={() => setShowDiagnosticsModal(true)}
@@ -3383,6 +3395,17 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
           </div>
         </div>
       )}
+
+      {/* 4-Pillar API Connection & Feed Vault Modal */}
+      <ApiVaultModal
+        isOpen={showApiVaultModal}
+        onClose={() => setShowApiVaultModal(false)}
+        settings={settings}
+        onSaveSetting={saveInlineSetting}
+        customGeminiApiKey={customGeminiApiKey}
+        onSaveGeminiKey={saveCustomGeminiApiKey}
+        firebaseStatus={firebaseStatus}
+      />
 
     </div>
   );
