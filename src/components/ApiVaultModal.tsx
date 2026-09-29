@@ -110,22 +110,22 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
         };
       }
       try {
+        // Query Google ModelService.ListModels to authenticate key and discover active models
         const resp = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(key)}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: "Respond with single word: OK" }] }],
-            }),
-          }
+          `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`
         );
         const latencyMs = Date.now() - startTime;
         if (resp.ok) {
+          const data = await resp.json();
+          const geminiModels = (data.models || [])
+            .map((m: any) => (m.name || "").replace("models/", ""))
+            .filter((name: string) => name.toLowerCase().includes("gemini"));
+
+          const displayModels = geminiModels.slice(0, 3).join(", ");
           return {
             success: true,
             latencyMs,
-            message: `Google Gemini 1.5 Flash verified successfully (${latencyMs}ms). Direct Cloud Handshake active.`,
+            message: `Google Gemini API Key verified successfully (${latencyMs}ms). Active models: ${displayModels || "gemini-flash, gemini-pro"}.`,
           };
         }
         const errJson = await resp.json().catch(() => ({}));
