@@ -30,7 +30,8 @@ import {
   Database,
   Layers,
   Radio,
-  Award
+  Award,
+  Globe
 } from "lucide-react";
 import {
   ResponsiveContainer,

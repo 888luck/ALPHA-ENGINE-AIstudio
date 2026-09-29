@@ -1,79 +1,92 @@
 {
-  "generatedAt": "2026-09-27T09:34:00.003926+00:00",
+  "generatedAt": "2026-09-29T16:27:07.244609+00:00",
   "maxActiveInstruments": 3,
   "macroContext": "Dynamic multi-exchange universe calibrated from overnight news and event flow.",
   "sourceEvents": [
-    "TEST_002"
+    "MACRO_2026-09-29_FOMC_Inter",
+    "MACRO_2026-09-29_US_Consume",
+    "MACRO_2026-09-29_ECB_Moneta",
+    "MACRO_2026-09-29_US_Non-Far",
+    "MACRO_2026-09-29_OPEC+_Mini",
+    "SAMPLE_006",
+    "SAMPLE_007",
+    "SAMPLE_008"
   ],
   "baskets": [
     {
       "rank": 1,
-      "sector": "Energy (Oil & Gas)",
+      "sector": "Technology (Semiconductors)",
       "tickers": [
-        "XLE"
+        "AMD"
       ],
-      "direction": "BUY",
-      "catalyst": "Energy supply/demand dynamics",
-      "impliedOfiTrend": "BUY (Energy supply/demand dynamics)",
-      "winRate": 56.0,
-      "profitFactor": 1.54,
-      "avgFrictionConsumed": 1.25,
-      "conId": 593796,
-      "primaryExchange": "ARCA",
+      "direction": "SELL",
+      "catalyst": "Tech earnings & AI demand profile",
+      "impliedOfiTrend": "SELL (Tech earnings & AI demand profile)",
+      "winRate": 54.4,
+      "profitFactor": 1.5,
+      "avgFrictionConsumed": 1.46,
+      "conId": 4391,
+      "primaryExchange": "NASDAQ",
       "currency": "USD",
       "isEuropean": false,
-      "expectedMovePct": 1.8,
+      "expectedMovePct": 2.6,
       "isRecursiveSwap": false,
       "invalidationReason": "",
       "challengeStatus": "PENDING_OPEN",
-      "sessionPhase": "CLOSED_HOLIDAY",
-      "countdownStr": "Market Closed (Weekend / Holiday)"
+      "sessionPhase": "ACTIVE_EXECUTION",
+      "countdownStr": "Closes in 3h 27m",
+      "isGated": false,
+      "gateReason": ""
     },
     {
       "rank": 2,
-      "sector": "Energy (Oil & Gas)",
+      "sector": "Technology (Semiconductors)",
       "tickers": [
-        "COP"
+        "NVDA"
       ],
-      "direction": "BUY",
-      "catalyst": "Energy supply/demand dynamics",
-      "impliedOfiTrend": "BUY (Energy supply/demand dynamics)",
-      "winRate": 56.0,
-      "profitFactor": 1.54,
-      "avgFrictionConsumed": 1.46,
-      "conId": 4658,
-      "primaryExchange": "NYSE",
+      "direction": "SELL",
+      "catalyst": "Tech earnings & AI demand profile",
+      "impliedOfiTrend": "SELL (Tech earnings & AI demand profile)",
+      "winRate": 54.4,
+      "profitFactor": 1.5,
+      "avgFrictionConsumed": 1.88,
+      "conId": 4815747,
+      "primaryExchange": "NASDAQ",
       "currency": "USD",
       "isEuropean": false,
-      "expectedMovePct": 2.0,
+      "expectedMovePct": 3.0,
       "isRecursiveSwap": false,
       "invalidationReason": "",
       "challengeStatus": "PENDING_OPEN",
-      "sessionPhase": "CLOSED_HOLIDAY",
-      "countdownStr": "Market Closed (Weekend / Holiday)"
+      "sessionPhase": "ACTIVE_EXECUTION",
+      "countdownStr": "Closes in 3h 27m",
+      "isGated": false,
+      "gateReason": ""
     },
     {
       "rank": 3,
-      "sector": "Energy (Oil & Gas)",
+      "sector": "Technology (Semiconductors)",
       "tickers": [
-        "VLO"
+        "SMH"
       ],
-      "direction": "BUY",
-      "catalyst": "Energy supply/demand dynamics",
-      "impliedOfiTrend": "BUY (Energy supply/demand dynamics)",
-      "winRate": 56.0,
-      "profitFactor": 1.54,
+      "direction": "SELL",
+      "catalyst": "Tech earnings & AI demand profile",
+      "impliedOfiTrend": "SELL (Tech earnings & AI demand profile)",
+      "winRate": 54.4,
+      "profitFactor": 1.5,
       "avgFrictionConsumed": 1.67,
-      "conId": 12836,
-      "primaryExchange": "NYSE",
+      "conId": 9599491,
+      "primaryExchange": "NASDAQ",
       "currency": "USD",
       "isEuropean": false,
-      "expectedMovePct": 2.2,
+      "expectedMovePct": 2.5,
       "isRecursiveSwap": false,
       "invalidationReason": "",
       "challengeStatus": "PENDING_OPEN",
-      "sessionPhase": "CLOSED_HOLIDAY",
-      "countdownStr": "Market Closed (Weekend / Holiday)"
+      "sessionPhase": "ACTIVE_EXECUTION",
+      "countdownStr": "Closes in 3h 27m",
+      "isGated": false,
+      "gateReason": ""
     }
   ]
 }

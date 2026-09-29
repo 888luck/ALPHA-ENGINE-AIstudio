@@ -1,220 +1,138 @@
-# 🚀 Alpha Engine — Institutional Multi-Agent Trading Platform
+# 🚀 Alpha Engine — Institutional Multi-Strategy Trading Platform
 
-Alpha Engine is an institutional-grade, **hybrid algorithmic trading framework** designed for quantitative intraday market analysis, real-time Order Flow Imbalance (OFI) tracking, multi-exchange dynamic universe discovery, and automated MiFID II / CBI regulatory compliance.
+Alpha Engine is an institutional-grade, **hybrid algorithmic trading framework** designed for quantitative intraday Order Flow Imbalance (OFI) scalp trading, Post-Earnings Announcement Drift (PEAD) catalyst execution, and automated Central Bank of Ireland (CBI) / MiFID II regulatory compliance on **Interactive Brokers Pro Ireland (IBIE)**.
 
-The platform links an interactive React web dashboard with a co-located Python execution runner situated adjacent to the Interactive Brokers (IBKR) Europe Core Hub in **Frankfurt, Germany (`europe-west3`)**, coordinated securely using a direct Google Firestore real-time data tunnel.
+The platform links an interactive React web dashboard with an asynchronous Python execution edge node co-located adjacent to the Interactive Brokers Europe Core Hub in **Frankfurt, Germany (`europe-west3`)**, coordinated securely using a direct Google Firestore real-time data tunnel.
 
 ---
 
-## 🏗️ 1. Architecture Overview
+## 🏛️ 1. Architecture Overview
 
 ```
                                     ┌────────────────────────────────────────────────────────┐
-                                    │               MULTI-AGENT INTELLIGENCE                │
-                                    │  • News Ingestor (IBKR Bulletins + Macro Calendars)    │
-                                    │  • Generator: NVIDIA NIM (Nemotron 3 Ultra)            │
-                                    │  • Verifier 1: Groq (LLaMA 3.1 70B)                    │
-                                    │  • Verifier 2: Google Gemini 1.5 Flash                 │
-                                    │  • Synthesis Judge: Google Gemini 1.5 Pro              │
-                                    │  • Quota Guard: Rolling-window Rate Limiter            │
+                                    │               PRIMARY SOURCE CATALYSTS                 │
+                                    │  • SEC EDGAR Official Form 8-K Disclosures             │
+                                    │  • ClinicalTrials.gov Protocol Registry v2             │
+                                    │  • OpenFDA Drug Clearances & PDUFA Calendars           │
+                                    │  • Federal Reserve & Macro Event Schedules             │
                                     └───────────────────────────┬────────────────────────────┘
                                                                 │
                                                                 ▼
 ┌─────────────────────────────────┐                 ┌────────────────────────────────────────┐
-│     INTERACTIVE WEB DASHBOARD   │                 │        DYNAMIC UNIVERSE BUILDER        │
-│  • Top N Basket Toggle (1–5)    │                 │  • IBKR Scanner Discovery (5 Profiles) │
-│  • Live/Paper Trading Gate      │◄───────────────►│  • 15% Max Friction Screening          │
-│  • Multi-Model Quota Monitor    │    Firestore    │  • Conviction Scoring & Ranking        │
-│  • AI Strategy Forge & Backtest │    Realtime     │  • Generates dynamic_baskets.json      │
+│     INTERACTIVE WEB DASHBOARD   │                 │      STRATEGY ENGINES & QUANT LAB      │
+│  • LIVE COCKPIT (Risk & Blotter)│                 │  • PEAD Momentum Radar (Large/Mega >$5B│
+│  • QUANT LAB (PEAD & Catalysts) │◄───────────────►│  • L2 Order Flow Imbalance (OFI) Engine│
+│  • Auto-Flatten Toggle (15:45)  │    Firestore    │  • Gate 5 Binary Event Blackout        │
+│  • Emergency Kill Switch        │    Realtime     │  • Watchlist Promotion API             │
 └─────────────────────────────────┘      Tunnel     └───────────────────┬────────────────────┘
                                                                         │
                                                                         ▼
                                                     ┌────────────────────────────────────────┐
+                                                    │       PRE-TRADE RISK & LIFECYCLE       │
+                                                    │  • Daily Capital Ceiling ($10,000)     │
+                                                    │  • Hard Loss Circuit Breaker ($250)    │
+                                                    │  • ADV Participation Cap (1.5% 5m ADV) │
+                                                    │  • Synthetic Fractional Stop Manager   │
+                                                    │  • Breakeven Latch (+1.0x ATR)         │
+                                                    │  • Tiered Scale-Out (+2.0x ATR, 50%)   │
+                                                    │  • Intraday MOC Controller (15:45 EST) │
+                                                    └───────────────────┬────────────────────┘
+                                                                        │
+                                                                        ▼
+                                                    ┌────────────────────────────────────────┐
                                                     │         FRANKFURT EDGE NODE (VM)       │
-                                                    │  • Co-located in europe-west3 (<1ms)   │
-                                                    │  • IBKR Pro Ireland (IBIE) TWS / DMA   │
-                                                    │  • Order Flow Imbalance (OFI) Engine   │
-                                                    │  • Dynamic Risk Manager (1% Max Loss)  │
-                                                    │  • What-If Live Commission Audit       │
-                                                    │  • EOD Post-Session Reasoning Auditor  │
+                                                    │  • IBKR Gateway (Port 4002 / 4001)     │
+                                                    │  • Broker Isolation Airbag (DU vs U)   │
+                                                    │  • Auto-Reconnect (Exponential Backoff)│
+                                                    │  • Live Audit Blotter with TCA (bps)   │
                                                     └────────────────────────────────────────┘
 ```
 
 ---
 
-## ⚡ 2. Core Capabilities & Multi-Agent Pipeline
+## ⚡ 2. Core Institutional Capabilities
 
-### A. Dynamic Universe Discovery & Friction Filtering
-- **No Hardcoded Tickers**: Discovers tradeable instruments dynamically every morning at **04:00 NY / 10:00 CET** using IBKR native `ScannerSubscription` across 5 profiles:
-  - US Major Equities (`STK.US.MAJOR`, `HOT_BY_VOLUME`)
-  - Euronext Paris (`STK.EU.SBF`, `HOT_BY_VOLUME`)
-  - Euronext Amsterdam (`STK.EU.AEB`, `HOT_BY_VOLUME`)
-  - Euronext Brussels (`STK.EU.SB`, `HOT_BY_VOLUME`)
-  - DAX / XETRA (`STK.EU.IBIS`, `TOP_PERC_GAIN`)
-- **15% Friction Ceiling**: Every candidate's estimated transaction costs (IBIE commissions, exchange fees, and half-spread) must consume **< 15%** of the projected intraday price excursion. High-friction candidates are automatically eliminated.
-- **Configurable Focus Basket (1–5 Instruments)**: Toggle how many instruments the system actively trades to respect IBKR basic Level 2 market depth limits (~3 simultaneous streams).
+### A. Pre-Trade Risk Gateway (SEC Rule 15c3-5 & MiFID II)
+Every order must clear five non-bypassable pre-trade risk gates before transmission to the broker wire:
+1. **Router Lock / Kill Switch Check**: Halts orders immediately if the emergency circuit breaker has been tripped.
+2. **Daily Capital Ceiling**: Pre-trade gross capital cap (default `$10,000`). Orders pushing aggregate commitment beyond the limit are blocked before entering the wire.
+3. **Daily Max Loss Cutoff**: Hard currency stop loss (default `$250`). Automatically liquidates positions and locks the execution router if session loss breaches threshold.
+4. **ADV / Market Impact Participation Cap**: Order size cannot exceed **1.5%** of the 5-minute Average Daily Volume (ADV), ensuring minimal market impact.
+5. **Short Locate & Borrow Fee Verification**: Validates shortable shares and rejects borrow rates exceeding **15%** annual fee.
 
-### B. Evolutive Multi-Model LLM Ensemble & Quota Guard
-- **Critic-Verifier Architecture**:
-  - **Generator** (`nvidia/nemotron-3-ultra`): Extracts events, maps GICS sectors, identifies liquid tradeable tickers.
-  - **Verifier 1** (`groq/llama-3.1-70b`): Anti-hallucination screening, economic validity check.
-  - **Verifier 2** (`google/gemini-1.5-flash`): Cross-validation of catalyst duration and directional bias.
-  - **Judge** (`google/gemini-1.5-pro`): Resolves conflicts and synthesizes final conviction.
-- **Rolling-Window Quota Guard (`SimpleQuotaGuard`)**:
-  - Enforces daily and per-minute sliding window limits declared in `model_registry.json`.
-  - Automatically falls back to secondary models or the zero-latency deterministic rules engine when quotas are reached, preventing any execution downtime.
+### B. Post-Earnings Announcement Drift (PEAD) Strategy Engine
+Exploits the classic, empirically verified capital markets anomaly where prices drift in the direction of unexpected earnings announcements:
+- **Liquidity Floor**: Mega/large caps only ($> \$5\text{B}$ market cap), eliminating illiquid penny stocks.
+- **Volume Surge**: Opening 15-minute volume must exceed $> 2.0\times$ 20-day ADV.
+- **Spread Stabilization Window**: 15-minute post-market-open spread stabilization window (09:45 EST) ensures bid-ask spreads normalize below $5\%$ of ATR.
+- **Microstructure OFI Confirmation**: Top-of-book dealer queue accumulation must exceed $+1.5\sigma$.
+- **Gate 5 Binary Event Blackout**: Automatically blocks intraday entries 30 minutes prior to scheduled binary releases (earnings releases, FDA advisory panels, Phase 3 trial readouts) to eliminate unpriced overnight gap risk.
 
-### C. Regulatory Compliance & Risk Architecture
-- **MiFIR / CBI Compliance**: Automatically appends Central Bank of Ireland regulatory tags (`mifid2DecisionMaker`, `mifid2ExecutionTrader`, algorithm IDs) to all European orders.
-- **Pre-Trade What-If Commission Query**: Checks real-time broker commission and initial margin changes using IBKR `whatIf=True` orders before entering trades.
-- **Multi-Currency FX Risk Parity**: Normalizes EUR and USD instrument volatility and stop distances into base account risk capital units.
-- **Circuit Breakers**: Hard-locks order execution if daily cumulative drawdown reaches **2.5%** of reference equity, triggering an automated emergency flush.
-- **Live Trading Safety Gate**: Live real-capital trading is locked by default (Port `4002` Paper). Requires administrator token confirmation (`ALPHA_LIVE_CONFIRMED_2026`) to unlock live DMA execution (Port `4001`).
+### C. Intraday Flattening Controller & Multi-Day Position Lifecycle
+- **Zero Overnight Exposure**: By default, the engine enforces strict Market-on-Close (MOC) discipline, liquidating intraday positions at **15:45 EST** (US Equities) and **17:15 CET** (European Equities).
+- **Opt-in Swing Preservation**: Multi-day catalyst swings (`is_swing=True`, e.g. qualified PEAD drifts) are safely held through the close while intraday scalps are flattened.
+- **Breakeven Latch (+1.0x ATR)**: When unrealized profit reaches $+1.0\times\text{ATR}$, the synthetic stop automatically ratchets to entry price (`stop_price = entry_price`), mathematically eliminating downside risk on the trade.
+- **Tiered Scale-Out (+2.0x ATR)**: At $+2.0\times\text{ATR}$ profit, the engine scales out $50\%$ of the position (`qty * 0.5`) to bank gains and trails the stop on the remaining runner to $+0.5\times\text{ATR}$ locked profit (`entry_price + 0.5 * atr`).
 
-### D. Tier A Event Study Reasoning Backtester
-- Located in `event_backtester.py`.
-- Evaluates AI catalyst predictions against historical price excursion metrics:
-  - **Directional Hit Rate** (predicted BUY/SELL bias vs. realized return)
-  - **Maximum Favorable Excursion (MFE)** and **Maximum Adverse Excursion (MAE)**
-  - **Brier Calibration Score** (measuring probability calibration of confidence scores)
-  - Category attribution (macro, central bank, geopolitical, earnings)
+### D. IBKR Pro Ireland (IBIE) Compliance & Infrastructure
+- **Synthetic Fractional Stop Manager**: IBKR natively rejects `STP` and `STP LMT` orders on decimal/fractional lots. All fractional stops run in-memory within Python and dispatch compliant `MKT` or `LMT DAY` exit orders the millisecond a price breach occurs.
+- **Broker Isolation Airbag**: Enforces strict environment separation (`managedAccounts`). If Paper mode connects to a live production `U...` account, the connection is instantly aborted to prevent accidental real-capital exposure.
+- **Socket Auto-Reconnect Worker**: Exponential backoff ($2\text{s} \to 60\text{s}$) tolerates nightly IBKR server maintenance resets (23:45–00:45 EST, error codes `1100`, `1101`, `1102`, `502`, `504`) without daemon crashes.
+- **MiFIR Reporting shortcodes**: Automatically appends Central Bank of Ireland regulatory tags (`mifid2DecisionMaker`, `mifid2ExecutionTrader`, algorithm IDs) to all European orders.
 
 ---
 
 ## 🚀 3. Quick Start Guide
 
-### Step 1: Run the Interactive Dashboard Locally
+### Step 1: Install Dependencies
 ```bash
-# 1. Install dependencies
+# Frontend & Backend Node dependencies
 npm install
 
-# 2. Start the local dashboard server
-npm run dev
-
-# 3. Open in your browser:
-# http://localhost:3000
-```
-Navigate to the **🧠 AI INTELLIGENCE & UNIVERSE** tab to see the live dynamic universe, focus basket toggle (1–5), live trading gate, and quota guard monitors.
-
-### Step 2: Run the Multi-Agent Intelligence Pipeline in Python
-```bash
-# Run pre-market event ingestion, ensemble analysis, and universe construction
-python main.py --calibration-only
-
-# Override active focus universe size (e.g. Top 2 instruments)
-python main.py --calibration-only --basket-size 2
+# Python dependencies
+pip install -r requirements.txt
 ```
 
-### Step 3: Run the Event Study Backtester
+### Step 2: Build & Start the Production Server
 ```bash
-python -c "from event_backtester import EventStudyBacktester; bt = EventStudyBacktester(); res = bt.evaluate_study(bt.generate_synthetic_study_sample()); print(f'Hit Rate: {res.directional_hit_rate}% | Brier Score: {res.brier_score} | Profit Factor: {res.profit_factor}'); print('Categories:', res.by_category)"
+# Compile TypeScript client and backend
+npm run build
+
+# Start production server on port 3000
+node dist/server.cjs
 ```
+Open **`http://localhost:3000`** in your browser.
 
-### Step 4: Run the Complete Test Suite
+### Step 3: Run the Automated Verification Test Suites
 ```bash
-python -m unittest discover -s tests -v
-```
-Validates:
-1. Event ingestion and MD5 deduplication
-2. Critic-Verifier ensemble evaluation and fallback
-3. SimpleQuotaGuard rate-limiting
-4. UniverseBuilder contract resolution, 15% friction screening, and Top N toggle
-5. Pre-trade What-If commission calculation (US & European tiers)
-6. EventStudyBacktester directional attribution and Brier scoring
-7. ReasoningAuditor post-session lessons learned memory bank
+# 1. Test Core Quant, Intraday Flattening, Breakeven Latch & Socket Reconnect
+py scratch/test_phase3_core.py
 
----
+# 2. Test Live Backend Risk & Execution Blotter Endpoints
+py scratch/test_phase3_endpoints.py
 
-## ☁️ 4. Google Cloud Deployment
-
-The repository includes automated CI/CD deployment configurations for Google Cloud:
-
-### Automated Deployment via Google Cloud Build (`cloudbuild.yaml`)
-Whenever commits are pushed to the `main` branch, Google Cloud Build automatically:
-1. Runs the unit and integration test suite (`tests/test_pipeline.py`).
-2. Executes the pre-market intelligence dry-run (`main.py --calibration-only`).
-3. Provisions or updates the `alpha-edge-node` **Spot VM in Frankfurt (`europe-west3-a`)** with a 2GB swapfile for ~$1.64/month.
-4. Builds and deploys the production dashboard to **Firebase Hosting** (`alpha-engine-ai-studio.web.app`).
-
-### Manual Deployment via Google Cloud Shell
-1. Open [console.cloud.google.com](https://console.cloud.google.com) and activate Cloud Shell (`>_`).
-2. Run the proximity deployer script:
-```bash
-git clone https://github.com/888luck/ALPHA-ENGINE-AIstudio.git
-cd ALPHA-ENGINE-AIstudio
-chmod +x deploy_to_gcp.sh
-./deploy_to_gcp.sh
+# 3. Test Phase 2 PEAD Anomaly & Promotion API
+py scratch/test_phase2_endpoints.py
 ```
 
 ---
 
-## ⚙️ 5. Configuration & Environment Variables
+## 🖥️ 4. Navigation & Interface Overview
 
-Create a `.env` file in the root directory:
-
-```env
-# Interactive Brokers Gateway Configuration
-IBKR_ACCOUNT_NUMBER="DU1234567"     # Paper default
-IBKR_HOST="127.0.0.1"
-IBKR_PORT=4002                      # 4002 = Paper, 4001 = Live
-IBKR_CLIENT_ID=10
-MAX_ACTIVE_INSTRUMENTS=3            # Active universe limit (1-5)
-ALLOW_LIVE_TRADING=false            # Safety lock (true requires live token)
-
-# MiFID II / CBI Regulatory Identifiers
-MIFID2_DECISION_MAKER_ID="ALGO_DEC_992"
-MIFID2_EXECUTION_TRADER_ID="ALGO_EXE_554"
-
-# Multi-Model LLM API Keys (Optional - deterministic rules fallback active if absent)
-NVIDIA_API_KEY=""                   # Generator: Nemotron 3 Ultra
-GROQ_API_KEY=""                     # Verifier 1: LLaMA 3.1 70B
-GEMINI_API_KEY=""                   # Verifier 2 & Judge: Gemini 1.5 Flash/Pro
-
-# Google Firebase / Firestore Tunnel
-FIREBASE_PROJECT_ID="alpha-engine-ai-studio"
-FIREBASE_API_KEY="AIzaSyCq4or4zJ70JUEe2CxukxwafGW_CVHSU_Q"
-```
+- **`LIVE COCKPIT`**:
+  - Pre-Trade Risk Gateway: Daily Capital Ceiling, Hard Daily Loss Cutoff, Fractional Lots toggle.
+  - Auto-Flatten Intraday Controller: 15:45 EST MOC toggle, live NY/Paris clocks, and immediate **"FLATTEN INTRADAY NOW"** button.
+  - PEAD & Intraday Lifecycle indicators: Breakeven Latch (+1.0x ATR) & Tiered Scale-Out (+2.0x ATR).
+  - Emergency Circuit Breaker: Instant kill switch panic button & operator unlock command.
+  - Live Execution Blotter: Audit trail of all fills, order types, slippage in bps, and transaction fees.
+- **`QUANT LAB`**:
+  - Primary Catalyst Feed: SEC 8-K filings, ClinicalTrials.gov study milestones, OpenFDA approvals.
+  - PEAD Momentum Radar: Empirical metrics (EPS Surprise, Rev Surprise, Volume Multiple, L2 OFI Sigma) and one-click **"PROMOTE TO ENGINE WATCHLIST"** button.
+- **`SYSTEM` / `LAUNCHPAD`**:
+  - Multi-exchange live books, connection diagnostics, and telemetry logs.
 
 ---
 
-## 📂 6. Repository File Structure
-
-```
-├── .firebaserc                     # Firebase active project alias bindings
-├── cloudbuild.yaml                 # Google Cloud Build automated CI/CD pipeline
-├── deploy_to_gcp.sh                # Frankfurt europe-west3 Spot VM deployer script
-├── deploy_to_hetzner.sh            # Hetzner Cloud VM provisioner script
-├── dynamic_baskets.json            # Calibrated daily Top N focus universe output
-├── event_backtester.py             # Tier A Event Study Reasoning Backtester
-├── fee_schedule.json               # Cached IBIE European & US fee matrices
-├── feed_registry.json              # Pluggable feed adapter registry (IBKR, FRED, ECB)
-├── firebase.json                   # Firestore database & Firebase Hosting configuration
-├── firebase_sync.py                # Zero-dependency Google Firestore REST client
-├── firestore.rules                 # Hardened Firestore security rules (role-based)
-├── llm_ensemble.py                 # Multi-model Critic-Verifier ensemble & Quota Guard
-├── local_edge_node.py              # Multi-exchange IBKR Scanner & Level 2 OFI collector
-├── main.py                         # Master execution daemon & pre-market calibration
-├── model_registry.json             # Dynamic LLM endpoints, fallbacks & quota limits
-├── news_ingestor.py                # Bulletin ingestion, RSS calendar polling & deduplication
-├── package.json                    # Dashboard React, Vite, and Express dependencies
-├── reasoning_auditor.py            # Post-session attribution & lessons learned memory bank
-├── risk_engine.py                  # Dynamic Risk Management (DRM) & What-If commission query
-├── server.ts                       # Express backend proxy & Vite development server
-├── universe_builder.py             # Contract resolution, 15% friction filter & ranking
-├── universe_models.py              # Strict dataclass schemas for events & universe
-├── src/
-│   ├── App.tsx                     # Main dashboard container & live navigation
-│   └── components/
-│       ├── Dashboard.tsx           # Execution metrics, order flow & circuit breaker UI
-│       └── GcpCompanion.tsx        # AI Intelligence Tab, Universe Manager & Cloud panel
-└── tests/
-    ├── __init__.py
-    └── test_pipeline.py            # Complete 7-part unit and integration test suite
-```
-
----
-
-## ⚖️ License & Disclaimers
-
-Alpha Engine is built for quantitative algorithmic research and compliance-first execution. 
-**Trading financial instruments involves significant risk of loss.** Live execution requires explicit administrator confirmation and adherence to broker margin and MiFID II requirements.
+## 📖 5. Documentation & Resources
+- **Operational Runbook**: See [`docs/RUNBOOK.md`](docs/RUNBOOK.md) for step-by-step newcomer instructions, daily session schedules, and emergency response procedures.
+- **Phase 3 Walkthrough**: See [`walkthrough.md`](walkthrough.md) for mathematical proofs, test output logs, and regulatory compliance details.

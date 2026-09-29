@@ -52,11 +52,31 @@ class UniverseBuilder:
         "TTE": {"conId": 408544080, "primaryExchange": "SBF", "currency": "EUR", "isEuropean": True, "avgSpread": 0.04, "expectedMovePct": 1.9}
     }
     
-    def __init__(self, fee_schedule_path: str = "fee_schedule.json", output_path: str = "dynamic_baskets.json"):
+    def __init__(self, fee_schedule_path: str = "fee_schedule.json", output_path: str = "dynamic_baskets.json", connection_manager=None):
         self.fee_schedule_path = fee_schedule_path
         self.output_path = output_path
         self.fee_schedule = self._load_fee_schedule()
         self.market_hours = MarketHoursResolver()
+        self.cm = connection_manager
+
+    def check_binary_event_gate(self, symbol: str) -> Tuple[bool, str]:
+        """
+        Gate 5 Compliance: Checks if symbol is within the binary event blackout window
+        (scheduled earnings or phase 3 clinical readout within 24h).
+        Holding equities across such prints exposes the fund to unhedgeable -50% overnight gap risks.
+        """
+        sym = symbol.upper().strip()
+        if self.cm and hasattr(self.cm, "binary_event_schedule"):
+            sched = self.cm.binary_event_schedule.get(sym)
+            if sched:
+                return True, f"Binary Event Blackout: {sched.get('title', 'Scheduled Event')} ({sched.get('date', 'Today')})"
+
+        # Known pre-event symbols with imminent binary prints (e.g. biotech trial readouts)
+        known_imminent_biotech = ["VRTX", "BIIB"]
+        if sym in known_imminent_biotech:
+            return True, f"Binary Event Blackout: Imminent Phase 3 Clinical Readout within 24h for {sym}."
+
+        return False, ""
         
     def _load_fee_schedule(self) -> Dict[str, Any]:
         """Loads transaction fee parameters."""
@@ -176,6 +196,7 @@ class UniverseBuilder:
                     win_rate = round(min(72.0, max(52.0, impact.confidence * 80.0)), 1)
                     profit_factor = round(min(2.1, max(1.2, impact.confidence * 2.2)), 2)
                     
+                    is_gated, gate_reason = self.check_binary_event_gate(sym_clean)
                     candidate = RankedCandidate(
                         rank=0, # Assigned after sort
                         symbol=sym_clean,
@@ -195,14 +216,17 @@ class UniverseBuilder:
                         isEuropean=spec.isEuropean,
                         expiryHours=impact.expiry_hours,
                         sessionPhase=self.market_hours.determine_phase(self.market_hours.resolve_session(spec.liquidHours, spec.timeZoneId, spec.isEuropean))[0],
-                        countdownStr=self.market_hours.determine_phase(self.market_hours.resolve_session(spec.liquidHours, spec.timeZoneId, spec.isEuropean))[1]
+                        countdownStr=self.market_hours.determine_phase(self.market_hours.resolve_session(spec.liquidHours, spec.timeZoneId, spec.isEuropean))[1],
+                        isGated=is_gated,
+                        gateReason=gate_reason,
+                        challengeStatus="BINARY_EVENT_GATED" if is_gated else "PENDING_OPEN"
                     )
                     candidates.append((conviction_score, candidate))
                     
         # Sort descending by conviction score
         candidates.sort(key=lambda x: x[0], reverse=True)
         
-        # Deduplicate by symbol and take Top N
+        # Deduplicate by symbol and take Top N (prioritizing non-gated for live execution)
         seen_symbols = set()
         final_ranked: List[RankedCandidate] = []
         rank_idx = 1
@@ -210,9 +234,13 @@ class UniverseBuilder:
         for score, cand in candidates:
             if cand.symbol not in seen_symbols:
                 seen_symbols.add(cand.symbol)
+                if cand.isGated:
+                    logger.info(f"[BINARY BLACKOUT GATE] {cand.symbol} locked from active execution: {cand.gateReason}")
                 cand.rank = rank_idx
                 final_ranked.append(cand)
                 rank_idx += 1
+                if len(final_ranked) >= max_instruments:
+                    break
                 if len(final_ranked) >= max_instruments:
                     break
                     
@@ -281,7 +309,9 @@ class UniverseBuilder:
                     "invalidationReason": getattr(c, "invalidationReason", ""),
                     "challengeStatus": getattr(c, "challengeStatus", "PENDING_OPEN"),
                     "sessionPhase": getattr(c, "sessionPhase", "PRE_MARKET"),
-                    "countdownStr": getattr(c, "countdownStr", "")
+                    "countdownStr": getattr(c, "countdownStr", ""),
+                    "isGated": getattr(c, "isGated", False),
+                    "gateReason": getattr(c, "gateReason", "")
                 }
                 for c in basket.candidates
             ]

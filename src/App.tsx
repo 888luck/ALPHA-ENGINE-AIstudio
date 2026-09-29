@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import Dashboard from "./components/Dashboard";
 import Launchpad from "./components/Launchpad";
-import { Sun, Moon, Activity, Tag, Globe, HelpCircle, LayoutGrid, Home } from "lucide-react";
+import { LiveCockpit } from "./components/LiveCockpit";
+import { QuantResearchLab } from "./components/QuantResearchLab";
+import { Sun, Moon, Activity, Tag, Globe, HelpCircle, LayoutGrid, Home, ShieldAlert, Layers } from "lucide-react";
 
 export default function App() {
   // Safe default persistent theme
@@ -10,13 +12,13 @@ export default function App() {
     return (saved as "dark" | "light") || "dark";
   });
 
-  const [view, setView] = useState<"launchpad" | "dashboard">(() => {
+  const [view, setView] = useState<"cockpit" | "lab" | "dashboard" | "launchpad">(() => {
     const saved = localStorage.getItem("alpha_dashboard_view");
-    return (saved as "launchpad" | "dashboard") || "launchpad";
+    return (saved as any) || "cockpit";
   });
   const [navTarget, setNavTarget] = useState<string | null>(null);
 
-  const handleNavigate = (newView: "launchpad" | "dashboard", target?: string) => {
+  const handleNavigate = (newView: "cockpit" | "lab" | "dashboard" | "launchpad", target?: string) => {
     setView(newView);
     localStorage.setItem("alpha_dashboard_view", newView);
     if (target) {
@@ -395,24 +397,60 @@ export default function App() {
             )}
           </button>
 
-          {/* View Switcher Button */}
-          <button 
-            type="button"
-            onClick={toggleView}
-            className="p-2 rounded-md transition-all duration-200 cursor-pointer text-[#00ff88] hover:text-[#00ff88]/80 border border-[#00ff88]/20 bg-[#00ff88]/5 hover:bg-[#00ff88]/10 flex items-center gap-2 text-[10px] font-mono tracking-wider font-semibold"
-          >
-            {view === "launchpad" ? (
-              <>
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span>DASHBOARD</span>
-              </>
-            ) : (
-              <>
-                <Home className="w-3.5 h-3.5" />
-                <span>LAUNCHPAD</span>
-              </>
-            )}
-          </button>
+          {/* Institutional Mode Switchers */}
+          <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-lg border border-white/10">
+            <button
+              type="button"
+              onClick={() => handleNavigate("cockpit")}
+              className={`px-3 py-1.5 rounded-md transition-all duration-200 cursor-pointer text-[10px] font-mono tracking-wider font-bold flex items-center gap-1.5 ${
+                view === "cockpit"
+                  ? "bg-rose-600 text-white shadow-md shadow-rose-950/50"
+                  : "text-slate-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span>LIVE COCKPIT</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleNavigate("lab")}
+              className={`px-3 py-1.5 rounded-md transition-all duration-200 cursor-pointer text-[10px] font-mono tracking-wider font-bold flex items-center gap-1.5 ${
+                view === "lab"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-950/50"
+                  : "text-slate-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>QUANT LAB</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleNavigate("dashboard")}
+              className={`px-2.5 py-1.5 rounded-md transition-all duration-200 cursor-pointer text-[10px] font-mono tracking-wider font-semibold flex items-center gap-1.5 ${
+                view === "dashboard"
+                  ? "bg-emerald-600 text-white"
+                  : "text-slate-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>SYSTEM</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleNavigate("launchpad")}
+              className={`px-2.5 py-1.5 rounded-md transition-all duration-200 cursor-pointer text-[10px] font-mono tracking-wider font-semibold flex items-center gap-1.5 ${
+                view === "launchpad"
+                  ? "bg-slate-700 text-white"
+                  : "text-slate-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span>HUB</span>
+            </button>
+          </div>
 
           {/* Interactive Help & Runbook Guide Button */}
           <button 
@@ -421,18 +459,17 @@ export default function App() {
             className="p-2 rounded-md transition-all duration-200 cursor-pointer text-[#00ff88] hover:text-[#00ff88]/80 border border-[#00ff88]/20 bg-[#00ff88]/5 hover:bg-[#00ff88]/10 flex items-center gap-2 text-[10px] font-mono tracking-wider font-semibold"
           >
             <HelpCircle className="w-3.5 h-3.5" />
-            <span>HOW-TO USE & RUNBOOK</span>
+            <span>RUNBOOK</span>
           </button>
         </div>
       </header>
 
       {/* Render the full Slate & Cyber-Green interactive dashboard element */}
       <main className="max-w-7xl mx-auto p-4 sm:p-6 transition-all duration-200">
-        {view === "launchpad" ? (
-          <Launchpad systemState={systemState} onNavigate={handleNavigate} />
-        ) : (
-          <Dashboard onNavigate={handleNavigate} navTarget={navTarget} />
-        )}
+        {view === "cockpit" && <LiveCockpit systemState={systemState} onRefresh={() => {}} />}
+        {view === "lab" && <QuantResearchLab />}
+        {view === "dashboard" && <Dashboard onNavigate={handleNavigate} navTarget={navTarget} />}
+        {view === "launchpad" && <Launchpad systemState={systemState} onNavigate={handleNavigate} />}
       </main>
 
       {/* Modern, Highly Graphic Onboarding Modal Overlay */}

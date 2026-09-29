@@ -113,6 +113,8 @@ class RankedCandidate:
     challengeStatus: str = "PENDING_OPEN"
     sessionPhase: str = "PRE_MARKET"
     countdownStr: str = ""
+    isGated: bool = False
+    gateReason: str = ""
 
 
 @dataclass
