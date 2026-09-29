@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   XCircle,
   ExternalLink,
@@ -52,11 +52,21 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
   const [activeTab, setActiveTab] = useState<"broker" | "cloud" | "ai" | "feeds">("ai");
 
   // Form State for Broker
-  const [accountNumber, setAccountNumber] = useState(settings?.ibkrAccountNumber || "DU1234567");
-  const [ibkrPort, setIbkrPort] = useState(settings?.ibkrPort || 4002);
-  const [ibkrClientId, setIbkrClientId] = useState(settings?.ibkrClientId || 1);
-  const [mifidMaker, setMifidMaker] = useState(settings?.mifid2DecisionMaker || "ALGO_DEC_992");
-  const [mifidTrader, setMifidTrader] = useState(settings?.mifid2ExecutionTrader || "ALGO_EXE_554");
+  const [accountNumber, setAccountNumber] = useState(
+    () => localStorage.getItem("ALPHA_IBKR_ACCOUNT") || settings?.ibkrAccountNumber || "DU1234567"
+  );
+  const [ibkrPort, setIbkrPort] = useState(
+    () => Number(localStorage.getItem("ALPHA_IBKR_PORT")) || settings?.ibkrPort || 4002
+  );
+  const [ibkrClientId, setIbkrClientId] = useState(
+    () => Number(localStorage.getItem("ALPHA_IBKR_CLIENT_ID")) || settings?.ibkrClientId || 1
+  );
+  const [mifidMaker, setMifidMaker] = useState(
+    () => localStorage.getItem("ALPHA_MIFID_MAKER") || settings?.mifid2DecisionMaker || "ALGO_DEC_992"
+  );
+  const [mifidTrader, setMifidTrader] = useState(
+    () => localStorage.getItem("ALPHA_MIFID_TRADER") || settings?.mifid2ExecutionTrader || "ALGO_EXE_554"
+  );
 
   // Form State for Cloud
   const [projectId, setProjectId] = useState("alpha-engine-ai-studio");
@@ -64,21 +74,70 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
   const [webApiKey, setWebApiKey] = useState("AIzaSyCq4or4zJ70JUEe2CxukxwafGW_CVHSU_Q");
 
   // Form State for AI
-  const [geminiKey, setGeminiKey] = useState(customGeminiApiKey || settings?.geminiApiKey || "");
-  const [groqKey, setGroqKey] = useState(settings?.customAiApiKey || "");
-  const [nvidiaKey, setNvidiaKey] = useState(settings?.nvidiaApiKey || "");
-  const [openaiKey, setOpenaiKey] = useState(settings?.openaiApiKey || "");
-  const [anthropicKey, setAnthropicKey] = useState(settings?.anthropicApiKey || "");
-  const [customBaseUrl, setCustomBaseUrl] = useState(settings?.customAiBaseUrl || "http://localhost:11434/v1");
-  const [customModelName, setCustomModelName] = useState(settings?.customAiModelName || "llama3.1");
+  const [geminiKey, setGeminiKey] = useState(
+    () => localStorage.getItem("ALPHA_GEMINI_API_KEY_OVERRIDE") || customGeminiApiKey || settings?.geminiApiKey || ""
+  );
+  const [groqKey, setGroqKey] = useState(
+    () => localStorage.getItem("ALPHA_GROQ_API_KEY_OVERRIDE") || settings?.customAiApiKey || ""
+  );
+  const [nvidiaKey, setNvidiaKey] = useState(
+    () => localStorage.getItem("ALPHA_NVIDIA_API_KEY_OVERRIDE") || settings?.nvidiaApiKey || ""
+  );
+  const [openaiKey, setOpenaiKey] = useState(
+    () => localStorage.getItem("ALPHA_OPENAI_API_KEY_OVERRIDE") || settings?.openaiApiKey || ""
+  );
+  const [anthropicKey, setAnthropicKey] = useState(
+    () => localStorage.getItem("ALPHA_ANTHROPIC_API_KEY_OVERRIDE") || settings?.anthropicApiKey || ""
+  );
+  const [customBaseUrl, setCustomBaseUrl] = useState(
+    () => localStorage.getItem("ALPHA_CUSTOM_AI_BASE_URL") || settings?.customAiBaseUrl || "http://localhost:11434/v1"
+  );
+  const [customModelName, setCustomModelName] = useState(
+    () => localStorage.getItem("ALPHA_CUSTOM_AI_MODEL_NAME") || settings?.customAiModelName || "llama3.1"
+  );
 
   // Form State for Feeds
-  const [openFdaKey, setOpenFdaKey] = useState(settings?.openFdaApiKey || "");
-  const [fredKey, setFredKey] = useState(settings?.fredApiKey || "");
-  const [patentsKey, setPatentsKey] = useState(settings?.patentsApiKey || "");
-  const [secUserAgent, setSecUserAgent] = useState(
-    settings?.secUserAgent || "AlphaEngine/2.0 (InstitutionalResearch; contact@alphaengine.internal)"
+  const [openFdaKey, setOpenFdaKey] = useState(
+    () => localStorage.getItem("ALPHA_OPENFDA_API_KEY") || settings?.openFdaApiKey || ""
   );
+  const [fredKey, setFredKey] = useState(
+    () => localStorage.getItem("ALPHA_FRED_API_KEY") || settings?.fredApiKey || ""
+  );
+  const [patentsKey, setPatentsKey] = useState(
+    () => localStorage.getItem("ALPHA_PATENTS_API_KEY") || settings?.patentsApiKey || ""
+  );
+  const [secUserAgent, setSecUserAgent] = useState(
+    () => localStorage.getItem("ALPHA_SEC_USER_AGENT") || settings?.secUserAgent || "AlphaEngine/2.0 (InstitutionalResearch; contact@alphaengine.internal)"
+  );
+
+  // Sync state whenever modal is opened
+  useEffect(() => {
+    if (isOpen) {
+      setGeminiKey(localStorage.getItem("ALPHA_GEMINI_API_KEY_OVERRIDE") || customGeminiApiKey || settings?.geminiApiKey || "");
+      setGroqKey(localStorage.getItem("ALPHA_GROQ_API_KEY_OVERRIDE") || settings?.customAiApiKey || "");
+      setNvidiaKey(localStorage.getItem("ALPHA_NVIDIA_API_KEY_OVERRIDE") || settings?.nvidiaApiKey || "");
+      setOpenaiKey(localStorage.getItem("ALPHA_OPENAI_API_KEY_OVERRIDE") || settings?.openaiApiKey || "");
+      setAnthropicKey(localStorage.getItem("ALPHA_ANTHROPIC_API_KEY_OVERRIDE") || settings?.anthropicApiKey || "");
+      setCustomBaseUrl(localStorage.getItem("ALPHA_CUSTOM_AI_BASE_URL") || settings?.customAiBaseUrl || "http://localhost:11434/v1");
+      setCustomModelName(localStorage.getItem("ALPHA_CUSTOM_AI_MODEL_NAME") || settings?.customAiModelName || "llama3.1");
+
+      setOpenFdaKey(localStorage.getItem("ALPHA_OPENFDA_API_KEY") || settings?.openFdaApiKey || "");
+      setFredKey(localStorage.getItem("ALPHA_FRED_API_KEY") || settings?.fredApiKey || "");
+      setPatentsKey(localStorage.getItem("ALPHA_PATENTS_API_KEY") || settings?.patentsApiKey || "");
+      setSecUserAgent(localStorage.getItem("ALPHA_SEC_USER_AGENT") || settings?.secUserAgent || "AlphaEngine/2.0 (InstitutionalResearch; contact@alphaengine.internal)");
+
+      setAccountNumber(localStorage.getItem("ALPHA_IBKR_ACCOUNT") || settings?.ibkrAccountNumber || "DU1234567");
+      setIbkrPort(Number(localStorage.getItem("ALPHA_IBKR_PORT")) || settings?.ibkrPort || 4002);
+      setIbkrClientId(Number(localStorage.getItem("ALPHA_IBKR_CLIENT_ID")) || settings?.ibkrClientId || 1);
+      setMifidMaker(localStorage.getItem("ALPHA_MIFID_MAKER") || settings?.mifid2DecisionMaker || "ALGO_DEC_992");
+      setMifidTrader(localStorage.getItem("ALPHA_MIFID_TRADER") || settings?.mifid2ExecutionTrader || "ALGO_EXE_554");
+    }
+  }, [isOpen, settings, customGeminiApiKey]);
+
+  // Save status banners
+  const [saveSuccessAi, setSaveSuccessAi] = useState(false);
+  const [saveSuccessBroker, setSaveSuccessBroker] = useState(false);
+  const [saveSuccessFeeds, setSaveSuccessFeeds] = useState(false);
 
   // Masking toggles
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
@@ -423,29 +482,107 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
 
   // Save Handlers
   const handleSaveBroker = async () => {
-    await onSaveSetting("ibkrAccountNumber", accountNumber);
-    await onSaveSetting("ibkrPort", Number(ibkrPort));
-    await onSaveSetting("ibkrClientId", Number(ibkrClientId));
-    await onSaveSetting("mifid2DecisionMaker", mifidMaker);
-    await onSaveSetting("mifid2ExecutionTrader", mifidTrader);
+    localStorage.setItem("ALPHA_IBKR_ACCOUNT", accountNumber);
+    localStorage.setItem("ALPHA_IBKR_PORT", String(ibkrPort));
+    localStorage.setItem("ALPHA_IBKR_CLIENT_ID", String(ibkrClientId));
+    localStorage.setItem("ALPHA_MIFID_MAKER", mifidMaker);
+    localStorage.setItem("ALPHA_MIFID_TRADER", mifidTrader);
+
+    const updates = {
+      ibkrAccountNumber: accountNumber,
+      ibkrPort: Number(ibkrPort),
+      ibkrClientId: Number(ibkrClientId),
+      mifid2DecisionMaker: mifidMaker,
+      mifid2ExecutionTrader: mifidTrader,
+    };
+
+    if (onSaveMultipleSettings) {
+      await onSaveMultipleSettings(updates);
+    } else {
+      for (const [k, v] of Object.entries(updates)) {
+        await onSaveSetting(k, v).catch(() => {});
+      }
+    }
+
+    setSaveSuccessBroker(true);
+    setTimeout(() => setSaveSuccessBroker(false), 3000);
   };
 
   const handleSaveAiKeys = async () => {
-    if (geminiKey) onSaveGeminiKey(geminiKey);
-    await onSaveSetting("geminiApiKey", geminiKey);
-    await onSaveSetting("customAiApiKey", groqKey);
-    await onSaveSetting("nvidiaApiKey", nvidiaKey);
-    await onSaveSetting("openaiApiKey", openaiKey);
-    await onSaveSetting("anthropicApiKey", anthropicKey);
-    await onSaveSetting("customAiBaseUrl", customBaseUrl);
-    await onSaveSetting("customAiModelName", customModelName);
+    const trimmedGemini = geminiKey.trim();
+    const trimmedGroq = groqKey.trim();
+    const trimmedNvidia = nvidiaKey.trim();
+    const trimmedOpenai = openaiKey.trim();
+    const trimmedAnthropic = anthropicKey.trim();
+    const trimmedBaseUrl = customBaseUrl.trim();
+    const trimmedModelName = customModelName.trim();
+
+    // Persist reliably in browser local storage
+    if (trimmedGemini) localStorage.setItem("ALPHA_GEMINI_API_KEY_OVERRIDE", trimmedGemini);
+    else localStorage.removeItem("ALPHA_GEMINI_API_KEY_OVERRIDE");
+
+    if (trimmedGroq) localStorage.setItem("ALPHA_GROQ_API_KEY_OVERRIDE", trimmedGroq);
+    else localStorage.removeItem("ALPHA_GROQ_API_KEY_OVERRIDE");
+
+    if (trimmedNvidia) localStorage.setItem("ALPHA_NVIDIA_API_KEY_OVERRIDE", trimmedNvidia);
+    else localStorage.removeItem("ALPHA_NVIDIA_API_KEY_OVERRIDE");
+
+    if (trimmedOpenai) localStorage.setItem("ALPHA_OPENAI_API_KEY_OVERRIDE", trimmedOpenai);
+    else localStorage.removeItem("ALPHA_OPENAI_API_KEY_OVERRIDE");
+
+    if (trimmedAnthropic) localStorage.setItem("ALPHA_ANTHROPIC_API_KEY_OVERRIDE", trimmedAnthropic);
+    else localStorage.removeItem("ALPHA_ANTHROPIC_API_KEY_OVERRIDE");
+
+    localStorage.setItem("ALPHA_CUSTOM_AI_BASE_URL", trimmedBaseUrl);
+    localStorage.setItem("ALPHA_CUSTOM_AI_MODEL_NAME", trimmedModelName);
+
+    if (onSaveGeminiKey) onSaveGeminiKey(trimmedGemini);
+
+    const updates = {
+      geminiApiKey: trimmedGemini,
+      customAiApiKey: trimmedGroq,
+      nvidiaApiKey: trimmedNvidia,
+      openaiApiKey: trimmedOpenai,
+      anthropicApiKey: trimmedAnthropic,
+      customAiBaseUrl: trimmedBaseUrl,
+      customAiModelName: trimmedModelName,
+    };
+
+    if (onSaveMultipleSettings) {
+      await onSaveMultipleSettings(updates);
+    } else {
+      for (const [k, v] of Object.entries(updates)) {
+        await onSaveSetting(k, v).catch(() => {});
+      }
+    }
+
+    setSaveSuccessAi(true);
+    setTimeout(() => setSaveSuccessAi(false), 3000);
   };
 
   const handleSaveFeedSettings = async () => {
-    await onSaveSetting("openFdaApiKey", openFdaKey);
-    await onSaveSetting("fredApiKey", fredKey);
-    await onSaveSetting("patentsApiKey", patentsKey);
-    await onSaveSetting("secUserAgent", secUserAgent);
+    localStorage.setItem("ALPHA_OPENFDA_API_KEY", openFdaKey.trim());
+    localStorage.setItem("ALPHA_FRED_API_KEY", fredKey.trim());
+    localStorage.setItem("ALPHA_PATENTS_API_KEY", patentsKey.trim());
+    localStorage.setItem("ALPHA_SEC_USER_AGENT", secUserAgent.trim());
+
+    const updates = {
+      openFdaApiKey: openFdaKey.trim(),
+      fredApiKey: fredKey.trim(),
+      patentsApiKey: patentsKey.trim(),
+      secUserAgent: secUserAgent.trim(),
+    };
+
+    if (onSaveMultipleSettings) {
+      await onSaveMultipleSettings(updates);
+    } else {
+      for (const [k, v] of Object.entries(updates)) {
+        await onSaveSetting(k, v).catch(() => {});
+      }
+    }
+
+    setSaveSuccessFeeds(true);
+    setTimeout(() => setSaveSuccessFeeds(false), 3000);
   };
 
   return (
@@ -667,9 +804,14 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                 <button
                   type="button"
                   onClick={handleSaveBroker}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-mono font-bold cursor-pointer transition shadow-xs"
+                  className={`px-5 py-2.5 rounded-xl text-xs font-mono font-bold cursor-pointer transition shadow-xs flex items-center gap-1.5 ${
+                    saveSuccessBroker
+                      ? "bg-emerald-600 text-white"
+                      : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                  }`}
                 >
-                  Save Broker Configuration
+                  {saveSuccessBroker ? <CheckCircle2 className="w-4 h-4" /> : null}
+                  {saveSuccessBroker ? "Broker Configuration Saved" : "Save Broker Configuration"}
                 </button>
               </div>
 
@@ -1065,9 +1207,14 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                 <button
                   type="button"
                   onClick={handleSaveAiKeys}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-mono font-bold cursor-pointer transition shadow-xs"
+                  className={`px-5 py-2.5 rounded-xl text-xs font-mono font-bold cursor-pointer transition shadow-xs flex items-center gap-1.5 ${
+                    saveSuccessAi
+                      ? "bg-emerald-600 text-white"
+                      : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                  }`}
                 >
-                  Save AI Model Credentials
+                  {saveSuccessAi ? <CheckCircle2 className="w-4 h-4" /> : null}
+                  {saveSuccessAi ? "AI Credentials Saved & Locked" : "Save AI Model Credentials"}
                 </button>
               </div>
             </div>
@@ -1483,9 +1630,14 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                 <button
                   type="button"
                   onClick={handleSaveFeedSettings}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-mono font-bold cursor-pointer transition shadow-xs"
+                  className={`px-5 py-2.5 rounded-xl text-xs font-mono font-bold cursor-pointer transition shadow-xs flex items-center gap-1.5 ${
+                    saveSuccessFeeds
+                      ? "bg-emerald-700 text-white"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                  }`}
                 >
-                  Save Feed Preferences
+                  {saveSuccessFeeds ? <CheckCircle2 className="w-4 h-4" /> : null}
+                  {saveSuccessFeeds ? "Feed Preferences Saved" : "Save Feed Preferences"}
                 </button>
               </div>
             </div>

@@ -419,12 +419,24 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
     return localStorage.getItem("ALPHA_GEMINI_API_KEY_OVERRIDE") || "";
   });
   const [serverHasKey, setServerHasKey] = useState<boolean | null>(null);
-  const [openaiApiKey, setOpenaiApiKey] = useState<string>("");
-  const [anthropicApiKey, setAnthropicApiKey] = useState<string>("");
-  const [nvidiaApiKey, setNvidiaApiKey] = useState<string>("");
-  const [customAiApiKey, setCustomAiApiKey] = useState<string>("");
-  const [customAiBaseUrl, setCustomAiBaseUrl] = useState<string>("");
-  const [customAiModelName, setCustomAiModelName] = useState<string>("");
+  const [openaiApiKey, setOpenaiApiKey] = useState<string>(() => {
+    return localStorage.getItem("ALPHA_OPENAI_API_KEY_OVERRIDE") || "";
+  });
+  const [anthropicApiKey, setAnthropicApiKey] = useState<string>(() => {
+    return localStorage.getItem("ALPHA_ANTHROPIC_API_KEY_OVERRIDE") || "";
+  });
+  const [nvidiaApiKey, setNvidiaApiKey] = useState<string>(() => {
+    return localStorage.getItem("ALPHA_NVIDIA_API_KEY_OVERRIDE") || "";
+  });
+  const [customAiApiKey, setCustomAiApiKey] = useState<string>(() => {
+    return localStorage.getItem("ALPHA_GROQ_API_KEY_OVERRIDE") || "";
+  });
+  const [customAiBaseUrl, setCustomAiBaseUrl] = useState<string>(() => {
+    return localStorage.getItem("ALPHA_CUSTOM_AI_BASE_URL") || "";
+  });
+  const [customAiModelName, setCustomAiModelName] = useState<string>(() => {
+    return localStorage.getItem("ALPHA_CUSTOM_AI_MODEL_NAME") || "";
+  });
   const [selectedAiProvider, setSelectedAiProvider] = useState<string>("gemini-flash");
   const [openaiConfigured, setOpenaiConfigured] = useState<boolean>(false);
   const [anthropicConfigured, setAnthropicConfigured] = useState<boolean>(false);
@@ -528,6 +540,132 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
       }
     } catch (e) {
       console.error("Failed saving inline setting:", e);
+    } finally {
+      setIsSavingInlineSetting(false);
+    }
+  };
+
+  const saveMultipleSettings = async (updates: Record<string, any>) => {
+    setIsSavingInlineSetting(true);
+    try {
+      if (updates.geminiApiKey !== undefined) {
+        if (updates.geminiApiKey) localStorage.setItem("ALPHA_GEMINI_API_KEY_OVERRIDE", updates.geminiApiKey);
+        else localStorage.removeItem("ALPHA_GEMINI_API_KEY_OVERRIDE");
+        setCustomGeminiApiKey(updates.geminiApiKey);
+      }
+      if (updates.customAiApiKey !== undefined) {
+        if (updates.customAiApiKey) localStorage.setItem("ALPHA_GROQ_API_KEY_OVERRIDE", updates.customAiApiKey);
+        else localStorage.removeItem("ALPHA_GROQ_API_KEY_OVERRIDE");
+        setCustomAiApiKey(updates.customAiApiKey);
+      }
+      if (updates.nvidiaApiKey !== undefined) {
+        if (updates.nvidiaApiKey) localStorage.setItem("ALPHA_NVIDIA_API_KEY_OVERRIDE", updates.nvidiaApiKey);
+        else localStorage.removeItem("ALPHA_NVIDIA_API_KEY_OVERRIDE");
+        setNvidiaApiKey(updates.nvidiaApiKey);
+      }
+      if (updates.openaiApiKey !== undefined) {
+        if (updates.openaiApiKey) localStorage.setItem("ALPHA_OPENAI_API_KEY_OVERRIDE", updates.openaiApiKey);
+        else localStorage.removeItem("ALPHA_OPENAI_API_KEY_OVERRIDE");
+        setOpenaiApiKey(updates.openaiApiKey);
+      }
+      if (updates.anthropicApiKey !== undefined) {
+        if (updates.anthropicApiKey) localStorage.setItem("ALPHA_ANTHROPIC_API_KEY_OVERRIDE", updates.anthropicApiKey);
+        else localStorage.removeItem("ALPHA_ANTHROPIC_API_KEY_OVERRIDE");
+        setAnthropicApiKey(updates.anthropicApiKey);
+      }
+      if (updates.customAiBaseUrl !== undefined) {
+        localStorage.setItem("ALPHA_CUSTOM_AI_BASE_URL", updates.customAiBaseUrl);
+        setCustomAiBaseUrl(updates.customAiBaseUrl);
+      }
+      if (updates.customAiModelName !== undefined) {
+        localStorage.setItem("ALPHA_CUSTOM_AI_MODEL_NAME", updates.customAiModelName);
+        setCustomAiModelName(updates.customAiModelName);
+      }
+      if (updates.ibkrAccountNumber !== undefined) {
+        localStorage.setItem("ALPHA_IBKR_ACCOUNT", updates.ibkrAccountNumber);
+        setEditAccount(updates.ibkrAccountNumber);
+      }
+      if (updates.ibkrPort !== undefined) {
+        localStorage.setItem("ALPHA_IBKR_PORT", String(updates.ibkrPort));
+        setEditIbkrPort(Number(updates.ibkrPort));
+      }
+      if (updates.ibkrClientId !== undefined) {
+        localStorage.setItem("ALPHA_IBKR_CLIENT_ID", String(updates.ibkrClientId));
+        setEditIbkrClientId(Number(updates.ibkrClientId));
+      }
+      if (updates.mifid2DecisionMaker !== undefined) {
+        localStorage.setItem("ALPHA_MIFID_MAKER", updates.mifid2DecisionMaker);
+        setEditDecisionMaker(updates.mifid2DecisionMaker);
+      }
+      if (updates.mifid2ExecutionTrader !== undefined) {
+        localStorage.setItem("ALPHA_MIFID_TRADER", updates.mifid2ExecutionTrader);
+        setEditTrader(updates.mifid2ExecutionTrader);
+      }
+      if (updates.openFdaApiKey !== undefined) {
+        localStorage.setItem("ALPHA_OPENFDA_API_KEY", updates.openFdaApiKey);
+      }
+      if (updates.fredApiKey !== undefined) {
+        localStorage.setItem("ALPHA_FRED_API_KEY", updates.fredApiKey);
+      }
+      if (updates.patentsApiKey !== undefined) {
+        localStorage.setItem("ALPHA_PATENTS_API_KEY", updates.patentsApiKey);
+      }
+      if (updates.secUserAgent !== undefined) {
+        localStorage.setItem("ALPHA_SEC_USER_AGENT", updates.secUserAgent);
+      }
+
+      setSettings((prev: any) => ({
+        ...(prev || {}),
+        ...updates
+      }));
+
+      const updatedValues = {
+        ibkrAccountNumber: editAccount,
+        mifid2DecisionMaker: editDecisionMaker,
+        mifid2ExecutionTrader: editTrader,
+        referenceEquity: editReferenceEquity,
+        virtualCapitalCeiling: editVirtualCapitalCeiling,
+        tradingMode: editTradingMode,
+        ibkrPort: editIbkrPort,
+        ibkrClientId: editIbkrClientId,
+        gatewayConnectionActive: editGatewayConnectionActive,
+        stopAtrMultiplier: editStopAtrMultiplier,
+        partialProfit: editPartialProfit,
+        breakevenLock: editBreakevenLock,
+        maxHoldBars: editMaxHoldBars,
+        ofiFilter: editOfiFilter,
+        adaptiveStop: editAdaptiveStop,
+        dailyDrawdownLimitPercent: editDailyDrawdownLimitPercent,
+        dailyDrawdownLimitCash: editDailyDrawdownLimitCash,
+        geminiApiKey: customGeminiApiKey || geminiApiKey,
+        openaiApiKey: openaiApiKey,
+        anthropicApiKey: anthropicApiKey,
+        nvidiaApiKey: nvidiaApiKey,
+        customAiApiKey: customAiApiKey,
+        customAiBaseUrl: customAiBaseUrl,
+        customAiModelName: customModelName,
+        selectedAiProvider: selectedAiProvider,
+        ...updates
+      };
+
+      try {
+        const res = await fetch("/api/set-settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedValues)
+        });
+        const contentType = res.headers.get("content-type") || "";
+        if (res.ok && contentType.includes("application/json")) {
+          const data = await res.json();
+          if (data?.settings) setSettings(data.settings);
+        }
+      } catch (err) {
+        // Safe CDN fallback
+      }
+
+      setOrderFeedback({ success: "Configuration secured in Vault." });
+    } catch (e) {
+      console.error("Failed saving multiple settings:", e);
     } finally {
       setIsSavingInlineSetting(false);
     }
@@ -3402,6 +3540,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
         onClose={() => setShowApiVaultModal(false)}
         settings={settings}
         onSaveSetting={saveInlineSetting}
+        onSaveMultipleSettings={saveMultipleSettings}
         customGeminiApiKey={customGeminiApiKey}
         onSaveGeminiKey={saveCustomGeminiApiKey}
         firebaseStatus={firebaseStatus}
