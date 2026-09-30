@@ -190,6 +190,16 @@ def main_loop():
                     print("[FIREBASE OVERRIDE] Cloud panel requested router unlocking. Resetting circuit breaker...")
                     drm.router_locked = False
 
+                # Dynamic Paper / Live mode switch requested from Web Dashboard
+                cloud_mode = remote_state.get("tradingMode")
+                if cloud_mode and cloud_mode.upper() in ["PAPER", "LIVE"]:
+                    current_configured_mode = "LIVE" if config.get("IBKR_PORT") == 4001 else "PAPER"
+                    if cloud_mode.upper() != current_configured_mode:
+                        print(f"[TRADING MODE SWITCH] Dashboard requested switch: {current_configured_mode} -> {cloud_mode.upper()}")
+                        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "switch_gateway_mode.py")
+                        if os.path.exists(script_path):
+                            subprocess.Popen(["python3", script_path, "--mode", cloud_mode.upper()])
+
         # Dynamic Per-Candidate Session Clock & Opening Reality Verification
         for cand in list(active_basket.candidates):
             spec = universe_builder.resolve_contract(cand.symbol)
