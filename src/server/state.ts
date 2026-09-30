@@ -198,6 +198,30 @@ export function calculateIBIECommission(symbol: string, primaryExchange: string,
   }
 }
 
+export function ingestScannedInstrument(symbol: string, primaryExchange: string, lastPrice: number) {
+  if (marketBooks[symbol]) {
+    marketBooks[symbol].primaryExchange = primaryExchange;
+    return;
+  }
+  
+  marketBooks[symbol] = {
+    symbol,
+    primaryExchange,
+    lastPrice,
+    lastOfi: Math.floor(Math.random() * 200) - 100,
+    bids: Array.from({ length: 5 }, (_, idx) => ({
+      price: Number((lastPrice - 0.01 - idx * 0.02 * (Math.random() * 0.5 + 0.8)).toFixed(2)),
+      size: Math.floor(Math.random() * 800) + 200,
+      impliedOfi: 0
+    })),
+    asks: Array.from({ length: 5 }, (_, idx) => ({
+      price: Number((lastPrice + 0.01 + idx * 0.02 * (Math.random() * 0.5 + 0.8)).toFixed(2)),
+      size: Math.floor(Math.random() * 800) + 200,
+      impliedOfi: 0
+    }))
+  };
+}
+
 export function setActiveTrades(trades: ActiveTrade[]) {
   activeTrades = trades;
 }
