@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "last_updated": "2026-09-27T00:00:00Z",
+  "version": "2.0.0",
+  "last_updated": "2026-09-30T00:00:00Z",
   "feeds": [
     {
       "name": "ibkr_news_bulletins",
@@ -12,10 +12,42 @@
       "requires_auth": true
     },
     {
+      "name": "sec_edgar_submissions",
+      "type": "official_regulatory_api",
+      "enabled": true,
+      "priority": 2,
+      "description": "U.S. SEC EDGAR direct submissions API for Form 8-K material disclosures",
+      "endpoint": "https://data.sec.gov/submissions/CIK{cik}.json",
+      "directory_discovery": "https://www.sec.gov/files/company_tickers.json",
+      "poll_interval_sec": 300,
+      "requires_auth": false
+    },
+    {
+      "name": "clinical_trials_gov",
+      "type": "biomedical_registry_api",
+      "enabled": true,
+      "priority": 3,
+      "description": "ClinicalTrials.gov REST API v2 study protocol and readout registry",
+      "endpoint": "https://clinicaltrials.gov/api/v2/studies",
+      "schema_discovery": "https://clinicaltrials.gov/api/v2/openapi.json",
+      "poll_interval_sec": 900,
+      "requires_auth": false
+    },
+    {
+      "name": "openfda_drug_regulatory",
+      "type": "drug_safety_api",
+      "enabled": true,
+      "priority": 4,
+      "description": "U.S. FDA adverse events and drug labeling regulatory filings",
+      "endpoint": "https://api.fda.gov/drug/event.json",
+      "poll_interval_sec": 1800,
+      "requires_auth": false
+    },
+    {
       "name": "fred_economic_calendar",
       "type": "official_macro_api",
       "enabled": true,
-      "priority": 2,
+      "priority": 5,
       "description": "Federal Reserve Bank of St. Louis economic release calendar (FOMC, CPI, NFP, GDP)",
       "endpoint": "https://api.stlouisfed.org/fred/releases/dates",
       "poll_interval_sec": 3600,
@@ -25,7 +57,7 @@
       "name": "ecb_press_releases",
       "type": "central_bank_rss",
       "enabled": true,
-      "priority": 3,
+      "priority": 6,
       "description": "European Central Bank monetary policy decisions and rate statements",
       "endpoint": "https://www.ecb.europa.eu/rss/press.html",
       "poll_interval_sec": 1800,

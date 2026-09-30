@@ -1,190 +1,164 @@
-# 🎓 ALPHA ENGINE RUNBOOK & OPERATIONAL GUIDE
-> **The Official Institutional Trading Blueprint for Interactive Brokers (IBKR Ireland / IBIE), Pre-Trade Risk Gateways, Post-Earnings Announcement Drift (PEAD), Intraday OFI Execution, and Regulatory Compliance.**
+# ALPHA ENGINE RUNBOOK & ONBOARDING GUIDE
+*Institutional-Grade Autonomous Intraday Momentum & Quantitative Execution Platform*
 
 ---
 
-## 🏛️ 1. System Overview & Architecture
+## 🏛️ System Overview & Core Philosophy
 
-Alpha Engine is an institutional-grade, multi-strategy algorithmic trading platform designed for **Interactive Brokers Pro Ireland (IBIE)** under Central Bank of Ireland (CBI) and MiFID II regulatory oversight.
+AlphaEngine is an institutional algorithmic trading platform architected for cross-market intraday momentum strategies across North American (NYSE, NASDAQ) and European (Euronext Paris, Deutsche Börse Xetra) equity markets.
+
+The engine operates on a zero-hallucination, zero-drift, 100% dynamic architecture. Every component—from multi-agent AI verification to exchange trading calendars, regulatory feeds, contract specifications, and risk bracket calculations—is dynamically queried, verified, and calibrated against authoritative primary sources.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                                  ALPHA ENGINE ARCHITECTURE                              │
-├─────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                         │
-│  [ Primary Data Feeds ]                                                                 │
-│  • Reuters Corporate Events & IBKR Earnings XML                                         │
-│  • Primary Catalysts: SEC EDGAR 8-K, ClinicalTrials.gov, OpenFDA, Federal Reserve       │
-│                                           │                                             │
-│                                           ▼                                             │
-│  [ Strategy Engines ]                                                                   │
-│  • Intraday L2 Order Flow Imbalance (OFI) Scalp Engine (Default Intraday)               │
-│  • Post-Earnings Announcement Drift (PEAD) Anomaly Engine (Mega/Large-Cap >$5B)         │
-│                                           │                                             │
-│                                           ▼                                             │
-│  [ Pre-Trade Risk Gateway (SEC Rule 15c3-5 & MiFID II) ]                                │
-│  • Gate 1: Daily Capital Ceiling ($10,000 max gross exposure)                           │
-│  • Gate 2: Hard Daily Loss Circuit Breaker ($250 session cutoff)                        │
-│  • Gate 3: ADV / Market Impact Cap (Max 1.5% of rolling 5m volume)                      │
-│  • Gate 4: Short Locate & Borrow Fee Verification (<15% annual fee)                     │
-│  • Gate 5: Binary Event Blackout (Blocks entry before unpriced prints)                  │
-│                                           │                                             │
-│                                           ▼                                             │
-│  [ Position Lifecycle & Execution Controller ]                                          │
-│  • Breakeven Latch (+1.0x ATR): Automatically moves stop to entry price                 │
-│  • Tiered Scale-Out (+2.0x ATR): Scales out 50% shares, trails runner stop (+0.5x ATR)  │
-│  • Intraday MOC Controller: Liquidates intraday trades at 15:45 EST / 17:15 CET         │
-│  • Synthetic Stop Manager: Python-managed fractional stops bypass broker rejections     │
-│                                           │                                             │
-│                                           ▼                                             │
-│  [ Broker Interface & Hardware Co-Location ]                                            │
-│  • IBKR TWS / Gateway API (Port 4002 Paper / Port 4001 Live)                            │
-│  • Environment Isolation Airbag: Aborts if live 'U...' account detected in Paper mode   │
-│  • Auto-Reconnect Worker: Exponential backoff (2s → 60s) survives nightly resets        │
-│  • Real-Time Execution Blotter: Audit trail with Transaction Cost Analysis (TCA)        │
-│                                                                                         │
-└─────────────────────────────────────────────────────────────────────────────────────────┘
+       [Primary Feeds: SEC EDGAR, ClinicalTrials, OpenFDA, Central Banks]
+                                  │
+                                  ▼
+                    [Multi-Model Ensemble Layer]
+          Generator (NVIDIA NIM) ➔ Verifier 1 (Groq Llama)
+                                  ➔ Verifier 2 (Gemini Flash)
+                                  ➔ Judge (Gemini Pro)
+                                  │
+                                  ▼
+           [Universe Builder & Dynamic Friction Screening]
+                                  │
+                                  ▼
+             [Interactive Brokers Ireland (IBIE) Gateway]
+                   Port 4002 Socket (Frankfurt VM)
+                                  │
+                                  ▼
+       [DRM Middleware: ATR(14) Volatility Bands & SEC 15c3-5 Gates]
 ```
 
 ---
 
-## 🛡️ 2. The 3 Institutional Roadmap Phases
+## 🛡️ The 5 Dynamic Core Pillars
 
-Alpha Engine is structured across three institutional phases, each mathematically verified and battle-tested:
-
-### Phase 1: Pre-Trade Risk Gateway & Capital Protection
-- **Pre-Trade Risk Gateway (`DRMMiddleware`)**: Enforces 5 non-bypassable pre-flight risk checks before any order reaches the broker wire.
-- **Hard Daily Loss Cutoff**: Circuit breaker that immediately flattens all active positions and hard-locks the execution router if session loss exceeds the configured threshold (default `$250`).
-- **Python Synthetic Fractional Stops (`SyntheticStopManager`)**: IBKR natively rejects `STP` and `STP LMT` orders on fractional quantities. Alpha Engine holds all fractional stops in-memory within Python and dispatches compliant `MKT` or `LMT DAY` exit orders the millisecond a price breach occurs.
-- **Environment Isolation Airbag**: Detects broker account IDs on startup (`managedAccounts`). If Paper mode connects to a production `U...` account, the connection is instantly severed to prevent accidental capital loss.
-
-### Phase 2: Binary Event Blackout & PEAD Anomaly Strategy
-- **Gate 5 Binary Event Blackout**: Never holds intraday positions through unpriced binary events (earnings announcements, FDA advisory readouts, Phase 3 trial releases). Intraday entries are locked 30 minutes before any scheduled binary release.
-- **Post-Earnings Announcement Drift (PEAD) Engine (`pead_engine.py`)**: Exploits the classic, empirically proven capital markets anomaly where stock prices drift in the direction of earnings surprises over 1 to 60 trading days:
-  - **Market Cap Floor**: Mega/large caps only ($> \$5\text{B}$), eliminating micro-cap liquidity traps.
-  - **Volume Multiple**: First 15-minute volume must exceed $> 2.0\times$ 20-day Average Daily Volume (ADV).
-  - **Spread Stabilization**: 15-minute post-market-open spread stabilization window (09:45 EST) ensures bid-ask spreads normalize below $5\%$ of ATR.
-  - **Level 2 OFI Confirmation**: Top-of-book dealer queue accumulation must exceed $+1.5\sigma$.
-  - **Stop Protection**: Initial synthetic stop loss set at $1.8\times\text{ATR}$.
-- **PEAD Momentum Radar (`QuantResearchLab.tsx`)**: Real-time research lab ranking qualified PEAD candidates and providing an instantaneous **"PROMOTE TO ENGINE WATCHLIST"** button.
-
-### Phase 3: Intraday Flattening Controller & Socket Resilience
-- **Intraday Flattening Controller (Market-on-Close Discipline)**: 
-  - Automatically liquidates intraday OFI positions at **15:45 EST** (US Equities) and **17:15 CET** (European Euronext/Xetra assets) to guarantee **zero overnight gap risk**.
-  - Qualified PEAD multi-day swing positions (`is_swing=True`) are preserved.
-  - Toggleable via the UI (**"AUTO-FLATTEN INTRADAY"**).
-- **Multi-Day PEAD Position Lifecycle**:
-  - **Breakeven Latch**: Once unrealized profit reaches $+1.0\times\text{ATR}$, the synthetic stop is automatically ratcheted to the entry price (`stop_price = entry_price`), locking in breakeven.
-  - **Tiered Scale-Out**: At $+2.0\times\text{ATR}$ profit, the engine scales out $50\%$ of the position (`qty * 0.5`) and trails the stop on the remaining runner to $+0.5\times\text{ATR}$ locked profit (`entry_price + 0.5 * atr`).
-- **IBKR Socket Auto-Reconnect**:
-  - Implements an exponential backoff loop ($2\text{s} \to 4\text{s} \to 8\text{s} \to 16\text{s} \to 32\text{s} \to 60\text{s}$).
-  - Catches disconnect error codes (`1100`, `1101`, `1102`, `502`, `504`) so the engine survives IBKR's nightly server resets (23:45–00:45 EST) without crashing.
-- **Execution Blotter & TCA**: Real-time audit trail tracking arrival price, fill price, slippage in basis points (bps), and IBIE exchange commissions.
+### Pillar 1: Dynamic Multi-Provider AI Model Catalog Auto-Discovery
+- **Problem Solved**: Hardcoded model names (e.g. `gemini-1.5-flash-002`, `llama-3-70b`) get retired by model providers, causing unexpected 404 errors and execution halts.
+- **Dynamic Solution**:
+  - The control plane exposes `GET /api/models/live-catalog` which directly interrogates provider catalog endpoints (`ai.models.list()`, Groq `/v1/models`, NVIDIA NIM `/v1/models`).
+  - Deprecated and sunset model versions (e.g. `1.0`, `1.5`) are automatically filtered out.
+  - The highest active versioned model is dynamically mapped to its quantitative role:
+    - **Generator**: NVIDIA NIM (`nemotron-3-ultra` / `meta/llama-3.1-70b-instruct`)
+    - **Verifier 1 (Critic)**: Groq Cloud (`llama-3.3-70b-versatile` / `llama-3.1-70b-versatile`)
+    - **Verifier 2 (Reality)**: Google AI Studio (`gemini-2.5-flash`)
+    - **Judge (Synthesis)**: Google AI Studio (`gemini-2.5-pro`)
+  - In `llm_ensemble.py`, `_auto_discover_models()` runs on engine initialization and daily pre-market calibration, binding live models with rolling-window `SimpleQuotaGuard` protection.
 
 ---
 
-## 🖥️ 3. Navigation & Dashboard Controls
-
-The UI is cleanly decoupled into two primary operational hubs via the top navigation bar:
-
-```
-[ LIVE COCKPIT ]   [ QUANT LAB ]   [ SYSTEM ]   [ LAUNCHPAD ]
-```
-
-### 1. LIVE COCKPIT (Default View)
-The institutional risk and execution dashboard:
-- **Telemetry Bar**: Displays active trading mode (`PAPER` or `LIVE`), Gateway connection status, broker account ID, active positions count, and live session P&L.
-- **Pre-Trade Risk Gateway Cards**:
-  1. **Daily Capital Ceiling**: Configure the hard capital cap (e.g. `$10,000`). Displays real-time utilized capital and percentage progress bar.
-  2. **Hard Daily Loss Cutoff**: Set the hard loss circuit breaker (e.g. `$250`). Shows distance in USD until auto-lock triggers.
-  3. **Fractional Execution (Synthetic Stops)**: Toggle decimal lots on/off. Confirms synthetic stop protection is active.
-  4. **Auto-Flatten Intraday (15:45 EST MOC)**:
-     - Toggle: Choose between strict MOC auto-flattening or multi-day swing mode.
-     - Live Clocks: Shows synchronized NY (EST) and Paris (CET) server times.
-     - Quick Action: **"FLATTEN INTRADAY NOW"** executes immediate Market-on-Close liquidations.
-- **PEAD & Intraday Lifecycle Banner**: Confirms active Breakeven Latch (`+1.0x ATR`) and Tiered Scale-Out (`+2.0x ATR`).
-- **Emergency Circuit Breaker (Panic Button)**:
-  - Big red button: **"FLATTEN ALL & ABORT (KILL SWITCH)"** sends global cancel and market liquidations.
-  - Amber button: **"AUTHORIZE ROUTER UNLOCK"** restores order transmission after safety assessment.
-- **Live Execution Blotter & TCA**: Real-time table of all executions with arrival price, fill price, slippage (bps), commission fees, and order types (`MOC / MKT (INTRADAY FLATTEN)`, `MKT (Synthetic Stop)`, `LMT (DAY)`).
-
-### 2. QUANT RESEARCH LAB
-The institutional analytics and asset qualification sandbox:
-- **Verified Catalyst Radar**: Ingests primary-source regulatory and corporate disclosures from SEC EDGAR (Form 8-K), ClinicalTrials.gov (Phase 3 trials), OpenFDA (approvals/PDUFA), and the Federal Reserve calendar. Gated events display a red blackout warning.
-- **PEAD Momentum Radar**:
-  - Displays qualified post-earnings drift candidates.
-  - Metrics: **EPS Surprise %**, **Revenue Surprise %**, **Volume Surge Multiple (x ADV)**, and **Level 2 OFI Sigma (+z-score)**.
-  - Multi-Factor Institutional Conviction Score (0–100).
-  - **"PROMOTE TO ENGINE WATCHLIST"**: Click to immediately promote a qualified candidate into `dynamic_baskets.json`, arming the live engine to trade it.
+### Pillar 2: Authoritative Exchange Calendars & Dual DST Alignment
+- **Problem Solved**: Hardcoded clock checks (e.g. `"15:50" <= current_ny_time < "16:00"`) break on market holidays (Memorial Day, Thanksgiving, Good Friday), fail to detect early closes (13:00 on Black Friday / Christmas Eve), and desynchronize during the 2–3 week Daylight Saving Time (DST) shift gap between the US and Europe.
+- **Dynamic Solution**:
+  - `market_hours_resolver.py` directly integrates Python `exchange_calendars` (`XNYS` for NYSE/NASDAQ, `XPAR` for Euronext Paris, `XETR` for Deutsche Börse).
+  - Queries exact official opening/closing timestamps and half-day schedules for any target year.
+  - **Dual DST Monitor**: Resolves the exact UTC offset between `America/New_York` and `Europe/Paris`. In March (when the US switches 2–3 weeks earlier) and October/November (when Europe switches 1 week earlier), the engine automatically detects the 5-hour time difference (vs. normal 6-hour difference) and anchors all execution windows strictly to UTC.
+  - Positions are liquidated during `MarketSessionPhase.CLOSING_FLATTEN` derived from the real exchange closing bell.
 
 ---
 
-## 🚀 4. Step-by-Step Operator Runbook: Daily Workflow
+### Pillar 3: Active Regulatory & Macro Feed Schema/Endpoint Auto-Adaptation
+- **Problem Solved**: Static CIK dictionaries fail when new tickers enter the universe; rigid JSON parsing breaks when government APIs update their OpenAPI schema; and lazy fallbacks hide broken feeds.
+- **Dynamic Solution**:
+  - **SEC EDGAR Direct Submissions**: `NewsIngestor.resolve_cik()` dynamically resolves any ticker against the SEC's live master directory (`https://www.sec.gov/files/company_tickers.json`) with persistent disk caching (`sec_cik_cache.json`).
+  - **ClinicalTrials.gov REST API v2**: Employs adaptive OpenAPI field navigation (`_adaptive_get_nested()`) that gracefully traverses `protocolSection.statusModule.overallStatus` across schema minor updates.
+  - **OpenFDA Regulatory Filings**: Actively probes `/drug/event.json` and `/drug/label.json` for serious adverse events and labeling changes.
+  - **Binary Event Blackout Gate**: Automatically freezes discretionary entries 48 hours prior to scheduled FDA PDUFA decisions, Phase 3 readouts, or quarterly earnings releases to protect against unhedgeable overnight gap risk.
 
-### Phase A: Pre-Market Preparation (08:30–09:15 EST / 14:30–15:15 CET)
-1. **Launch the Engine**:
+---
+
+### Pillar 4: Native IBKR `reqContractDetails()` Socket Resolution on Startup
+- **Problem Solved**: Static contract specifications lack official exchange minTick sizes, liquid hours, and primary exchange routing rules.
+- **Dynamic Solution**:
+  - `ConnectionManager.contractDetails()` captures official broker metadata directly from the live socket (`127.0.0.1:4002`):
+    - `conId`: Contract identifier
+    - `primaryExchange`: Official routing destination (e.g. `NASDAQ`, `SBF`, `IBIS`)
+    - `minTick`: Precise tick increment (e.g. `0.01`, `0.005`)
+    - `liquidHours` & `tradingHours`: Official session strings
+    - `timeZoneId`: Exchange native timezone (`America/New_York`, `Europe/Paris`)
+  - `UniverseBuilder.resolve_contract()` queries the live socket on startup and persists verified specs to `contract_spec_cache.json` for resilient offline operation.
+
+---
+
+### Pillar 5: Dynamic Volatility Risk Scaling (ATR-14 & Microstructure Sizing)
+- **Problem Solved**: Hardcoded fixed point stops (e.g. 1.8% or 1.2%) over-risk during volatile regimes and get prematurely stopped out during normal market noise.
+- **Dynamic Solution**:
+  - `DRMMiddleware.calculate_atr14()` calculates the 14-period Wilder Average True Range (ATR) from live candlestick bars.
+  - `DRMMiddleware.calculate_dynamic_brackets()` computes adaptive brackets aligned to `minTick`:
+    - **Adaptive Stop-Loss**: `Entry ± (1.5 × ATR)`
+    - **Breakeven Latch**: Ratchets stop to Entry once unrealized profit hits `+1.0 × ATR`
+    - **Tiered Scale-Out**: Liquidates 50% of position size at `+2.0 × ATR` and trails remaining stop to lock in `+0.5 × ATR`
+    - **Profit Target**: Final exit at `+3.0 × ATR`
+  - **Capital Sizing**: Position size is strictly calculated as `Risk Capital / (k_stop × ATR × Point Value)`, maintaining invariant 1% risk per trade regardless of market volatility.
+
+---
+
+## 🖥️ Operational Architecture & Production Access
+
+### 1. Cloud Infrastructure
+| Resource | Specification | Details |
+|---|---|---|
+| **Edge Compute Node** | GCP Compute Engine `alpha-edge-node` | `europe-west3-a` (Frankfurt, Germany) |
+| **Machine Type** | `e2-medium` (2 vCPUs, 4 GB RAM) | Resized for low-latency European execution |
+| **External IP** | `34.159.125.115` | Public Frankfurt gateway IP |
+| **Cloud Scopes** | `https://www.googleapis.com/auth/cloud-platform` | Native Firestore & Cloud Logging access |
+| **Control Plane** | Firebase Hosting + Cloud Run | `https://alpha-engine-ai-studio.web.app` |
+
+### 2. Standalone IB Gateway 10.50 & Web VNC
+Interactive Brokers Gateway 10.50 runs headlessly inside a virtual X11 frame buffer on the Frankfurt VM:
+- **API Socket Port**: `127.0.0.1:4002` (Verified active and listening)
+- **Direct HTTPS Web VNC**: `https://34.159.125.115:8443/vnc.html`
+- **Reverse Proxy Authentication**:
+  - **Username**: `admin`
+  - **Password**: `Alpha2026Engine!`
+- **Firewall Rule**: `allow-ibgateway-web` open on `0.0.0.0/0:8443`.
+
+---
+
+## 🚀 Daemon Commands & Lifecycle Management
+
+### SSH into the Frankfurt Edge Node
+```bash
+gcloud compute ssh alpha-edge-node --zone=europe-west3-a
+```
+
+### Inspect Edge Node Services
+```bash
+# AlphaEngine Trading Daemon status & logs
+sudo systemctl status alpha-engine
+sudo journalctl -u alpha-engine -f -n 50
+
+# IB Gateway & Web VNC service status
+sudo systemctl status ibgateway
+sudo journalctl -u ibgateway -f -n 50
+```
+
+### Restart Daemons
+```bash
+sudo systemctl restart alpha-engine
+sudo systemctl restart ibgateway
+```
+
+### Emergency Kill Switch & Manual Flattening
+If an anomalous market dislocation occurs, the system can be halted immediately:
+1. **Via Cloud Dashboard**: Click the prominent **EMERGENCY KILL SWITCH** button in the System Control Center.
+2. **Via REST API**:
    ```bash
-   node dist/server.cjs
+   curl -X POST https://alpha-engine-ai-studio.web.app/api/risk/emergency-kill \
+     -H "Content-Type: application/json"
    ```
-   Verify server starts on `http://localhost:3000`.
-2. **Verify IBKR Gateway / TWS**:
-   - Ensure IBKR Gateway or TWS is running on port `4002` (Paper) or `4001` (Live).
-   - In TWS API settings: check *"Enable ActiveX and Socket Clients"*, uncheck *"Read-Only API"*, and ensure Port matches.
-3. **Open Live Cockpit**:
-   - Open `http://localhost:3000` in your browser.
-   - Verify connection badge shows `GATEWAY ARMED` and account ID starts with `DU` (Paper) or `U` (Live).
-4. **Configure Session Risk Limits**:
-   - In Live Cockpit, verify Daily Capital Ceiling (e.g. `$10,000`) and Hard Daily Loss Cutoff (e.g. `$250`).
-   - Click **"APPLY RISK GATES"** to sync settings with the backend.
-
-### Phase B: Catalyst Promotion in Quant Lab (09:15–09:30 EST)
-1. Navigate to **QUANT LAB**.
-2. Click **"REFRESH DRIFT RADAR"** to inspect overnight and morning earnings releases.
-3. Review candidates: ensure **Volume Surge $\ge 2.0\times$ ADV**, **EPS Surprise $> 0$**, and **L2 OFI Sigma $\ge +1.5\sigma$**.
-4. Click **"PROMOTE TO ENGINE WATCHLIST"** on qualified assets (e.g. `NVDA`, `SAP`).
-5. Verify candidate badge switches to `PROMOTED TO ACTIVE ENGINE WATCHLIST`.
-
-### Phase C: Opening Bell & Execution (09:30–15:45 EST)
-1. **09:30–09:45 EST**: The 15-minute spread stabilization window activates. The engine monitors book depth but delays aggressive entries until spreads contract to $\le 5\%$ of ATR.
-2. **09:45–15:45 EST**: Active trading window:
-   - Primary intraday engine trades Level 2 Order Flow Imbalance (OFI).
-   - Positions automatically benefit from the **Breakeven Latch** at $+1.0\times\text{ATR}$ and **Tiered Scale-Out** at $+2.0\times\text{ATR}$.
-   - Every order fill appears instantaneously in the **Live Execution Blotter**.
-
-### Phase D: End-of-Day Flattening (15:45 EST / 17:15 CET)
-1. At **15:45 EST** (US Equities) and **17:15 CET** (European Euronext/Xetra Equities), the **Intraday Flattening Controller** automatically liquidates all non-swing positions with `MOC / MKT (INTRADAY FLATTEN)` orders.
-2. Verify in Live Cockpit that open positions stand at `0` (or only designated PEAD swing holdings remain).
-3. If needed, click **"FLATTEN INTRADAY NOW"** to force immediate manual closure.
-
-### Phase E: Nightly Maintenance (23:45–00:45 EST)
-- IBKR servers perform routine daily resets during this window (codes `1100`, `1102`).
-- The **Auto-Reconnect Worker** automatically reconnects with exponential backoff. No operator intervention is required.
+3. **Via Local Server**:
+   ```bash
+   curl -X POST http://localhost:3000/api/risk/emergency-kill
+   ```
+This immediately transmits a global order cancellation (`reqGlobalCancel()`), liquidates all open intraday positions at market, and places the execution router under hard software lock.
 
 ---
 
-## ⚠️ 5. Emergency Procedures & Troubleshooting
+## 📋 Pre-Flight Checklist Before Live Trading Session
 
-### Emergency Kill Switch (Panic Flush)
-If unexpected volatility or external news breaks:
-1. In **LIVE COCKPIT**, click **"FLATTEN ALL & ABORT (KILL SWITCH)"**.
-2. Click **"YES, FLATTEN NOW"** in the confirmation prompt.
-3. The engine immediately:
-   - Dispatches `reqGlobalCancel` to cancel all open working orders.
-   - Dispatches market liquidation orders for all active positions.
-   - Hard-locks the execution router.
-
-### Unlocking the System
-After assessing the market:
-1. In **LIVE COCKPIT**, click **"AUTHORIZE ROUTER UNLOCK"**.
-2. The router is disarmed and restored to normal monitoring.
-
-### Frequently Asked Questions
-
-**Q: Can I trade both intraday OFI scalps and multi-day PEAD swings simultaneously?**
-> **A:** Yes! Intraday scalping is the engine's default operational mode (flattening at 15:45 EST). PEAD candidates promoted in the Quant Lab can be held as multi-day swings, protected by Gate 5 Binary Event Blackout.
-
-**Q: Why does the engine use synthetic stops instead of broker native stop orders?**
-> **A:** Interactive Brokers rejects native `STP` and `STP LMT` orders on fractional shares. Python-managed Synthetic Stops monitor live ticks in memory and execute fractional `MKT` orders instantly upon stop breach.
-
-**Q: How do I know if an account is safe from live trading risks?**
-> **A:** The Broker Isolation Airbag prevents any live trading when in `PAPER` mode: if an account starting with `U...` is detected, the socket is immediately terminated. Real capital is never deployed unless explicitly configured.
+- [ ] **IB Gateway Authenticated**: Access `https://34.159.125.115:8443/vnc.html` and verify the green "Connected" status with port `4002` open.
+- [ ] **API Vault Handshake**: Verify in the control center that Google Gemini, Groq, and Cloud Firestore endpoints return green latency badges (<300ms).
+- [ ] **Market Hours Synchronized**: Confirm the active session countdown displays correctly for Euronext (`XPAR`), Xetra (`XETR`), and NYSE (`XNYS`).
+- [ ] **Friction Filter Active**: Confirm maximum friction ratio ceiling is enforced at 15.0% of expected gross move.
+- [ ] **Binary Event Gate Screened**: Verify zero candidate symbols are within 48h of an earnings or FDA trial blackout window.

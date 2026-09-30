@@ -52,12 +52,32 @@ class UniverseBuilder:
         "TTE": {"conId": 408544080, "primaryExchange": "SBF", "currency": "EUR", "isEuropean": True, "avgSpread": 0.04, "expectedMovePct": 1.9}
     }
     
-    def __init__(self, fee_schedule_path: str = "fee_schedule.json", output_path: str = "dynamic_baskets.json", connection_manager=None):
+    def __init__(self, fee_schedule_path: str = "fee_schedule.json", output_path: str = "dynamic_baskets.json", connection_manager=None, spec_cache_path: str = "contract_spec_cache.json"):
         self.fee_schedule_path = fee_schedule_path
         self.output_path = output_path
+        self.spec_cache_path = spec_cache_path
         self.fee_schedule = self._load_fee_schedule()
         self.market_hours = MarketHoursResolver()
         self.cm = connection_manager
+        self.spec_cache: Dict[str, Dict[str, Any]] = self._load_spec_cache()
+
+    def _load_spec_cache(self) -> Dict[str, Dict[str, Any]]:
+        """Loads persistent contract specifications from disk."""
+        if os.path.exists(self.spec_cache_path):
+            try:
+                with open(self.spec_cache_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.debug(f"[CONTRACT CACHE] Could not read {self.spec_cache_path}: {e}")
+        return {}
+
+    def _save_spec_cache(self):
+        """Persists resolved contract specifications to disk."""
+        try:
+            with open(self.spec_cache_path, "w", encoding="utf-8") as f:
+                json.dump(self.spec_cache, f, indent=2)
+        except Exception as e:
+            logger.debug(f"[CONTRACT CACHE] Could not save {self.spec_cache_path}: {e}")
 
     def check_binary_event_gate(self, symbol: str) -> Tuple[bool, str]:
         """
@@ -93,31 +113,83 @@ class UniverseBuilder:
         }
 
     def resolve_contract(self, symbol: str) -> Optional[ContractSpec]:
-        """Resolves symbol against IBKR specification matrix."""
+        """
+        Dynamically resolves symbol against live IBKR socket metadata,
+        falling back to persistent cache or known matrix.
+        """
         sym = symbol.upper().strip()
-        info = self.KNOWN_CONTRACTS.get(sym)
-        if not info:
-            # Fallback for newly identified symbol
-            is_eu = any(sym.endswith(suffix) for suffix in [".PA", ".AS", ".DE", ".MC"])
+
+        # 1. Live IBKR Socket Cache / Probe
+        if self.cm:
+            # Check connection manager contract details cache
+            cached_ibkr = getattr(self.cm, 'contract_details_cache', {}).get(sym)
+            if cached_ibkr:
+                is_eu = cached_ibkr.get("currency") == "EUR" or any(ex in cached_ibkr.get("primaryExchange", "") for ex in ["SBF", "IBIS", "AEB"])
+                spec = ContractSpec(
+                    symbol=sym,
+                    secType="STK",
+                    exchange="SMART",
+                    primaryExchange=cached_ibkr.get("primaryExchange", "SMART"),
+                    currency=cached_ibkr.get("currency", "EUR" if is_eu else "USD"),
+                    conId=int(cached_ibkr.get("conId", 0)),
+                    minTick=float(cached_ibkr.get("minTick", 0.01)),
+                    liquidHours=cached_ibkr.get("liquidHours", ""),
+                    timeZoneId=cached_ibkr.get("timeZoneId", "America/New_York"),
+                    isEuropean=is_eu
+                )
+                self.spec_cache[sym] = {
+                    "conId": spec.conId,
+                    "primaryExchange": spec.primaryExchange,
+                    "currency": spec.currency,
+                    "minTick": spec.minTick,
+                    "liquidHours": spec.liquidHours,
+                    "timeZoneId": spec.timeZoneId,
+                    "isEuropean": spec.isEuropean
+                }
+                self._save_spec_cache()
+                return spec
+
+        # 2. Check Persistent Disk Cache
+        if sym in self.spec_cache:
+            c = self.spec_cache[sym]
             return ContractSpec(
                 symbol=sym,
                 secType="STK",
                 exchange="SMART",
-                primaryExchange="SBF" if is_eu else "SMART",
-                currency="EUR" if is_eu else "USD",
-                conId=0,
-                isEuropean=is_eu
+                primaryExchange=c.get("primaryExchange", "SMART"),
+                currency=c.get("currency", "USD"),
+                conId=int(c.get("conId", 0)),
+                minTick=float(c.get("minTick", 0.01)),
+                liquidHours=c.get("liquidHours", ""),
+                timeZoneId=c.get("timeZoneId", "America/New_York"),
+                isEuropean=bool(c.get("isEuropean", False))
             )
-            
+
+        # 3. Known Contracts Static Matrix Fallback
+        info = self.KNOWN_CONTRACTS.get(sym)
+        if info:
+            return ContractSpec(
+                symbol=sym,
+                secType="STK",
+                exchange="SMART",
+                primaryExchange=info["primaryExchange"],
+                currency=info["currency"],
+                conId=info["conId"],
+                minTick=0.01,
+                isEuropean=info["isEuropean"]
+            )
+
+        # 4. Universal Fallback
+        is_eu = any(sym.endswith(suffix) for suffix in [".PA", ".AS", ".DE", ".MC"])
         return ContractSpec(
             symbol=sym,
             secType="STK",
             exchange="SMART",
-            primaryExchange=info["primaryExchange"],
-            currency=info["currency"],
-            conId=info["conId"],
+            primaryExchange="SBF" if is_eu else "SMART",
+            currency="EUR" if is_eu else "USD",
+            conId=0,
             minTick=0.01,
-            isEuropean=info["isEuropean"]
+            isEuropean=is_eu
         )
 
     def calculate_projected_friction(self, symbol: str, target_stop_dist: float, stock_price: float = 100.0) -> float:

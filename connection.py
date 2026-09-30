@@ -265,7 +265,35 @@ class ConnectionManager(EWrapper, EClient):
         print(f"[CONTRACT RESOLVED] {c.symbol} (ConID: {c.conId}) LiquidHours: {getattr(contractDetails, 'liquidHours', 'N/A')[:40]}...")
 
     def contractDetailsEnd(self, reqId: int):
-        pass
+        """Signals completion of contract details resolution for reqId."""
+        if hasattr(self, '_contract_events') and reqId in self._contract_events:
+            self._contract_events[reqId].set()
+
+    def resolve_contract_details_blocking(self, contract: Any, timeout: float = 3.0) -> Optional[Dict[str, Any]]:
+        """
+        Requests contract details via live socket and blocks until completed or timeout.
+        Returns cached dictionary or None.
+        """
+        if not self.is_connected:
+            return None
+
+        if not hasattr(self, '_contract_events'):
+            self._contract_events = {}
+
+        import random
+        req_id = random.randint(10000, 99999)
+        event = threading.Event()
+        self._contract_events[req_id] = event
+
+        try:
+            self.reqContractDetails(req_id, contract)
+            event.wait(timeout)
+        except Exception as e:
+            print(f"[CONTRACT DETAILS ERR] Failed requesting details for {getattr(contract, 'symbol', 'UNKNOWN')}: {e}")
+        finally:
+            self._contract_events.pop(req_id, None)
+
+        return self.contract_details_cache.get(getattr(contract, 'symbol', ''))
 
     # --- WHAT-IF ORDER COMMISSION AUDIT CALLBACK ---
     def openOrder(self, orderId: int, contract: Any, order: Any, orderState: Any):

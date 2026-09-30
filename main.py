@@ -169,6 +169,7 @@ def main_loop():
     # Core loop coordinating the intraday trading session lifecycle
     active_session = True
     iteration = 0
+    last_audit_date = None
     while active_session:
         current_ny_time = get_current_ny_time()
         current_cet_time = get_current_cet_time()
@@ -251,13 +252,17 @@ def main_loop():
                         trade_id = f"TRD_{sym}_EDGE"
                         avg_cost = float(pos.get("avgCost", 0.0))
                         unrealized_val = float(cm.pnl_updates.get("unrealized", 0.0))
+                        atr = drm.calculate_atr14(cm.historical_data_buffer.get(sym, []), current_price=avg_cost)
+                        brackets = drm.calculate_dynamic_brackets(avg_cost, "BUY" if qty_val > 0 else "SELL", atr, k_stop=1.5, min_tick=spec.minTick)
                         live_trade = {
                             "id": trade_id,
                             "symbol": sym,
                             "quantity": float(abs(qty_val)),
                             "direction": "BUY" if qty_val > 0 else "SELL",
                             "entryPrice": avg_cost,
-                            "stopPrice": float(avg_cost * 0.982 if qty_val > 0 else avg_cost * 1.018),
+                            "stopPrice": brackets["stop_price"],
+                            "takeProfit": brackets["take_profit"],
+                            "atr": brackets["atr"],
                             "currentPrice": avg_cost,
                             "unrealizedPnL": unrealized_val,
                             "mifidDecisionMaker": config["MIFID2_DECISION_MAKER_ID"],
@@ -266,11 +271,12 @@ def main_loop():
                         }
                         firebase_tunnel.push_active_trade(trade_id, live_trade)
                 else:
-                    # Simulation sandbox mode: evaluate candidate setup
+                    # Simulation sandbox mode: evaluate candidate setup with dynamic ATR bands
                     sim_entry = 100.0 if cand.isEuropean else 52.40
-                    stop_offset = sim_entry * 0.012
-                    sim_stop = sim_entry - stop_offset if direction == "BUY" else sim_entry + stop_offset
-                    pos_qty = drm.calculate_position_size(sim_entry, sim_stop)
+                    atr = drm.calculate_atr14(cm.historical_data_buffer.get(sym, []), current_price=sim_entry)
+                    brackets = drm.calculate_dynamic_brackets(sim_entry, direction, atr, k_stop=1.5, min_tick=spec.minTick)
+                    sim_stop = brackets["stop_price"]
+                    pos_qty = drm.calculate_position_size(sim_entry, sim_stop, currency=spec.currency)
                     
                     trade_id = f"TRD_{sym}_EDGE"
                     unrealized_pnl = float(0.35 * (pos_qty or 50)) if direction == "BUY" else float(-0.20 * (pos_qty or 50))
@@ -282,6 +288,8 @@ def main_loop():
                         "direction": direction,
                         "entryPrice": float(sim_entry),
                         "stopPrice": float(sim_stop),
+                        "takeProfit": brackets["take_profit"],
+                        "atr": brackets["atr"],
                         "currentPrice": float(sim_entry + 0.35),
                         "unrealizedPnL": unrealized_pnl,
                         "catalyst": cand.catalyst,
@@ -292,9 +300,10 @@ def main_loop():
                     firebase_tunnel.push_active_trade(trade_id, sim_trade)
                     cm.active_positions[sym] = {"qty": (pos_qty or 50) if direction == "BUY" else -(pos_qty or 50), "avgCost": sim_entry}
 
-        # Scenario C: EOD Flattening Window (15:50 - 16:00 NY / 17:25 - 17:30 CET)
-        if "15:50" <= current_ny_time < "16:00":
-            print("[PHASE - HARD TERMINATION] Initiating automated Flat EOD Flush. Flattening all positions.")
+        # Scenario C: Dynamic Exchange Session Flattening Window
+        is_eod_flatten_phase = any(cand.sessionPhase == MarketSessionPhase.CLOSING_FLATTEN for cand in active_basket.candidates)
+        if is_eod_flatten_phase:
+            print("[PHASE - DYNAMIC TERMINATION] Initiating automated Flat EOD Flush (Exchange Closing Phase reached). Flattening positions.")
             for symbol, pos in list(cm.active_positions.items()):
                 pos_qty = float(pos.get("qty", 0.0))
                 if abs(pos_qty) > 0:
@@ -316,12 +325,14 @@ def main_loop():
                     firebase_tunnel.delete_active_trade(f"TRD_{symbol}_EDGE")
             drm.emergency_flush()
             
-        # Scenario D: Post-Market Audit & Attribution Window (16:10 NY / 17:35 CET)
-        elif "16:10" <= current_ny_time:
-            print("[PHASE - POST-SESSION REPORT & REASONING AUDIT]")
-            auditor.audit_daily_predictions(dynamic_basket_path="dynamic_baskets.json")
-            print("[SYNC] Transferring session logs and performance reports to secure Firebase server...")
-            active_session = False  # Terminate standard session
+        # Scenario D: Post-Market Audit & Attribution Window (20:00 NY / 02:00 CET close of PEAD)
+        elif "20:00" <= current_ny_time < "20:05":
+            today_str = datetime.date.today().isoformat()
+            if last_audit_date != today_str:
+                print("[PHASE - POST-SESSION REPORT & REASONING AUDIT]")
+                auditor.audit_daily_predictions(dynamic_basket_path="dynamic_baskets.json")
+                print("[SYNC] Transferring session logs and performance reports to secure Firebase server...")
+                last_audit_date = today_str
             
         # Synchronize risk state to Firestore in real-time
         net_liq = float(cm.account_summary.get("NetLiquidation", drm.start_day_equity))

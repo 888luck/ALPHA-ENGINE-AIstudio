@@ -72,6 +72,77 @@ class DRMMiddleware:
             return False
         return True
 
+    def calculate_atr14(self, bars: List[Dict[str, float]], current_price: float = 100.0) -> float:
+        """
+        Calculates 14-period Wilder Average True Range (ATR) from candlestick bars.
+        True Range = max(H - L, abs(H - C_prev), abs(L - C_prev))
+        If fewer than 14 bars are available, dynamically scales to 1.8% of current asset price.
+        """
+        if not bars or len(bars) < 2:
+            return round(max(0.10, current_price * 0.018), 2)
+            
+        tr_list = []
+        for i in range(1, len(bars)):
+            h = float(bars[i].get("high", current_price))
+            l = float(bars[i].get("low", current_price))
+            c_prev = float(bars[i-1].get("close", current_price))
+            tr = max(h - l, abs(h - c_prev), abs(l - c_prev))
+            tr_list.append(tr)
+            
+        if len(tr_list) >= 14:
+            atr = sum(tr_list[-14:]) / 14.0
+        else:
+            atr = sum(tr_list) / len(tr_list)
+            
+        return round(max(0.05, atr), 2)
+
+    def calculate_dynamic_brackets(
+        self,
+        entry_price: float,
+        direction: str,
+        atr: float,
+        k_stop: float = 1.5,
+        min_tick: float = 0.01
+    ) -> Dict[str, float]:
+        """
+        Calculates volatility & microstructure risk brackets (Adaptive Stops, Breakeven, Scale-Out, TP).
+        All values are aligned to the instrument's official exchange minTick.
+        """
+        dir_clean = direction.upper().strip()
+        is_long = dir_clean in ["BUY", "LONG"]
+        stop_dist = max(min_tick * 2.0, k_stop * atr)
+        
+        if is_long:
+            stop_price = entry_price - stop_dist
+            breakeven_trigger = entry_price + (1.0 * atr)
+            scale_out_trigger = entry_price + (2.0 * atr)
+            scale_out_new_stop = entry_price + (0.5 * atr)
+            take_profit = entry_price + (3.0 * atr)
+        else:
+            stop_price = entry_price + stop_dist
+            breakeven_trigger = entry_price - (1.0 * atr)
+            scale_out_trigger = entry_price - (2.0 * atr)
+            scale_out_new_stop = entry_price - (0.5 * atr)
+            take_profit = entry_price - (3.0 * atr)
+            
+        # Round to minTick precision
+        def round_tick(val: float) -> float:
+            if min_tick <= 0:
+                return round(val, 2)
+            return round(round(val / min_tick) * min_tick, 4)
+            
+        return {
+            "entry_price": round_tick(entry_price),
+            "stop_price": round_tick(stop_price),
+            "stop_distance": round_tick(stop_dist),
+            "breakeven_trigger": round_tick(breakeven_trigger),
+            "scale_out_trigger": round_tick(scale_out_trigger),
+            "scale_out_new_stop": round_tick(scale_out_new_stop),
+            "take_profit": round_tick(take_profit),
+            "atr": round(atr, 2),
+            "k_stop": k_stop
+        }
+
     def calculate_position_size(self, entry_price: float, initial_stop: float, currency: str = "USD", fx_rate_to_base: float = 1.0) -> float:
         """
         Dynamic 1% Equity Position Sizer with Multi-Currency & FX Normalization.

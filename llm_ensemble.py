@@ -3,7 +3,7 @@ Evolutive Multi-Model LLM Ensemble for Alpha Engine
 Implements the Critic-Verifier multi-agent consensus architecture across:
 - NVIDIA NIM (Nemotron)
 - Groq (Llama 3.1 / 3.3)
-- Google AI Studio / Vertex (Gemini 1.5 Flash / Pro)
+- Google AI Studio / Vertex (Gemini 2.5 Flash / Pro)
 
 Reads model roles dynamically from model_registry.json with automated fallbacks.
 Includes SimpleQuotaGuard: a rolling-window per-provider rate limiter that
@@ -282,7 +282,86 @@ class MultiModelEnsemble:
         # Initialise quota guard — limits come from registry or _DEFAULT_QUOTA_LIMITS
         quota_limits = self.registry.get("quota_limits", None)
         self.quota_guard = SimpleQuotaGuard(limits=quota_limits)
+        # Dynamically discover active non-deprecated models from live API catalogs
+        self._auto_discover_models()
+
+    def _auto_discover_models(self):
+        """
+        Dynamically probes provider model catalog endpoints to discover active models
+        and eradicate hardcoded or retired model strings (e.g. Gemini 1.5 sunset).
+        """
+        endpoints = self.registry.get("endpoints", {})
         
+        # 1. Google Gemini Dynamic Discovery
+        gemini_key = os.getenv("GEMINI_API_KEY", "")
+        if gemini_key and gemini_key != "MY_GEMINI_API_KEY":
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models?key={gemini_key}"
+                req = urllib.request.Request(url, headers={"Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    if resp.status == 200:
+                        data = json.loads(resp.read().decode("utf-8"))
+                        raw_models = data.get("models", [])
+                        valid_models = []
+                        for m in raw_models:
+                            name = m.get("name", "").replace("models/", "")
+                            methods = m.get("supportedGenerationMethods", [])
+                            # Exclude deprecated / sunset models (e.g. 1.0, 1.5)
+                            if "generateContent" in methods and not any(v in name for v in ["1.0", "1.5", "legacy"]):
+                                valid_models.append(name)
+                        
+                        # Find highest flash and pro models
+                        flash_candidates = [m for m in valid_models if "flash" in m or "lite" in m]
+                        pro_candidates = [m for m in valid_models if "pro" in m or "ultra" in m]
+                        
+                        best_flash = sorted(flash_candidates, reverse=True)[0] if flash_candidates else "gemini-2.5-flash"
+                        best_pro = sorted(pro_candidates, reverse=True)[0] if pro_candidates else "gemini-2.5-pro"
+                        
+                        if "verifier_2" in endpoints:
+                            endpoints["verifier_2"]["active_model"] = best_flash
+                        if "judge" in endpoints:
+                            endpoints["judge"]["active_model"] = best_pro
+                            
+                        logger.info(f"[DYNAMIC MODEL CATALOG] Auto-discovered Google models: Flash={best_flash} | Pro={best_pro}")
+            except Exception as e:
+                logger.debug(f"[DYNAMIC MODEL CATALOG] Gemini probe skipped: {e}")
+
+        # 2. Groq Dynamic Discovery
+        groq_key = os.getenv("GROQ_API_KEY", "")
+        if groq_key:
+            try:
+                url = "https://api.groq.com/openai/v1/models"
+                req = urllib.request.Request(url, headers={"Authorization": f"Bearer {groq_key}", "Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    if resp.status == 200:
+                        data = json.loads(resp.read().decode("utf-8"))
+                        groq_models = [m.get("id", "") for m in data.get("data", []) if m.get("active", True)]
+                        # Look for latest llama versatile models
+                        versatile = [m for m in groq_models if "versatile" in m or "70b" in m]
+                        if versatile and "verifier_1" in endpoints:
+                            best_groq = sorted(versatile, reverse=True)[0]
+                            endpoints["verifier_1"]["active_model"] = best_groq
+                            logger.info(f"[DYNAMIC MODEL CATALOG] Auto-discovered Groq model: {best_groq}")
+            except Exception as e:
+                logger.debug(f"[DYNAMIC MODEL CATALOG] Groq probe skipped: {e}")
+
+        # 3. NVIDIA NIM Dynamic Discovery
+        nvidia_key = os.getenv("NVIDIA_API_KEY", "")
+        if nvidia_key:
+            try:
+                url = "https://integrate.api.nvidia.com/v1/models"
+                req = urllib.request.Request(url, headers={"Authorization": f"Bearer {nvidia_key}", "Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    if resp.status == 200:
+                        data = json.loads(resp.read().decode("utf-8"))
+                        nim_models = [m.get("id", "") for m in data.get("data", [])]
+                        nemotrons = [m for m in nim_models if "nemotron" in m]
+                        if nemotrons and "generator" in endpoints:
+                            best_nim = nemotrons[0]
+                            endpoints["generator"]["active_model"] = best_nim
+                            logger.info(f"[DYNAMIC MODEL CATALOG] Auto-discovered NVIDIA NIM model: {best_nim}")
+            except Exception as e:
+                logger.debug(f"[DYNAMIC MODEL CATALOG] NVIDIA probe skipped: {e}")
 
     def _load_registry(self) -> Dict[str, Any]:
         """Loads or falls back to default model registry."""
@@ -306,12 +385,12 @@ class MultiModelEnsemble:
                     "active_model": "llama-3.1-70b-versatile",
                     "base_url": "https://api.groq.com/openai/v1",
                     "api_key_env": "GROQ_API_KEY",
-                    "fallback_model": "gemini-1.5-flash",
+                    "fallback_model": "gemini-2.5-flash",
                     "fallback_base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
                     "fallback_key_env": "GEMINI_API_KEY"
                 },
                 "verifier_2": {
-                    "active_model": "gemini-1.5-flash",
+                    "active_model": "gemini-2.5-flash",
                     "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
                     "api_key_env": "GEMINI_API_KEY",
                     "fallback_model": "llama-3.1-70b-versatile",
@@ -319,7 +398,7 @@ class MultiModelEnsemble:
                     "fallback_key_env": "GROQ_API_KEY"
                 },
                 "judge": {
-                    "active_model": "gemini-1.5-pro",
+                    "active_model": "gemini-2.5-pro",
                     "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
                     "api_key_env": "GEMINI_API_KEY",
                     "fallback_model": "llama-3.1-70b-versatile",

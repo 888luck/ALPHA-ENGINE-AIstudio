@@ -2291,8 +2291,8 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                       onChange={(e) => setSelectedAiProvider(e.target.value)}
                       className="w-full mt-1 bg-white border border-slate-200 rounded p-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs font-mono"
                     >
-                      <option value="gemini-flash">Google Gemini 1.5 Flash (Performance)</option>
-                      <option value="gemini-pro">Google Gemini 1.5 Pro (Precision)</option>
+                      <option value="gemini-flash">Google Gemini 2.5 Flash (Performance)</option>
+                      <option value="gemini-pro">Google Gemini 2.5 Pro (Precision)</option>
                       <option value="openai-4o">OpenAI GPT-4o (Reasoning)</option>
                       <option value="openai-4o-mini">OpenAI GPT-4o Mini (Speed)</option>
                       <option value="nvidia-llama-70">NVIDIA Llama 3.1 70B (Edge)</option>
@@ -3221,8 +3221,8 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                         className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-sm transition"
                       >
                         <option value="auto">System Selection (Best Fit/Cost)</option>
-                        <option value="gemini-flash">Google Gemini 1.5 Flash (Fast/Free)</option>
-                        <option value="gemini-pro">Google Gemini 1.5 Pro (Deep Reasoning)</option>
+                        <option value="gemini-flash">Google Gemini 2.5 Flash (Fast/Free)</option>
+                        <option value="gemini-pro">Google Gemini 2.5 Pro (Deep Reasoning)</option>
                         <option value="openai-4o">OpenAI GPT-4o (Quantitative Logic)</option>
                         <option value="openai-4o-mini">OpenAI GPT-4o Mini (Efficiency)</option>
                         <option value="anthropic-sonnet">Anthropic Claude 3.5 Sonnet (Advanced Coding)</option>

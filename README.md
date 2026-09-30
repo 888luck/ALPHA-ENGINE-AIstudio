@@ -117,11 +117,34 @@ py scratch/test_phase2_endpoints.py
 
 ---
 
+---
+
+## 🛡️ 3. The 5 Dynamic Core Pillars (Deprecation-Free Architecture)
+
+AlphaEngine enforces a zero-drift, zero-hardcoding design to permanently protect operations against external API deprecations:
+
+1. **Dynamic Multi-Provider AI Model Catalog Auto-Discovery**:
+   - Live endpoint negotiation (`ai.models.list()`, Groq `/v1/models`, NVIDIA NIM `/v1/models`) dynamically discovers supported models and eliminates deprecated ones (e.g. Gemini 1.5 sunset).
+   - In-memory `SimpleQuotaGuard` enforces per-provider rolling-window rate limits.
+2. **Authoritative Exchange Calendars (`exchange_calendars`) & Dual DST Alignment**:
+   - Direct integration of `XNYS`, `XPAR`, and `XETR` official calendars resolves exchange holidays, early closes, and opening observation buffers dynamically.
+   - Dual DST Desynchronization Monitor tracks the 2–3 week shift window between US and European clocks, anchoring all session schedules to UTC.
+3. **Active Regulatory & Macro Feed Schema/Endpoint Auto-Adaptation**:
+   - SEC EDGAR CIK mappings are dynamically resolved from the SEC's live `company_tickers.json` directory.
+   - ClinicalTrials.gov and OpenFDA feeds utilize adaptive OpenAPI field traversal to self-heal across schema updates.
+4. **Native IBKR `reqContractDetails()` Socket Resolution on Startup**:
+   - Real minTick increments, liquid trading hours, and primary exchange routing are queried directly from the IB Gateway socket on startup and cached to `contract_spec_cache.json`.
+5. **Dynamic Volatility Risk Scaling (ATR-14 & Microstructure Sizing)**:
+   - Position sizing and stop-loss/take-profit brackets are calculated dynamically using 14-period Wilder ATR rather than arbitrary fixed percentages.
+   - Enforces adaptive breakeven latches (+1.0x ATR) and tiered scale-outs (+2.0x ATR).
+
+---
+
 ## 🖥️ 4. Navigation & Interface Overview
 
 - **`LIVE COCKPIT`**:
   - Pre-Trade Risk Gateway: Daily Capital Ceiling, Hard Daily Loss Cutoff, Fractional Lots toggle.
-  - Auto-Flatten Intraday Controller: 15:45 EST MOC toggle, live NY/Paris clocks, and immediate **"FLATTEN INTRADAY NOW"** button.
+  - Auto-Flatten Intraday Controller: MOC toggle, live NY/Paris clocks, and immediate **"FLATTEN INTRADAY NOW"** button.
   - PEAD & Intraday Lifecycle indicators: Breakeven Latch (+1.0x ATR) & Tiered Scale-Out (+2.0x ATR).
   - Emergency Circuit Breaker: Instant kill switch panic button & operator unlock command.
   - Live Execution Blotter: Audit trail of all fills, order types, slippage in bps, and transaction fees.
@@ -134,5 +157,6 @@ py scratch/test_phase2_endpoints.py
 ---
 
 ## 📖 5. Documentation & Resources
-- **Operational Runbook**: See [`docs/RUNBOOK.md`](docs/RUNBOOK.md) for step-by-step newcomer instructions, daily session schedules, and emergency response procedures.
+- **Operational Runbook**: See [`docs/RUNBOOK.md`](docs/RUNBOOK.md) for full architecture specifications, VNC instructions, and emergency recovery procedures.
 - **Phase 3 Walkthrough**: See [`walkthrough.md`](walkthrough.md) for mathematical proofs, test output logs, and regulatory compliance details.
+

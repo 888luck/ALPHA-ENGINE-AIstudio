@@ -178,13 +178,13 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
           const data = await resp.json();
           const geminiModels = (data.models || [])
             .map((m: any) => (m.name || "").replace("models/", ""))
-            .filter((name: string) => name.toLowerCase().includes("gemini"));
+            .filter((name: string) => name.toLowerCase().includes("gemini") && !name.includes("1.0") && !name.includes("1.5"));
 
           const displayModels = geminiModels.slice(0, 3).join(", ");
           return {
             success: true,
             latencyMs,
-            message: `Google Gemini API Key verified successfully (${latencyMs}ms). Active models: ${displayModels || "gemini-flash, gemini-pro"}.`,
+            message: `Google Gemini API Key verified successfully (${latencyMs}ms). Active models: ${displayModels || "gemini-2.5-flash, gemini-2.5-pro"}.`,
           };
         }
         const errJson = await resp.json().catch(() => ({}));

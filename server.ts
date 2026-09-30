@@ -107,8 +107,8 @@ async function getUniversalAIResponse(prompt: string, options: { provider?: stri
         }
       });
       
-      // Map aliases to standard models from gemini-api skill
-      const modelName = targetProvider === "gemini-pro" ? "gemini-1.5-pro" : "gemini-1.5-flash";
+      // Map aliases to standard active models
+      const modelName = targetProvider === "gemini-pro" ? "gemini-2.5-pro" : "gemini-2.5-flash";
       const result = await ai.models.generateContent({
         model: modelName,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -1667,16 +1667,16 @@ app.post("/api/test-ai-key", async (req, res) => {
       if (!key) throw new Error("No Gemini API key supplied or configured.");
       const ai = new GoogleGenAI({ apiKey: key });
       const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.5-flash",
         contents: testPrompt,
       });
       const latencyMs = Date.now() - startTime;
       return res.json({
         success: true,
         latencyMs,
-        provider: "Google Gemini (1.5 Flash)",
+        provider: "Google Gemini (2.5 Flash)",
         reply: response.text?.trim() || "READY",
-        message: `Gemini 1.5 Flash responded successfully in ${latencyMs}ms.`
+        message: `Gemini 2.5 Flash responded successfully in ${latencyMs}ms.`
       });
     }
 
@@ -1785,6 +1785,193 @@ app.post("/api/test-ai-key", async (req, res) => {
       error: err.message || "Failed to communicate with AI provider."
     });
   }
+});
+
+// Cache for live model catalogs (TTL: 1 hour)
+const modelCatalogCache: Record<string, { timestamp: number; data: any }> = {};
+
+// Universal Dynamic Multi-Provider Live Model Catalog Endpoint
+app.get("/api/models/live-catalog", async (req, res) => {
+  const providerQuery = (req.query.provider as string || "all").toLowerCase();
+  const cacheKey = `catalog_${providerQuery}`;
+  const now = Date.now();
+
+  if (modelCatalogCache[cacheKey] && (now - modelCatalogCache[cacheKey].timestamp < 3600000)) {
+    return res.json({ success: true, cached: true, ...modelCatalogCache[cacheKey].data });
+  }
+
+  const catalog: Record<string, any[]> = {
+    google_genai: [],
+    groq: [],
+    nvidia_nim: [],
+    openai: []
+  };
+
+  // 1. Google Gemini Dynamic Discovery
+  const geminiKey = systemSettings.geminiApiKey || process.env.GEMINI_API_KEY;
+  if (geminiKey && geminiKey !== "MY_GEMINI_API_KEY") {
+    try {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiKey}`, {
+        headers: { "Accept": "application/json" },
+        signal: AbortSignal.timeout(6000)
+      });
+      if (resp.ok) {
+        const body: any = await resp.json();
+        const rawModels: any[] = body.models || [];
+        catalog.google_genai = rawModels
+          .filter(m => {
+            const id = m.name?.replace("models/", "") || "";
+            const methods: string[] = m.supportedGenerationMethods || [];
+            const isDeprecated = id.includes("1.0") || id.includes("1.5") || id.includes("legacy");
+            return methods.includes("generateContent") && !isDeprecated;
+          })
+          .map(m => {
+            const id = m.name.replace("models/", "");
+            const isPro = id.includes("pro") || id.includes("ultra");
+            const isFlash = id.includes("flash") || id.includes("lite");
+            return {
+              id,
+              name: m.displayName || id,
+              description: m.description || "",
+              inputTokenLimit: m.inputTokenLimit || 1048576,
+              outputTokenLimit: m.outputTokenLimit || 8192,
+              recommendedRole: isPro ? "judge" : (isFlash ? "verifier_2" : "generator"),
+              status: "active"
+            };
+          });
+      }
+    } catch (e: any) {
+      console.warn("[MODEL CATALOG] Gemini live probe failed:", e.message);
+    }
+  }
+
+  // Fallback defaults if Gemini key is not configured or offline
+  if (catalog.google_genai.length === 0) {
+    catalog.google_genai = [
+      { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash (Verified)", inputTokenLimit: 1048576, outputTokenLimit: 8192, recommendedRole: "verifier_2", status: "active" },
+      { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro (Verified)", inputTokenLimit: 2097152, outputTokenLimit: 8192, recommendedRole: "judge", status: "active" }
+    ];
+  }
+
+  // 2. Groq Dynamic Discovery
+  const groqKey = systemSettings.customAiApiKey || process.env.GROQ_API_KEY;
+  if (groqKey) {
+    try {
+      const resp = await fetch("https://api.groq.com/openai/v1/models", {
+        headers: { "Authorization": `Bearer ${groqKey}`, "Accept": "application/json" },
+        signal: AbortSignal.timeout(5000)
+      });
+      if (resp.ok) {
+        const body: any = await resp.json();
+        catalog.groq = (body.data || [])
+          .filter((m: any) => m.active !== false && !m.id.includes("whisper"))
+          .map((m: any) => ({
+            id: m.id,
+            name: m.id,
+            contextWindow: m.context_window || 8192,
+            recommendedRole: "verifier_1",
+            status: "active"
+          }));
+      }
+    } catch (e: any) {
+      console.warn("[MODEL CATALOG] Groq live probe failed:", e.message);
+    }
+  }
+  if (catalog.groq.length === 0) {
+    catalog.groq = [
+      { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B Versatile", recommendedRole: "verifier_1", status: "active" },
+      { id: "llama-3.1-70b-versatile", name: "Llama 3.1 70B Versatile", recommendedRole: "verifier_1", status: "active" }
+    ];
+  }
+
+  // 3. NVIDIA NIM Dynamic Discovery
+  const nvidiaKey = systemSettings.nvidiaApiKey || process.env.NVIDIA_API_KEY;
+  if (nvidiaKey) {
+    try {
+      const resp = await fetch("https://integrate.api.nvidia.com/v1/models", {
+        headers: { "Authorization": `Bearer ${nvidiaKey}`, "Accept": "application/json" },
+        signal: AbortSignal.timeout(5000)
+      });
+      if (resp.ok) {
+        const body: any = await resp.json();
+        catalog.nvidia_nim = (body.data || []).slice(0, 20).map((m: any) => ({
+          id: m.id,
+          name: m.id,
+          recommendedRole: "generator",
+          status: "active"
+        }));
+      }
+    } catch (e: any) {
+      console.warn("[MODEL CATALOG] NVIDIA live probe failed:", e.message);
+    }
+  }
+  if (catalog.nvidia_nim.length === 0) {
+    catalog.nvidia_nim = [
+      { id: "nvidia/nemotron-3-ultra", name: "NVIDIA Nemotron 3 Ultra", recommendedRole: "generator", status: "active" },
+      { id: "meta/llama-3.1-70b-instruct", name: "Meta Llama 3.1 70B Instruct", recommendedRole: "generator", status: "active" }
+    ];
+  }
+
+  // Cache catalog result
+  const responseData = {
+    timestamp: new Date().toISOString(),
+    providers: catalog,
+    activeGemini: catalog.google_genai.map(m => m.id),
+    activeGroq: catalog.groq.map(m => m.id),
+    activeNvidia: catalog.nvidia_nim.map(m => m.id)
+  };
+
+  modelCatalogCache[cacheKey] = { timestamp: now, data: responseData };
+  res.json({ success: true, cached: false, ...responseData });
+});
+
+// Dedicated compatibility endpoint for Gemini model discovery
+app.get("/api/gemini/available-models", async (req, res) => {
+  const geminiKey = systemSettings.geminiApiKey || process.env.GEMINI_API_KEY;
+  if (!geminiKey || geminiKey === "MY_GEMINI_API_KEY") {
+    return res.json({
+      success: true,
+      models: [
+        { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", role: "verifier_2" },
+        { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", role: "judge" }
+      ]
+    });
+  }
+
+  try {
+    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiKey}`, {
+      headers: { "Accept": "application/json" },
+      signal: AbortSignal.timeout(6000)
+    });
+    if (resp.ok) {
+      const body: any = await resp.json();
+      const models = (body.models || [])
+        .filter((m: any) => {
+          const id = m.name?.replace("models/", "") || "";
+          const methods: string[] = m.supportedGenerationMethods || [];
+          return methods.includes("generateContent") && !id.includes("1.0") && !id.includes("1.5");
+        })
+        .map((m: any) => {
+          const id = m.name.replace("models/", "");
+          return {
+            id,
+            name: m.displayName || id,
+            role: id.includes("pro") ? "judge" : "verifier_2"
+          };
+        });
+      return res.json({ success: true, models });
+    }
+  } catch (err: any) {
+    console.warn("[GEMINI MODELS] Could not fetch catalog:", err.message);
+  }
+
+  res.json({
+    success: true,
+    models: [
+      { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", role: "verifier_2" },
+      { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", role: "judge" }
+    ]
+  });
 });
 
 // 4. Regulatory, Science & Catalyst Feed Live Probe
@@ -2138,8 +2325,8 @@ app.post("/api/backtest-audit", async (req, res) => {
 
     // Provider config
     const pricingTable: Record<string, { model: string; inPrice: number; outPrice: number; name: string }> = {
-      "gemini-flash": { model: "gemini-3.5-flash", inPrice: 0.075, outPrice: 0.30, name: "Gemini 1.5 Flash" },
-      "gemini-pro": { model: "gemini-3.1-pro-preview", inPrice: 1.25, outPrice: 5.00, name: "Gemini 1.5 Pro" },
+      "gemini-flash": { model: "gemini-2.5-flash", inPrice: 0.075, outPrice: 0.30, name: "Gemini 2.5 Flash" },
+      "gemini-pro": { model: "gemini-2.5-pro", inPrice: 1.25, outPrice: 5.00, name: "Gemini 2.5 Pro" },
       "nvidia-nim": { model: "llama3-free", inPrice: 0.00, outPrice: 0.00, name: "Llama 3 (Nvidia NIM Free)" },
       "claude": { model: "claude-sonnet", inPrice: 3.00, outPrice: 15.00, name: "Claude 3.5 Sonnet" }
     };

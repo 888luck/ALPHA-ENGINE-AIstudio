@@ -2005,8 +2005,8 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                             onChange={(e) => setAiProvider(e.target.value)}
                             className="bg-black border border-white/10 rounded px-2.5 py-1 text-[11px] text-slate-200 font-mono outline-none focus:border-[#00ff88] cursor-pointer"
                           >
-                            <option value="gemini-flash">Gemini 1.5 Flash ($0.075 / 1M)</option>
-                            <option value="gemini-pro">Gemini 1.5 Pro ($1.25 / 1M)</option>
+                            <option value="gemini-flash">Gemini 2.5 Flash ($0.075 / 1M)</option>
+                            <option value="gemini-pro">Gemini 2.5 Pro ($1.25 / 1M)</option>
                             <option value="nvidia-nim">Llama 3 (NVIDIA NIM - Free)</option>
                             <option value="claude">Claude 3.5 Sonnet ($3.00 / 1M)</option>
                           </select>
@@ -2531,8 +2531,8 @@ journalctl -u alpha-engine.service -f</pre>
                     className="bg-black/60 border border-white/10 rounded px-2.5 py-1.5 text-[10.5px] text-slate-200 font-mono focus:border-[#00ff88] focus:outline-none"
                   >
                     <option value="auto">System Selection</option>
-                    <option value="gemini-flash">Gemini 1.5 Flash (Low Latency)</option>
-                    <option value="gemini-pro">Gemini 1.5 Pro (Max Reasoning)</option>
+                    <option value="gemini-flash">Gemini 2.5 Flash (Low Latency)</option>
+                    <option value="gemini-pro">Gemini 2.5 Pro (Max Reasoning)</option>
                     <option value="openai-4o">OpenAI GPT-4o (Quant Logic)</option>
                     <option value="openai-4o-mini">OpenAI GPT-4o Mini</option>
                     <option value="anthropic-sonnet">Claude 3.5 Sonnet</option>
@@ -3090,12 +3090,12 @@ journalctl -u alpha-engine.service -f</pre>
                 <div className="bg-[#141a29] border border-white/10 p-4 rounded-xl space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-200 font-mono flex items-center gap-1.5">
-                      <Award className="w-3.5 h-3.5 text-purple-400" /> JUDGE (GEMINI 1.5 PRO)
+                      <Award className="w-3.5 h-3.5 text-purple-400" /> JUDGE (GEMINI 2.5 PRO)
                     </span>
                     <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded font-mono">SYNTHESIS</span>
                   </div>
                   <p className="text-[11px] text-slate-400">
-                    Model: <code className="text-indigo-300">gemini-1.5-pro</code>
+                    Model: <code className="text-indigo-300">gemini-2.5-pro</code>
                   </p>
                   <p className="text-[11px] text-slate-400">
                     Role: Tie-breaker adjudication, conflict synthesis, final universe sign-off.
