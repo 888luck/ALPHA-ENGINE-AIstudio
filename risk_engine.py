@@ -16,13 +16,19 @@ class DRMMiddleware:
     def __init__(self, connection_manager, account_number: str = "DEFAULT", params: Dict[str, Any] = None):
         self.cm = connection_manager
         self.account_number = account_number
-        self.max_trade_risk_pct = 0.01      # 1% equity ceiling per trade setup
-        self.max_daily_drawdown_pct = 0.025 # 2.5% daily aggregate loss threshold
+        
+        # Institutional Risk Hierarchy (0.25% Risk Budget per trade, 4r Daily Loss Cutoff)
+        self.max_trade_risk_pct = 0.0025    # r = 0.25% equity risk budget per trade setup ($250 on $100k)
+        self.max_daily_drawdown_pct = 0.010 # 1.0% daily aggregate loss threshold (= 4r, $1,000 on $100k)
         
         # Institutional Pre-Trade Risk Gateway Parameters
         params = params or {}
-        self.daily_capital_ceiling = float(params.get("daily_capital_ceiling", 10000.0))  # Daily capital allocation (e.g. €10,000)
-        self.daily_max_loss_cutoff = float(params.get("daily_max_loss_cutoff", 250.0))    # Hard currency stop loss (e.g. €250)
+        self.start_day_equity = float(params.get("start_day_equity", 100000.0))
+        self.daily_capital_ceiling = float(params.get("daily_capital_ceiling", 10000.0))  # Daily capital allocation ceiling
+        
+        # Daily loss cutoff defaults strictly to 4r = 4 * (0.0025 * start_day_equity) = $1,000 on $100k
+        derived_cutoff = 4.0 * (self.start_day_equity * self.max_trade_risk_pct)
+        self.daily_max_loss_cutoff = float(params.get("daily_max_loss_cutoff", derived_cutoff))
         self.fractional_trading_enabled = bool(params.get("fractional_trading_enabled", True))
         self.max_adv_participation_pct = float(params.get("max_adv_participation_pct", 0.015)) # 1.5% max of 5m ADV
         self.max_short_borrow_fee_pct = float(params.get("max_short_borrow_fee_pct", 15.0))    # 15% max annual borrow fee
@@ -33,9 +39,6 @@ class DRMMiddleware:
         
         # Lock status indicator
         self.router_locked = False
-        
-        # Track initial start-of-day reference equity
-        self.start_day_equity = 100000.0  # Normalized fallback default
 
     def update_settings(self, settings: Dict[str, Any]):
         """Updates risk gateway settings dynamically from API/UI."""
@@ -61,10 +64,10 @@ class DRMMiddleware:
         net_liq = self.cm.account_summary.get("NetLiquidation", self.start_day_equity)
         maint_margin = self.cm.account_summary.get("MaintMarginReq", 0.0)
         
-        # Fallback to Reg T manual 25% Intraday margin calculation if missing from broker stream
+        # Fallback to conservative margin estimation if broker summary is pending
         if maint_margin == 0.0 and len(self.cm.active_positions) > 0:
             total_exposure = sum(abs(pos.get("qty", 0) * pos.get("avgCost", 0.0)) for pos in self.cm.active_positions.values())
-            maint_margin = total_exposure * 0.25 # Reg T 25% intraday rule
+            maint_margin = total_exposure * 0.25
         
         # If maintenance margin consumes more than 80% of aggregate Net Liquidating value: raise critical alarm
         if maint_margin > (net_liq * 0.80):
@@ -74,12 +77,14 @@ class DRMMiddleware:
 
     def calculate_atr14(self, bars: List[Dict[str, float]], current_price: float = 100.0) -> float:
         """
-        Calculates 14-period Wilder Average True Range (ATR) from candlestick bars.
-        True Range = max(H - L, abs(H - C_prev), abs(L - C_prev))
-        If fewer than 14 bars are available, dynamically scales to 1.8% of current asset price.
+        Calculates 14-period Wilder Average True Range (ATR) using Wilder's Exponential Smoothing (RMA):
+          TR_t = max(H - L, abs(H - C_prev), abs(L - C_prev))
+          ATR_t = (ATR_{t-1} * 13 + TR_t) / 14
+        Requires at least 14 bars (ideally 28+) of historical data. Refuses ungrounded trading if insufficient history.
         """
-        if not bars or len(bars) < 2:
-            return round(max(0.10, current_price * 0.018), 2)
+        if not bars or len(bars) < 14:
+            print(f"[RISK WARNING] Insufficient bar history ({len(bars) if bars else 0} bars < 14 required). Refusing ungrounded ATR estimate.")
+            return 0.0
             
         tr_list = []
         for i in range(1, len(bars)):
@@ -89,12 +94,14 @@ class DRMMiddleware:
             tr = max(h - l, abs(h - c_prev), abs(l - c_prev))
             tr_list.append(tr)
             
-        if len(tr_list) >= 14:
-            atr = sum(tr_list[-14:]) / 14.0
-        else:
-            atr = sum(tr_list) / len(tr_list)
+        # Initial 14-period SMA seed
+        atr = sum(tr_list[:14]) / 14.0
+        
+        # Subsequent Wilder's RMA smoothing across remaining bars
+        for tr in tr_list[14:]:
+            atr = (atr * 13.0 + tr) / 14.0
             
-        return round(max(0.05, atr), 2)
+        return round(max(0.01, atr), 4)
 
     def calculate_dynamic_brackets(
         self,
@@ -139,32 +146,40 @@ class DRMMiddleware:
             "scale_out_trigger": round_tick(scale_out_trigger),
             "scale_out_new_stop": round_tick(scale_out_new_stop),
             "take_profit": round_tick(take_profit),
-            "atr": round(atr, 2),
+            "atr": round(atr, 4),
             "k_stop": k_stop
         }
 
-    def calculate_position_size(self, entry_price: float, initial_stop: float, currency: str = "USD", fx_rate_to_base: float = 1.0) -> float:
+    def calculate_position_size(
+        self,
+        entry_price: float,
+        initial_stop: float,
+        multiplier: float = 1.0,
+        currency: str = "USD",
+        fx_rate_to_base: float = 1.0
+    ) -> float:
         """
-        Dynamic 1% Equity Position Sizer with Multi-Currency & FX Normalization.
-        Supports fractional sizes with 4-decimal precision if fractional_trading_enabled is True.
+        Institutional Position Sizer based on strict per-trade risk budget r = 0.25% of NetLiquidation.
+        Formula: Qty = r / (|Entry - Stop| * Multiplier * fx_rate_to_base)
+        Supports stocks (multiplier=1.0) and futures contracts (e.g. ES=50, NQ=20, CL=1000).
         """
         net_liq = self.cm.account_summary.get("NetLiquidation", self.start_day_equity)
-        risk_capital = net_liq * self.max_trade_risk_pct
+        risk_capital = net_liq * self.max_trade_risk_pct # r = 0.25% of NetLiq ($250 on $100k)
         stop_distance = abs(entry_price - initial_stop)
         
         if stop_distance <= 0:
             print("[RISK ERROR] Invalid initial stop loss distance. Cannot calculate position sizing.")
             return 0.0
             
-        unit_risk_in_base = stop_distance * fx_rate_to_base
+        unit_risk_in_base = stop_distance * multiplier * fx_rate_to_base
         raw_qty = risk_capital / unit_risk_in_base
         
-        if self.fractional_trading_enabled:
+        if self.fractional_trading_enabled and multiplier == 1.0:
             target_qty = round(raw_qty, 4)
         else:
             target_qty = float(math.floor(raw_qty))
             
-        print(f"[RISK ENGINE] Sizing: NetLiq: ${net_liq:.2f} | RiskCap: ${risk_capital:.2f} | UnitRisk ({currency}): ${unit_risk_in_base:.2f} -> Qty: {target_qty}")
+        print(f"[RISK ENGINE] Sizing: NetLiq: ${net_liq:.2f} | RiskCap (r=0.25%): ${risk_capital:.2f} | UnitRisk ({currency}): ${unit_risk_in_base:.2f} (mult={multiplier}) -> Qty: {target_qty}")
         return target_qty
 
     def check_pre_trade_gateway(self, symbol: str, action: str, requested_qty: float, price: float, rolling_5m_volume: float = 0.0) -> Dict[str, Any]:
@@ -183,7 +198,7 @@ class DRMMiddleware:
         order_notional = requested_qty * price
         
         # Gate 0: Geo Market Isolation Policy (US vs Europe)
-        is_eu = symbol.upper() in ["SAP", "RWE", "AIR", "ASML", "ENGI", "TTE", "SGO", "LVMH", "MC"] or any(symbol.upper().endswith(ext) for ext in [".PA", ".AS", ".DE", ".MC"])
+        is_eu = symbol.upper() in ["SAP", "RWE", "AIR", "ASML", "ENGI", "TTE", "SGO", "MC"] or any(symbol.upper().endswith(ext) for ext in [".PA", ".AS", ".DE", ".MC"])
         if self.market_scope == "US" and is_eu:
             return {
                 "approved": False,
@@ -212,7 +227,13 @@ class DRMMiddleware:
             return {"approved": False, "reason": f"Daily loss of ${total_pnl:.2f} breached hard cutoff of -${self.daily_max_loss_cutoff:.2f}. System Locked."}
             
         # Gate 3: ADV / Market Impact Participation Cap (Max 1.5% of 5m volume)
-        if rolling_5m_volume > 0 and requested_qty > (rolling_5m_volume * self.max_adv_participation_pct):
+        # Fail-Closed: If volume data is unavailable or zero, order MUST be rejected.
+        if rolling_5m_volume <= 0:
+            return {
+                "approved": False,
+                "reason": f"Market volume unavailable (rolling_5m_volume={rolling_5m_volume}); cannot verify 1.5% participation cap (Fail-Closed)."
+            }
+        if requested_qty > (rolling_5m_volume * self.max_adv_participation_pct):
             max_allowed = rolling_5m_volume * self.max_adv_participation_pct
             return {
                 "approved": False,
@@ -220,13 +241,20 @@ class DRMMiddleware:
             }
             
         # Gate 4: Short Locate & Borrow Fee Verification
+        # Fail-Closed: If institutional short availability cache is absent, reject short order.
         if action.upper() in ["SELL", "SHORT"] and symbol not in self.cm.active_positions:
-            short_info = getattr(self.cm, 'short_availability_cache', {}).get(symbol, {})
-            shortable_shares = short_info.get("shares_available", 1000000) # Default liquid if not in cache
-            borrow_fee_pct = short_info.get("borrow_fee_pct", 0.5)
+            short_cache = getattr(self.cm, 'short_availability_cache', {})
+            if symbol not in short_cache or not short_cache[symbol]:
+                return {
+                    "approved": False,
+                    "reason": f"Short locate unavailable: No institutional borrow data found in cache for {symbol} (Fail-Closed)."
+                }
+            short_info = short_cache[symbol]
+            shortable_shares = short_info.get("shares_available", 0) # Fail-Closed default 0
+            borrow_fee_pct = short_info.get("borrow_fee_pct", 999.0) # Fail-Closed default prohibitively high
             
             if shortable_shares < requested_qty:
-                return {"approved": False, "reason": f"Short locate unavailable: only {shortable_shares} shares available for {symbol}"}
+                return {"approved": False, "reason": f"Short locate unavailable: only {shortable_shares} shares available for {symbol}, requested {requested_qty:.2f}."}
             if borrow_fee_pct > self.max_short_borrow_fee_pct:
                 return {"approved": False, "reason": f"Short borrow fee {borrow_fee_pct:.1f}% exceeds max allowable threshold of {self.max_short_borrow_fee_pct:.1f}%"}
                 
@@ -243,15 +271,15 @@ class DRMMiddleware:
     def check_binary_event_blackout(self, symbol: str, lead_time_minutes: int = 30) -> Dict[str, Any]:
         """
         Enforces institutional binary event protection.
-        If an earnings release or major binary trial is scheduled within lead_time_minutes
-        or before next session open, entry orders are blocked to prevent overnight gap risk.
+        Fail-Closed: If binary calendar is uninitialized or missing, blocks new entries.
+        If an event is scheduled within lead_time_minutes or marked as after-hours print today, entry is blocked.
         """
-        if not hasattr(self.cm, 'binary_event_schedule'):
-            return {"is_blacked_out": False, "reason": "No scheduled binary events"}
+        if not hasattr(self.cm, 'binary_event_schedule') or self.cm.binary_event_schedule is None:
+            return {"is_blacked_out": True, "reason": "Binary event calendar uninitialized (Fail-Closed)"}
             
         event = self.cm.binary_event_schedule.get(symbol.upper())
         if not event:
-            return {"is_blacked_out": False, "reason": "No scheduled binary events"}
+            return {"is_blacked_out": False, "reason": "Clear"}
             
         event_timestamp = event.get("timestamp", 0)
         time_to_event = event_timestamp - time.time()
@@ -260,7 +288,7 @@ class DRMMiddleware:
         if (0 < time_to_event <= (lead_time_minutes * 60)) or event.get("is_today_after_hours", False):
             return {
                 "is_blacked_out": True,
-                "reason": f"{event.get('title', 'Earnings Release')} scheduled ({event.get('time_str', 'today after-hours')})"
+                "reason": f"{event.get('title', 'Binary Event')} scheduled ({event.get('time_str', 'today after-hours')})"
             }
             
         return {"is_blacked_out": False, "reason": "Clear"}
@@ -324,8 +352,9 @@ class DRMMiddleware:
 
     def emergency_flush(self):
         """
-        Liquidates all outstanding orders and flattens client positions.
+        Liquidates all outstanding orders and flattens client positions via real broker MKT orders.
         Locks the execution router from transmitting further orders.
+        Does NOT zero local position state until broker confirmations arrive.
         """
         self.router_locked = True
         print("[RISK DISPATCH] INITIALIZING EMERGENCY FLUSH. CANCELLING ALL OPEN WORKING PAPERS...")
@@ -336,29 +365,40 @@ class DRMMiddleware:
         except Exception as e:
             print(f"[RISK EXCEPTION] ReqGlobalCancel failed: {e}")
             
-        # 2. Market-On-Close order simulation / Direct adaptive limit routing to flatten structures
+        # 2. Transmit real Market liquidation orders directly to IBKR
         active_positions = list(self.cm.active_positions.items())
         for symbol, data in active_positions:
-            qty = data["qty"]
+            qty = data.get("qty", 0.0)
             if qty == 0:
                 continue
                 
             opposite_direction = "SELL" if qty > 0 else "BUY"
             exit_qty = abs(qty)
             
-            print(f"[FLATTEN DISPATCH] Placing market liquidation order: {opposite_direction} {exit_qty} {symbol}")
-            # Real production client order routing logic would transmit code via connection_manager:
-            # self.cm.placeOrder(self.cm.nextOrderId(), create_contract(symbol), create_market_order(opposite_direction, exit_qty))
+            print(f"[FLATTEN DISPATCH] Transmitting market liquidation order: {opposite_direction} {exit_qty} {symbol}")
+            try:
+                contract = self.cm.create_contract(symbol)
+                order = self.cm.create_market_order(opposite_direction, exit_qty)
+                order_id = self.cm.nextOrderId()
+                self.cm.placeOrder(order_id, contract, order)
+                print(f"[FLATTEN DISPATCH] Order #{order_id} transmitted to IBKR for {symbol} ({opposite_direction} {exit_qty})")
+            except Exception as e:
+                print(f"[FLATTEN ERROR] Failed transmitting liquidation order for {symbol}: {e}")
             
-            # Update local state tracking
-            self.cm.active_positions[symbol]["qty"] = 0
+            # NOTE: We do NOT zero self.cm.active_positions[symbol]["qty"] locally here!
+            # Broker truth is enforced strictly by inbound orderStatus / execDetails / position callbacks.
             
-        print("[RISK DISPATCH] EMERGENCY FLUSH EXECUTED. SYSTEM NOW STANDS FLAT. ROUTER UNDER SECURE HARD LOCK.")
+        print("[RISK DISPATCH] EMERGENCY FLUSH EXECUTED. ORDERS TRANSMITTED. ROUTER UNDER SECURE HARD LOCK.")
 
     def unlock_router(self, operator_key: str = "") -> bool:
-        """Manual router unlocking requiring explicit authorization."""
+        """Manual router unlocking requiring explicit authorization against OPERATOR_ADMIN_KEY."""
+        import os
+        admin_key = os.environ.get("OPERATOR_ADMIN_KEY", "ALPHA_ADMIN_REVERT_992")
+        if not operator_key or operator_key != admin_key:
+            print(f"[SECURITY ALERT] Unauthorized attempt to unlock router with key: '{operator_key}'! Unlock rejected.")
+            return False
         self.router_locked = False
-        print("[RISK GATEWAY] Execution router manually unlocked by operator.")
+        print("[RISK GATEWAY] Execution router successfully unlocked by verified operator.")
         return True
 
     def check_intraday_flattening(self, current_time_est: str = "", current_time_cet: str = "") -> List[Dict[str, Any]]:
@@ -366,6 +406,7 @@ class DRMMiddleware:
         Intraday Flattening Controller (SEC / MiFID II Market-on-Close Discipline).
         If intraday_flattening_enabled is True, automatically liquidates all intraday positions
         at or past 15:45 EST (for US products) and 17:15 CET (for European products).
+        Transmits real liquidation orders to IBKR.
         Returns list of executed liquidation orders with order_type 'MOC / MKT (INTRADAY FLATTEN)'.
         """
         if not self.intraday_flattening_enabled:
@@ -396,12 +437,20 @@ class DRMMiddleware:
             if data.get("is_swing", False):
                 continue
                 
-            is_european = symbol.upper() in ["SGO", "ENGI", "RWE", "SAP"] or data.get("exchange") in ["IBIS", "SBF", "AEB"]
+            is_european = symbol.upper() in ["SGO", "ENGI", "RWE", "SAP", "MC", "AIR", "ASML", "TTE"] or data.get("exchange") in ["IBIS", "SBF", "AEB"]
             if (is_european and is_eu_eod) or (not is_european and is_us_eod):
                 opposite_action = "SELL" if qty > 0 else "BUY"
                 exit_qty = abs(qty)
-                print(f"[INTRADAY MOC FLATTEN] Executing {opposite_action} {exit_qty} {symbol} (EOD Cutoff reached).")
-                self.cm.active_positions[symbol]["qty"] = 0
+                print(f"[INTRADAY MOC FLATTEN] Transmitting {opposite_action} {exit_qty} {symbol} to IBKR (EOD Cutoff reached).")
+                try:
+                    contract = self.cm.create_contract(symbol)
+                    order = self.cm.create_market_order(opposite_action, exit_qty)
+                    order_id = self.cm.nextOrderId()
+                    self.cm.placeOrder(order_id, contract, order)
+                    print(f"[INTRADAY FLATTEN] Transmitted order #{order_id} to IBKR for {symbol}")
+                except Exception as e:
+                    print(f"[INTRADAY FLATTEN ERR] Could not transmit liquidation order for {symbol}: {e}")
+
                 liquidations.append({
                     "symbol": symbol,
                     "action": opposite_action,

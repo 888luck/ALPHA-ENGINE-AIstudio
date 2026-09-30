@@ -265,8 +265,9 @@ class UniverseBuilder:
                     exp_move = contract_info.get("expectedMovePct", 1.8)
                     conviction_score = (impact.confidence * exp_move) / (friction_pct + 0.1)
                     
-                    win_rate = round(min(72.0, max(52.0, impact.confidence * 80.0)), 1)
-                    profit_factor = round(min(2.1, max(1.2, impact.confidence * 2.2)), 2)
+                    # Zero Synthetic Policy: Win rate & profit factor must come from verified trade logs, not manufactured formulas
+                    win_rate = None
+                    profit_factor = None
                     
                     is_gated, gate_reason = self.check_binary_event_gate(sym_clean)
                     candidate = RankedCandidate(
@@ -313,35 +314,10 @@ class UniverseBuilder:
                 rank_idx += 1
                 if len(final_ranked) >= max_instruments:
                     break
-                if len(final_ranked) >= max_instruments:
-                    break
                     
-        # If no candidates passed (e.g. quiet news day), provide safe fallback basket
+        # Zero Synthetic Policy: If no candidates qualify, preserve cash and return empty basket
         if not final_ranked:
-            logger.warning("[UNIVERSE FALLBACK] No high-conviction events passed filters. Seeding core benchmark assets.")
-            for i, sym in enumerate(["XLE", "SPY", "SAP"][:max_instruments]):
-                info = self.KNOWN_CONTRACTS[sym]
-                final_ranked.append(RankedCandidate(
-                    rank=i + 1,
-                    symbol=sym,
-                    sector="Core Benchmark",
-                    subsector="Equities",
-                    direction="BUY",
-                    catalyst="Macro trend benchmark allocation",
-                    confidence=0.60,
-                    projectedWinRate=58.0,
-                    profitFactor=1.45,
-                    expectedMovePct=info["expectedMovePct"],
-                    averageSpread=info["avgSpread"],
-                    estimatedFrictionPct=5.2,
-                    conId=info["conId"],
-                    primaryExchange=info["primaryExchange"],
-                    currency=info["currency"],
-                    isEuropean=info["isEuropean"],
-                    expiryHours=24,
-                    sessionPhase=self.market_hours.determine_phase(self.market_hours.get_fallback_session(info["isEuropean"]))[0],
-                    countdownStr=self.market_hours.determine_phase(self.market_hours.get_fallback_session(info["isEuropean"]))[1]
-                ))
+            logger.info("[UNIVERSE RESOLVER] No qualified events passed conviction and friction gates. Candidate universe is flat (0 instruments). Cash preserved.")
                 
         basket = DynamicBasket(
             generatedAt=datetime.now(timezone.utc).isoformat(),

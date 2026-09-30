@@ -43,3 +43,8 @@ test_performance.json
 
 # Firebase
 .firebase/
+*adminsdk*.json
+
+# Logs & Local Caches
+*.log
+contract_spec_cache.json

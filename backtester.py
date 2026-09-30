@@ -53,8 +53,7 @@ class AlphaBacktestingEngine:
         """
         bars = self.generate_synthetic_history(symbol, timeframe, start_date, end_date)
         if len(bars) < 25:
-            # Generate longer mock data if range is too narrow to build SMA-20
-            bars = self.generate_synthetic_history(symbol, timeframe, "2026-05-01", "2026-06-16")
+            raise ValueError(f"Insufficient historical bars ({len(bars)} < 25 required) for {symbol} between {start_date} and {end_date}. Cannot compute 20-period indicators.")
 
         self.equity = self.starting_capital
         self.balance_history = [{"date": bars[0]["date"], "equity": self.starting_capital}]
@@ -410,30 +409,12 @@ class AlphaBacktestingEngine:
                 return bars
         except Exception as e:
             import sys
-            print(f"[BACKTESTER] Failed to fetch real data from Yahoo Finance: {e}. Falling back to synthetic generation.", file=sys.stderr)
-            pass
+            print(f"[BACKTESTER ERROR] Failed to fetch real historical data from market feed: {e}", file=sys.stderr)
+            raise RuntimeError(f"Zero Synthetic Policy Violation: Real market data unavailable for {symbol} ({start_date_str} to {end_date_str}). Refusing random-walk fabrication.") from e
             
-        # Fallback basic generation if real data fails
-        current_time = start_date
-        current_price = 100.0
-        delta_minutes = 60 if interval != "1d" else 1440
-        random.seed(hash(symbol))
-        
-        while current_time <= end_date:
-            if current_time.weekday() < 5:
-                chg = current_price * random.normalvariate(0.0002, 0.015)
-                op = current_price
-                cl = op + chg
-                bars.append({
-                    "date": current_time.isoformat() + "Z",
-                    "open": round(op, 2),
-                    "high": round(max(op, cl) * 1.01, 2),
-                    "low": round(min(op, cl) * 0.99, 2),
-                    "close": round(cl, 2),
-                    "volume": int(1000000 * random.uniform(0.5, 1.5))
-                })
-                current_price = cl
-            current_time += timedelta(minutes=delta_minutes)
+        if not bars:
+            raise RuntimeError(f"Zero Synthetic Policy Violation: No bar data retrieved for {symbol} ({start_date_str} to {end_date_str}).")
+
         return bars
 
 if __name__ == "__main__":

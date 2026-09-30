@@ -31,6 +31,9 @@ class ConnectionManager(EWrapper, EClient):
         self.level2_depth: Dict[str, Dict[int, Any]] = {}  # ticker -> level depth map
         self.pnl_updates: Dict[str, Any] = {"realized": 0.0, "unrealized": 0.0, "total": 0.0}
         
+        # Order Management & ID Tracking
+        self.next_order_id: int = 1
+        
         # Institutional Data Caches
         self.short_availability_cache: Dict[str, Dict[str, Any]] = {} # symbol -> {shares_available, borrow_fee_pct}
         self.fundamental_data_cache: Dict[str, str] = {}              # symbol -> xml/json reports
@@ -43,6 +46,7 @@ class ConnectionManager(EWrapper, EClient):
         # Event callbacks mapped to strategic risk router
         self.on_quote_callback: Optional[Callable] = None
         self.on_execution_callback: Optional[Callable] = None
+        self.on_order_status_callback: Optional[Callable] = None
         self.on_pnl_callback: Optional[Callable] = None
         self.on_historical_data_complete_callback: Optional[Callable] = None
         
@@ -173,18 +177,72 @@ class ConnectionManager(EWrapper, EClient):
             if self.auto_reconnect_enabled and not self._is_reconnecting:
                 threading.Thread(target=self._reconnect_worker, name="IBKR_Reconnect_Thread", daemon=True).start()
 
+    def nextValidId(self, orderId: int):
+        """Standard IBKR callback initializing the next valid order ID."""
+        self.next_order_id = orderId
+        print(f"[IBKR GATEWAY] Next valid order ID received from broker: {orderId}")
+
+    def nextOrderId(self) -> int:
+        """Atomically allocates and returns the next valid sequence order ID."""
+        if not hasattr(self, 'next_order_id') or self.next_order_id is None:
+            self.next_order_id = 1
+        oid = self.next_order_id
+        self.next_order_id += 1
+        return oid
+
+    def create_contract(self, symbol: str, sec_type: str = "STK", exchange: str = "SMART", currency: str = "USD") -> Any:
+        """Constructs an institutional Contract specification."""
+        contract = Contract()
+        sym_clean = symbol.upper().strip()
+        contract.symbol = sym_clean
+        contract.secType = sec_type
+        contract.exchange = exchange
+        contract.currency = currency
+        
+        # Official European Venue Routing
+        if sym_clean in ["SAP", "RWE"]:
+            contract.exchange = "IBIS"
+            contract.currency = "EUR"
+        elif sym_clean in ["ENGI", "SGO", "AIR", "TTE", "MC"]:
+            contract.exchange = "SBF"
+            contract.currency = "EUR"
+        elif sym_clean in ["ASML"]:
+            contract.exchange = "AEB"
+            contract.currency = "EUR"
+        return contract
+
+    def create_market_order(self, action: str, quantity: float) -> Any:
+        """Constructs a compliant IBKR Market order (MKT DAY)."""
+        order = Order()
+        order.action = action.upper().strip()
+        order.orderType = "MKT"
+        order.totalQuantity = float(quantity)
+        order.tif = "DAY"
+        return order
+
+    def orderStatus(self, orderId: int, status: str, filled: float, remaining: float, avgFillPrice: float, permId: int, parentId: int, lastFillPrice: float, clientId: int, whyHeld: str, mktCapPrice: float):
+        """Tracks live broker order lifecycle state changes (Submitted, Filled, Cancelled)."""
+        print(f"[ORDER STATUS] Order #{orderId}: {status} | Filled: {filled} | Remaining: {remaining} @ Avg ${avgFillPrice:.2f}")
+        if self.on_order_status_callback:
+            self.on_order_status_callback(orderId, status, filled, remaining, avgFillPrice)
+
     def accountSummary(self, reqId: int, account: str, tag: str, value: str, currency: str):
         """Processes account values (e.g. NetLiquidation, MaintMarginReq) needed for risk screening."""
         self.account_summary[tag] = float(value) if value.replace('.', '', 1).isdigit() else value
         
     def position(self, account: str, contract: Any, position: float, avgCost: float):
-        """Tracks active positions across the intraday target catalog."""
+        """Tracks active positions across the intraday target catalog directly from broker truth."""
         symbol = contract.symbol
-        self.active_positions[symbol] = {
-            "qty": position,
-            "avgCost": avgCost,
-            "account": account
-        }
+        if position == 0:
+            self.active_positions.pop(symbol, None)
+            print(f"[BROKER POSITION] {symbol} position is now FLAT (0 shares). Removed from active catalog.")
+        else:
+            self.active_positions[symbol] = {
+                "qty": position,
+                "avgCost": avgCost,
+                "account": account
+            }
+            print(f"[BROKER POSITION] {symbol}: {position} shares @ avgCost ${avgCost:.2f} ({account})")
 
     def pnlSingle(self, reqId: int, valKey: int, pos: int, dailyPnL: float, unrealizedPnL: float, realizedPnL: float, value: float):
         """Real-time portfolio drawdown monitor callback."""
@@ -212,10 +270,11 @@ class ConnectionManager(EWrapper, EClient):
         Captures institutional short availability and borrow rate dynamics:
           tickType 236 = Shortable shares available
           tickType 232 = Short borrow fee rate (%)
+        Fail-Closed: Does NOT populate synthetic 1,000,000 shares. Remains strictly broker-provided.
         """
         symbol = self.req_id_to_symbol.get(reqId, "UNKNOWN")
         if symbol not in self.short_availability_cache:
-            self.short_availability_cache[symbol] = {"shares_available": 1000000, "borrow_fee_pct": 0.5}
+            self.short_availability_cache[symbol] = {}
             
         if tickType == 236: # Shortable Shares
             self.short_availability_cache[symbol]["shares_available"] = float(value)

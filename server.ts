@@ -399,49 +399,44 @@ export function calculateIBIECommission(symbol: string, primaryExchange: string,
   }
 }
 
-// Seed initial active trades & historical files
-let activeTrades: ActiveTrade[] = [
-  {
-    id: "TRD_001",
-    symbol: "XLE",
-    quantity: 650,
-    direction: "BUY",
-    entryPrice: 92.40,
-    stopPrice: 91.20,
-    currentPrice: 93.15,
-    unrealizedPnL: 487.50,
-    mifidDecisionMaker: "ALGO_DEC_992",
-    mifidExecutionTrader: "ALGO_EXE_554",
-    timestamp: new Date().toISOString()
-  }
-];
+// Zero Synthetic Policy: Active trades and historical blotters are maintained strictly by broker execution feeds
+let activeTrades: ActiveTrade[] = [];
+let historicalLogs: HistoricalLog[] = [];
 
-let historicalLogs: HistoricalLog[] = [
-  {
-    id: "LOG_101",
-    symbol: "NEE",
-    quantity: 420,
-    direction: "BUY",
-    entryPrice: 72.80,
-    exitPrice: 74.20,
-    realizedPnL: 588.00,
-    commission: 4.80,
-    efficiencyRatio: 8.5, // Total friction consumed 8.5% of gross profits
-    timestamp: new Date(Date.now() - 3600000).toISOString()
-  },
-  {
-    id: "LOG_102",
-    symbol: "ENPH",
-    quantity: 110,
-    direction: "SELL",
-    entryPrice: 115.60,
-    exitPrice: 113.10,
-    realizedPnL: 275.00,
-    commission: 2.20,
-    efficiencyRatio: 11.2,
-    timestamp: new Date(Date.now() - 7200000).toISOString()
+// Secrets Masking Helper
+function getMaskedSettings(settings: typeof systemSettings) {
+  const masked = { ...settings };
+  if (masked.geminiApiKey) masked.geminiApiKey = "configured";
+  if (masked.openaiApiKey) masked.openaiApiKey = "configured";
+  if (masked.anthropicApiKey) masked.anthropicApiKey = "configured";
+  if (masked.nvidiaApiKey) masked.nvidiaApiKey = "configured";
+  if (masked.customAiApiKey) masked.customAiApiKey = "configured";
+  if (masked.openFdaApiKey) masked.openFdaApiKey = "configured";
+  if (masked.fredApiKey) masked.fredApiKey = "configured";
+  if (masked.patentsApiKey) masked.patentsApiKey = "configured";
+  return masked;
+}
+
+// Authentication Middleware for State-Changing Control Plane Routes
+const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const operatorKey = process.env.OPERATOR_ADMIN_KEY || "ALPHA_ADMIN_REVERT_992";
+  const authHeader = (req.headers["authorization"] || "") as string;
+  const token = authHeader.startsWith("Bearer ") ? authHeader.substring(7).trim() : authHeader.trim();
+  const xKey = ((req.headers["x-admin-key"] || req.body?.operator_key || req.query?.operator_key || "") as string).trim();
+
+  if (token === operatorKey || xKey === operatorKey) {
+    return next();
   }
-];
+
+  // Allow bypass ONLY in explicit offline development mode
+  if (process.env.NODE_ENV === "development" && process.env.ALLOW_INSECURE_DEV === "true") {
+    return next();
+  }
+
+  return res.status(401).json({
+    error: "UNAUTHORIZED: Valid Operator Admin Key required to execute state-changing or risk operations."
+  });
+};
 
 // Level 2 Order Book Simulation Variables
 // Pre-seed ticks of Energy, Utilities, and Clean Tech targets
@@ -544,7 +539,7 @@ app.get("/api/diagnostics", (req, res) => {
     anthropicConfigured: !!(systemSettings.anthropicApiKey || process.env.ANTHROPIC_API_KEY),
     selectedAiProvider: systemSettings.selectedAiProvider,
     firebaseStatus: process.env.FIREBASE_API_KEY ? "configured" : "unconfigured",
-    settings: systemSettings,
+    settings: getMaskedSettings(systemSettings),
   });
 });
 
@@ -568,7 +563,7 @@ app.get("/api/state", (req, res) => {
   console.log("[SERVER] Incoming request for /api/state");
   try {
     res.json({
-      settings: systemSettings,
+      settings: getMaskedSettings(systemSettings),
       activeTrades,
       historicalLogs,
       marketBooks,
@@ -683,7 +678,7 @@ app.get("/api/risk/status", (req, res) => {
   });
 });
 
-app.post("/api/risk/settings", (req, res) => {
+app.post("/api/risk/settings", authMiddleware, (req, res) => {
   const { dailyCapitalCeiling, dailyMaxLossCutoff, fractionalTradingEnabled, intradayFlatteningEnabled, tradingMode, marketScope } = req.body;
   
   if (dailyCapitalCeiling !== undefined) systemSettings.dailyCapitalCeiling = Number(dailyCapitalCeiling);
@@ -698,10 +693,11 @@ app.post("/api/risk/settings", (req, res) => {
   }
 
   console.log(`[RISK CONFIG UPDATED] Ceiling: $${systemSettings.dailyCapitalCeiling} | Loss Cutoff: $${systemSettings.dailyMaxLossCutoff} | Scope: ${systemSettings.marketScope} | Mode: ${systemSettings.tradingMode}`);
-  res.json({ success: true, settings: systemSettings });
+  persistSettings();
+  res.json({ success: true, settings: getMaskedSettings(systemSettings) });
 });
 
-app.post("/api/risk/flatten-intraday", (req, res) => {
+app.post("/api/risk/flatten-intraday", authMiddleware, (req, res) => {
   const reason = req.body.reason || "15:45 EST MOC / Manual Intraday Flatten Rule";
   const liquidatedTrades: any[] = [];
   
@@ -738,7 +734,7 @@ app.post("/api/risk/flatten-intraday", (req, res) => {
   });
 });
 
-app.post("/api/risk/emergency-kill", (req, res) => {
+app.post("/api/risk/emergency-kill", authMiddleware, (req, res) => {
   systemSettings.killSwitchEngaged = true;
   systemSettings.routerLocked = true;
   
@@ -762,6 +758,15 @@ app.post("/api/risk/emergency-kill", (req, res) => {
   });
   activeTrades = [];
 
+  // Forward kill command to Edge Node via Firestore
+  if (db_fs) {
+    db_fs.collection("system_commands").add({
+      type: "EMERGENCY_FLUSH",
+      reason: "Kill switch triggered from web control plane",
+      timestamp: new Date().toISOString()
+    }).catch(err => console.warn("[FIREBASE] Command forward warning:", err.message));
+  }
+
   console.warn(`[KILL SWITCH] EMERGENCY FLUSH EXECUTED. Liquidated ${liquidatedCount} positions. Router Locked.`);
   res.json({
     success: true,
@@ -770,7 +775,7 @@ app.post("/api/risk/emergency-kill", (req, res) => {
   });
 });
 
-app.post("/api/risk/unlock", (req, res) => {
+app.post("/api/risk/unlock", authMiddleware, (req, res) => {
   systemSettings.killSwitchEngaged = false;
   systemSettings.routerLocked = false;
   console.log("[RISK GATEWAY] Router unlocked by operator command.");
@@ -1413,7 +1418,7 @@ app.post("/api/scanner-ingest", (req, res) => {
   res.json({ success: true, symbol, primaryExchange: exch, marketBooks });
 });
 
-app.post("/api/set-settings", (req, res) => {
+app.post("/api/set-settings", authMiddleware, (req, res) => {
   const { 
     ibkrAccountNumber, 
     mifid2DecisionMaker, 
@@ -1493,21 +1498,22 @@ app.post("/api/set-settings", (req, res) => {
     systemSettings.dailyDrawdownLimitCash = Number(dailyDrawdownLimitCash);
   }
 
-  if (geminiApiKey !== undefined) systemSettings.geminiApiKey = geminiApiKey;
-  if (openaiApiKey !== undefined) systemSettings.openaiApiKey = openaiApiKey;
-  if (anthropicApiKey !== undefined) systemSettings.anthropicApiKey = anthropicApiKey;
-  if (nvidiaApiKey !== undefined) systemSettings.nvidiaApiKey = nvidiaApiKey;
-  if (customAiApiKey !== undefined) systemSettings.customAiApiKey = customAiApiKey;
+  // Preserve existing keys if client sends "configured" placeholder
+  if (geminiApiKey !== undefined && geminiApiKey !== "configured") systemSettings.geminiApiKey = geminiApiKey;
+  if (openaiApiKey !== undefined && openaiApiKey !== "configured") systemSettings.openaiApiKey = openaiApiKey;
+  if (anthropicApiKey !== undefined && anthropicApiKey !== "configured") systemSettings.anthropicApiKey = anthropicApiKey;
+  if (nvidiaApiKey !== undefined && nvidiaApiKey !== "configured") systemSettings.nvidiaApiKey = nvidiaApiKey;
+  if (customAiApiKey !== undefined && customAiApiKey !== "configured") systemSettings.customAiApiKey = customAiApiKey;
   if (customAiBaseUrl !== undefined) systemSettings.customAiBaseUrl = customAiBaseUrl;
   if (customAiModelName !== undefined) systemSettings.customAiModelName = customAiModelName;
   if (selectedAiProvider !== undefined) systemSettings.selectedAiProvider = selectedAiProvider;
-  if (openFdaApiKey !== undefined) systemSettings.openFdaApiKey = openFdaApiKey;
-  if (fredApiKey !== undefined) systemSettings.fredApiKey = fredApiKey;
-  if (patentsApiKey !== undefined) systemSettings.patentsApiKey = patentsApiKey;
+  if (openFdaApiKey !== undefined && openFdaApiKey !== "configured") systemSettings.openFdaApiKey = openFdaApiKey;
+  if (fredApiKey !== undefined && fredApiKey !== "configured") systemSettings.fredApiKey = fredApiKey;
+  if (patentsApiKey !== undefined && patentsApiKey !== "configured") systemSettings.patentsApiKey = patentsApiKey;
   if (secUserAgent !== undefined) systemSettings.secUserAgent = secUserAgent;
 
   persistSettings();
-  res.json({ success: true, settings: systemSettings });
+  res.json({ success: true, settings: getMaskedSettings(systemSettings) });
 });
 
 app.post("/api/github-sync-action", async (req, res) => {
@@ -2148,128 +2154,74 @@ app.post("/api/simulate-tick", (req, res) => {
   res.json({ success: true, book });
 });
 
-// Dynamic pre-trade order sizing router & 1% risk pool allocator
-app.post("/api/place-trade", (req, res) => {
+// Single Execution Authority: Order Relay to Frankfurt Python Edge Node via Firestore
+app.post("/api/place-trade", authMiddleware, async (req, res) => {
   if (systemSettings.routerLocked) {
     return res.status(403).json({ error: "EXECUTION ROUTER HARD-LOCKED: Risk circuit breaker or session termination in progress." });
   }
 
-  const { symbol, direction, entryPrice, stopPrice, targetProfit } = req.body;
+  const { symbol, direction, entryPrice, stopPrice, quantity } = req.body;
 
   if (!symbol || !direction || !entryPrice || !stopPrice) {
     return res.status(400).json({ error: "Missing required order parameters (symbol, direction, entry, stop)." });
   }
 
-  const book = marketBooks[symbol];
-  if (!book) return res.status(404).json({ error: "Target asset book not found." });
-
-  // 1. DRM 1% Position Sizing check based on Virtual Capital Ceiling if specified, else netLiquidation
-  const stopDistance = Math.abs(entryPrice - stopPrice);
-  if (stopDistance <= 0) {
-    return res.status(400).json({ error: "Initial stop distance cannot be zero or negative." });
-  }
-
-  const activeCapital = (systemSettings.virtualCapitalCeiling && systemSettings.virtualCapitalCeiling > 0)
-    ? systemSettings.virtualCapitalCeiling
-    : systemSettings.netLiquidation;
-
-  const riskCapital = activeCapital * 0.01;
-  const calculatedQty = Math.floor(riskCapital / stopDistance);
-
-  if (calculatedQty <= 0) {
-    return res.status(400).json({ error: "Required stop-distance too wide compared to Virtual Capital Ceiling. Implied position size is 0 units." });
-  }
-
-  // 2. Spread & 15% Friction Rule Validation Filter incorporating exact IBIE commissions
-  const currentSpread = Number((book.asks[0].price - book.bids[0].price).toFixed(2));
-  const expectedCommission = calculateIBIECommission(symbol, book.primaryExchange, calculatedQty, entryPrice);
-  
-  // Friction = Spread difference cost + commissions
-  const halfSpreadCost = (currentSpread / 2) * calculatedQty;
-  const roundTripComm = expectedCommission * 2;
-  const totalFriction = halfSpreadCost + roundTripComm;
-  
-  const projectedGrossProfit = (targetProfit || (stopDistance * 1.5)) * calculatedQty;
-  const efficiencyRatio = Number(((totalFriction / projectedGrossProfit) * 100).toFixed(1));
-
-  if (efficiencyRatio > 15) {
-    return res.status(422).json({
-      error: "TRADE REJECTED FOR EFFICIENCY LOSS: Transaction fee + spread friction consumes over 15% of projected profit ceiling.",
-      efficiencyRatio,
-      frictionCost: totalFriction,
-      calculatedQty
+  // Single Authority Policy: The Frankfurt Python Edge Node is the sole execution authority.
+  // Express relays the authenticated order command to Firestore for execution by the Edge Node.
+  if (db_fs) {
+    try {
+      const cmdId = `CMD_${Date.now()}_${symbol}`;
+      await db_fs.collection("system_commands").doc(cmdId).set({
+        type: "SUBMIT_ORDER",
+        symbol: symbol.toUpperCase(),
+        direction: direction.toUpperCase(),
+        entryPrice: Number(entryPrice),
+        stopPrice: Number(stopPrice),
+        quantity: quantity ? Number(quantity) : null,
+        status: "PENDING_EDGE_DISPATCH",
+        createdAt: new Date().toISOString()
+      });
+      return res.json({ 
+        success: true, 
+        message: `Order command queued for Frankfurt Python Edge Node execution (Ref: ${cmdId})`,
+        commandId: cmdId
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: `Failed queuing order command to Edge Node: ${err.message}` });
+    }
+  } else {
+    return res.status(503).json({ 
+      error: "Edge Node communication link offline (Firestore uninitialized). Simulated execution is disabled under Zero Synthetic Policy." 
     });
   }
-
-  // 3. Margin requirement safety rule checks (ensure net liq covers minimum requirements)
-  const virtualMarginImpact = calculatedQty * 15.00; // Estimated intraday initial margin
-  if (systemSettings.maintenanceMargin + virtualMarginImpact > activeCapital * 0.85) {
-    return res.status(422).json({ error: "TRADE ABORTED: Margin leverage check failed. Intraday deployment triggers systemic margin risk threshold under specified Capital Ceiling." });
-  }
-
-  // Calculate target price based on active partial profit setting
-  const targetMultiplier = systemSettings.partialProfit ? 2.5 : 2.0;
-  const targetPriceVal = direction === "BUY"
-    ? Number((Number(entryPrice) + stopDistance * targetMultiplier).toFixed(2))
-    : Number((Number(entryPrice) - stopDistance * targetMultiplier).toFixed(2));
-
-  // Place trade setup inside active trades list
-  const newTrade: ActiveTrade = {
-    id: `TRD_${Math.floor(Math.random() * 9000) + 1000}`,
-    symbol,
-    quantity: calculatedQty,
-    direction,
-    entryPrice: Number(entryPrice),
-    stopPrice: Number(stopPrice),
-    currentPrice: book.lastPrice,
-    unrealizedPnL: 0.0,
-    mifidDecisionMaker: systemSettings.mifid2DecisionMaker,
-    mifidExecutionTrader: systemSettings.mifid2ExecutionTrader,
-    timestamp: new Date().toISOString(),
-    
-    // Upgraded tactical tracking state fields
-    initialQuantity: calculatedQty,
-    initialStop: Number(stopPrice),
-    targetPrice: targetPriceVal,
-    barsHeld: 0,
-    tranche1ScaledOut: false,
-    breakevenApplied: false,
-    scaleOutProfit: 0,
-    efficiencyRatio: efficiencyRatio
-  };
-
-  activeTrades.push(newTrade);
-  res.json({ success: true, trade: newTrade, efficiencyRatio, calculatedQty });
 });
 
 // Manual override emergency kill button endpoint
-app.post("/api/trigger-flush", (req, res) => {
+app.post("/api/trigger-flush", authMiddleware, async (req, res) => {
   executeEmergencyFlush("MANUAL SYSTEMIC OVERRIDE KILL-SWITCH INITIATED VIA PORTFOLIO WEB PANEL");
-  res.json({ success: true, settings: systemSettings, activeTrades });
+  if (db_fs) {
+    try {
+      await db_fs.collection("system_commands").add({
+        type: "EMERGENCY_FLUSH",
+        reason: "Manual flush initiated via web control plane",
+        timestamp: new Date().toISOString()
+      });
+    } catch (e: any) {
+      console.warn("[FIREBASE] Command forward warning:", e.message);
+    }
+  }
+  res.json({ success: true, settings: getMaskedSettings(systemSettings), activeTrades });
 });
 
-app.post("/api/reset-simulation", (req, res) => {
+app.post("/api/reset-simulation", authMiddleware, (req, res) => {
   systemSettings.routerLocked = false;
   systemSettings.netLiquidation = systemSettings.referenceEquity;
   systemSettings.maintenanceMargin = 0.00;
   systemSettings.marketTime = "09:30";
   systemSettings.marketPhase = "EXECUTION";
   activeTrades = [];
-  historicalLogs = [
-    {
-      id: "LOG_101",
-      symbol: "NEE",
-      quantity: 420,
-      direction: "BUY",
-      entryPrice: 72.80,
-      exitPrice: 74.20,
-      realizedPnL: 588.00,
-      commission: 4.80,
-      efficiencyRatio: 8.5,
-      timestamp: new Date().toISOString()
-    }
-  ];
-  res.json({ success: true });
+  historicalLogs = [];
+  res.json({ success: true, settings: getMaskedSettings(systemSettings) });
 });
 
 // Pre-flight proactive simulator across multiple asset baskets
@@ -2308,10 +2260,10 @@ app.get("/api/run-expectancy", (req, res) => {
   res.json(resultData);
 });
 
-app.post("/api/reset-drawdown-lock", (req, res) => {
+app.post("/api/reset-drawdown-lock", authMiddleware, (req, res) => {
   systemSettings.routerLocked = false;
   console.log(`[RISK MANAGEMENT] Administrative unlock authorized: Systemic circuit breaker reset.`);
-  res.json({ success: true, settings: systemSettings });
+  res.json({ success: true, settings: getMaskedSettings(systemSettings) });
 });
 
 app.post("/api/backtest-audit", async (req, res) => {

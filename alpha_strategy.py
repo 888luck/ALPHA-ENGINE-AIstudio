@@ -11,55 +11,105 @@ class AlphaStrategy:
         self.cm = connection_manager
         self.dec_maker = dec_maker
         self.exec_trader = exec_trader
-        self.last_bid_price = 0.0
-        self.last_bid_size = 0.0
-        self.last_ask_price = 0.0
-        self.last_ask_size = 0.0
+        
+        # Per-Symbol Microstructure Order Book State Tracking (prevents cross-symbol contamination)
+        self.quote_state: Dict[str, Dict[str, float]] = {} # symbol -> {bid_price, bid_size, ask_price, ask_size}
         
         # Max transaction efficiency limit: limit entries if friction > 15% target
         self.max_friction_pct = 0.15
-        self._macro_bias_cache: Dict[str, Tuple[float, bool]] = {} # symbol -> (timestamp, is_bullish)
+        self._macro_bias_cache: Dict[str, Any] = {} # symbol -> (timestamp, is_bullish)
 
-    def calculate_ofi(self, bid_price: float, bid_size: float, ask_price: float, ask_size: float) -> float:
+    def calculate_ofi(self, *args, **kwargs) -> float:
         """
-        Calculates cumulative Order Flow Imbalance (OFI).
-        Formula:
-          If Ask_Price_t > Ask_Price_t-1: Ask_Vol_Imbalance = -Ask_Size_t
-          If Ask_Price_t == Ask_Price_t-1: Ask_Vol_Imbalance = Ask_Size_t - Ask_Size_t-1
-          If Ask_Price_t < Ask_Price_t-1: Ask_Vol_Imbalance = Ask_Size_t-1
+        Calculates Order Flow Imbalance (OFI) according to Cont, Kukanov & Stoikov (2014)
+        ('The Price Impact of Order Book Events'):
+        
+        Bid Event Impact (e_b):
+          If Bid_Price_t > Bid_Price_t-1: e_b = Bid_Size_t (Price improved, new aggressive bid volume)
+          If Bid_Price_t == Bid_Price_t-1: e_b = Bid_Size_t - Bid_Size_t-1 (Queue delta)
+          If Bid_Price_t < Bid_Price_t-1: e_b = -Bid_Size_t-1 (Price dropped, previous bid queue wiped/cancelled)
           
-          If Bid_Price_t > Bid_Price_t-1: Bid_Vol_Imbalance = Bid_Size_t
-          If Bid_Price_t == Bid_Price_t-1: Bid_Vol_Imbalance = Bid_Size_t - Bid_Size_t-1
-          If Bid_Price_t < Bid_Price_t-1: Bid_Vol_Imbalance = -Bid_Size_t-1
+        Ask Event Impact (e_a):
+          If Ask_Price_t < Ask_Price_t-1: e_a = Ask_Size_t (Price dropped, new aggressive ask volume)
+          If Ask_Price_t == Ask_Price_t-1: e_a = Ask_Size_t - Ask_Size_t-1 (Queue delta)
+          If Ask_Price_t > Ask_Price_t-1: e_a = -Ask_Size_t-1 (Price rose, previous ask queue wiped/lifted)
           
-          OFI = Bid_Vol_Imbalance - Ask_Vol_Imbalance
+        OFI = e_b - e_a
+        
+        Supports both (symbol, bid_p, bid_s, ask_p, ask_s) and legacy (bid_p, bid_s, ask_p, ask_s).
         """
-        if self.last_bid_price == 0 or self.last_ask_price == 0:
-            self.last_bid_price, self.last_bid_size = bid_price, bid_size
-            self.last_ask_price, self.last_ask_size = ask_price, ask_size
+        symbol = "DEFAULT"
+        bid_price = 0.0
+        bid_size = 0.0
+        ask_price = 0.0
+        ask_size = 0.0
+
+        if len(args) == 5:
+            symbol, bid_price, bid_size, ask_price, ask_size = args
+        elif len(args) == 4:
+            if isinstance(args[0], str):
+                symbol = args[0]
+                bid_price, bid_size, ask_price = args[1:4]
+                ask_size = kwargs.get("ask_size", 0.0)
+            else:
+                symbol = kwargs.get("symbol", "DEFAULT")
+                bid_price, bid_size, ask_price, ask_size = args
+        elif len(args) >= 1 and isinstance(args[0], str):
+            symbol = args[0]
+            bid_price = args[1] if len(args) > 1 else kwargs.get("bid_price", 0.0)
+            bid_size = args[2] if len(args) > 2 else kwargs.get("bid_size", 0.0)
+            ask_price = args[3] if len(args) > 3 else kwargs.get("ask_price", 0.0)
+            ask_size = args[4] if len(args) > 4 else kwargs.get("ask_size", 0.0)
+        else:
+            symbol = kwargs.get("symbol", "DEFAULT")
+            bid_price = kwargs.get("bid_price", 0.0)
+            bid_size = kwargs.get("bid_size", 0.0)
+            ask_price = kwargs.get("ask_price", 0.0)
+            ask_size = kwargs.get("ask_size", 0.0)
+
+        sym_key = str(symbol).upper().strip()
+        bid_price = float(bid_price)
+        bid_size = float(bid_size)
+        ask_price = float(ask_price)
+        ask_size = float(ask_size)
+        if sym_key not in self.quote_state:
+            self.quote_state[sym_key] = {
+                "bid_price": float(bid_price), "bid_size": float(bid_size),
+                "ask_price": float(ask_price), "ask_size": float(ask_size)
+            }
             return 0.0
-            
-        # 1. Ask Vol Imbalance
-        if ask_price > self.last_ask_price:
-            ask_imbalance = -ask_size
-        elif ask_price == self.last_ask_price:
-            ask_imbalance = ask_size - self.last_ask_size
-        else:
-            ask_imbalance = self.last_ask_size
-            
-        # 2. Bid Vol Imbalance
-        if bid_price > self.last_bid_price:
-            bid_imbalance = bid_size
-        elif bid_price == self.last_bid_price:
-            bid_imbalance = bid_size - self.last_bid_size
-        else:
-            bid_imbalance = -self.last_bid_size
-            
-        ofi = bid_imbalance - ask_imbalance
-        
-        self.last_bid_price, self.last_bid_size = bid_price, bid_size
-        self.last_ask_price, self.last_ask_size = ask_price, ask_size
-        
+
+        prev = self.quote_state[sym_key]
+        last_bid_p = prev["bid_price"]
+        last_bid_s = prev["bid_size"]
+        last_ask_p = prev["ask_price"]
+        last_ask_s = prev["ask_size"]
+
+        # 1. Bid Event Impact (e_b)
+        if bid_price > last_bid_p:
+            e_b = bid_size
+        elif bid_price == last_bid_p:
+            e_b = bid_size - last_bid_s
+        else: # bid_price < last_bid_p
+            e_b = -last_bid_s
+
+        # 2. Ask Event Impact (e_a) - Cont, Kukanov & Stoikov (2014)
+        if ask_price < last_ask_p:
+            e_a = ask_size
+        elif ask_price == last_ask_p:
+            e_a = ask_size - last_ask_s
+        else: # ask_price > last_ask_p
+            e_a = -last_ask_s
+
+        # OFI = e_b - e_a
+        ofi = float(e_b - e_a)
+
+        # Update per-symbol quote state
+        self.quote_state[sym_key] = {
+            "bid_price": float(bid_price), "bid_size": float(bid_size),
+            "ask_price": float(ask_price), "ask_size": float(ask_size)
+        }
+
         return ofi
 
     def screen_macro_driver_congruence(self, macro_asset_symbol: str, target_asset_symbol: str, ofi_value: float, macro_bullish: bool = None) -> bool:

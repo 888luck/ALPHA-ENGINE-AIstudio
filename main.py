@@ -1,5 +1,7 @@
+import os
 import sys
 import time
+import subprocess
 import datetime
 import argparse
 import zoneinfo
@@ -52,12 +54,11 @@ def run_premarket_calibration(news_ingestor: NewsIngestor, ensemble: MultiModelE
         except Exception as e:
             print(f"[SCANNER DISCOVERY WARN] Scanner aggregation bypassed: {e}")
 
-    # 1. Ingest Events
-    events = news_ingestor.poll_macro_economic_calendar()
-    # Inject overnight news batch
-    news_ingestor.inject_sample_premarket_events()
+    # 1. Ingest Real Events (Zero Synthetic Policy: SEC EDGAR, ClinicalTrials, OpenFDA, and broker bulletins)
+    symbols_to_poll = discovered_symbols if discovered_symbols else ["NVDA", "AAPL", "MSFT", "TSLA", "SAP", "MC"]
+    events = news_ingestor.poll_all_real_feeds(symbols=symbols_to_poll)
     pending = news_ingestor.get_pending_events()
-    print(f"[INGESTION] Ingested {len(pending)} event catalysts for evaluation.")
+    print(f"[INGESTION] Ingested {len(pending)} verified event filings for evaluation.")
     
     # 2. Multi-Model Ensemble Analysis
     print(f"[ENSEMBLE] Evaluating {len(pending)} events across Critic-Verifier models...")
