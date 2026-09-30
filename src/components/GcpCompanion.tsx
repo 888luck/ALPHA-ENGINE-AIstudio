@@ -534,15 +534,15 @@ export default function GcpCompanion(props: GcpCompanionProps) {
       if (trimmed.startsWith("- ")) {
         let content = trimmed.replace("- ", "");
         return (
-          <li key={idx} className="text-[11px] text-slate-300 ml-3 list-disc py-0.5 leading-normal font-sans">
+          <li key={idx} className="text-xs text-slate-300 ml-3 list-disc py-0.5 leading-normal font-sans">
             {parseStrongText(content)}
           </li>
         );
       }
       if (trimmed.startsWith("**")) {
-        return <p key={idx} className="text-[11px] text-[#00ff88] font-bold mt-2 font-sans">{parseStrongText(trimmed)}</p>;
+        return <p key={idx} className="text-xs text-[#00ff88] font-bold mt-2 font-sans">{parseStrongText(trimmed)}</p>;
       }
-      return <p key={idx} className="text-[11.5px] text-slate-300 my-1 leading-relaxed font-sans">{parseStrongText(line)}</p>;
+      return <p key={idx} className="text-xs text-slate-300 my-1 leading-relaxed font-sans">{parseStrongText(line)}</p>;
     });
   };
 
@@ -567,7 +567,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
       {/* 🌐 CLOUD-AGNOSTIC PROVIDER ACTIVE CALIBRATION CONTROL BAR */}
       <div className="bg-black/45 p-3.5 mb-5 rounded-lg border border-indigo-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-mono select-none">
         <div className="space-y-1">
-          <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider block">Active Proximity Cloud Target</span>
+          <span className="text-xs text-indigo-400 font-bold uppercase tracking-wider block">Active Proximity Cloud Target</span>
           <div className="flex items-center gap-1.5 text-xs text-slate-200">
             <span className="w-2 h-2 rounded-full bg-[#00ff88] animate-pulse" />
             <span className="font-semibold text-slate-100 uppercase">
@@ -576,7 +576,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-1 bg-black/40 p-1 border border-white/5 rounded text-[10px]">
+        <div className="flex flex-wrap gap-1 bg-black/40 p-1 border border-white/5 rounded text-xs">
           <button
             onClick={() => setCloudProvider("gcp")}
             className={`px-3 py-1.5 rounded transition font-bold cursor-pointer ${cloudProvider === "gcp" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-350"}`}
@@ -612,7 +612,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
           <div>
             <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
               Multi-Cloud Low-Latency Control Plane
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#00ff88]/15 text-[#00ff88] border border-[#00ff88]/20 font-mono font-bold uppercase animate-pulse">
+              <span className="text-xs px-1.5 py-0.5 rounded bg-[#00ff88]/15 text-[#00ff88] border border-[#00ff88]/20 font-mono font-bold uppercase animate-pulse">
                 Agnostic Engine Active
               </span>
             </h3>
@@ -623,7 +623,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
         </div>
 
         {/* Multi-Tab Selector */}
-        <div className="flex flex-wrap gap-1 bg-black/35 border border-white/10 p-1 rounded font-mono text-[10px]">
+        <div className="flex flex-wrap gap-1 bg-black/35 border border-white/10 p-1 rounded font-mono text-xs">
           <button
             onClick={() => setActiveTab("github")}
             className={`px-3 py-1.5 rounded transition flex items-center gap-1 cursor-pointer ${
@@ -714,13 +714,13 @@ export default function GcpCompanion(props: GcpCompanionProps) {
             <div>
               <h4 className="text-xs font-bold text-slate-100 uppercase tracking-widest flex items-center gap-2 font-mono">
                 Frankfurt Co-Location Engaged • Trading Dashboard Active
-                <span className="text-[8.5px] font-mono px-1.5 py-0.5 rounded font-bold bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20 animate-pulse">
+                <span className="text-xs font-mono px-1.5 py-0.5 rounded font-bold bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20 animate-pulse">
                   ONLINE
                 </span>
               </h4>
-              <p className="text-[11px] text-slate-400 mt-0.5 leading-normal">
+              <p className="text-xs text-slate-400 mt-0.5 leading-normal">
                 Your co-located <strong className="text-slate-200">{cloudProvider.toUpperCase()}</strong> instance is actively bridging telemetry. 
-                API Interface is locked to: <strong className="text-emerald-400 font-mono text-[10.5px] uppercase">{apiEngineType === "portal" ? "Official REST Web Client Portal" : apiEngineType === "local-build" ? "Direct Official Native Headless Build (Failsafe)" : "Legacy Docker Image Lock"}</strong>.
+                API Interface is locked to: <strong className="text-emerald-400 font-mono text-xs uppercase">{apiEngineType === "portal" ? "Official REST Web Client Portal" : apiEngineType === "local-build" ? "Direct Official Native Headless Build (Failsafe)" : "Legacy Docker Image Lock"}</strong>.
               </p>
             </div>
           </div>
@@ -730,7 +730,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
               setVmConfigured(false);
               setWizardOpen(true);
             }}
-            className="px-3 py-1.5 text-[9.5px] uppercase font-mono font-bold tracking-wider rounded border border-white/10 hover:border-[#00ff88]/30 text-emerald-300 bg-[#00ff88]/5 hover:bg-[#00ff88]/10 transition cursor-pointer select-none whitespace-nowrap"
+            className="px-3 py-1.5 text-xs uppercase font-mono font-bold tracking-wider rounded border border-white/10 hover:border-[#00ff88]/30 text-emerald-300 bg-[#00ff88]/5 hover:bg-[#00ff88]/10 transition cursor-pointer select-none whitespace-nowrap"
           >
             ⚙️ RE-RUN ONBOARDING WIZARD
           </button>
@@ -746,11 +746,11 @@ export default function GcpCompanion(props: GcpCompanionProps) {
               <div>
                 <h4 className="text-xs font-bold text-slate-100 uppercase tracking-widest flex items-center gap-2 font-mono">
                   Fast-Track System Onboarding & Automation Hub
-                  <span className="text-[8.5px] px-1.5 py-0.5 rounded font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 font-extrabold uppercase animate-pulse">
+                  <span className="text-xs px-1.5 py-0.5 rounded font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 font-extrabold uppercase animate-pulse">
                     SETUP REQUIRED
                   </span>
                 </h4>
-                <p className="text-[11px] text-slate-400 font-sans font-medium mt-0.5 leading-normal">
+                <p className="text-xs text-slate-400 font-sans font-medium mt-0.5 leading-normal">
                   Configure your credentials, select a failsafe direct IBKR API engine, save keys, and bootstrap co-located nodes in Frankfurt instantly.
                 </p>
               </div>
@@ -758,7 +758,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
             <button
               type="button"
               onClick={() => setWizardOpen(!wizardOpen)}
-              className="px-2.5 py-1 text-[9.5px] uppercase font-mono font-bold tracking-wider rounded border border-white/10 transition cursor-pointer hover:bg-white/5 select-none text-indigo-300"
+              className="px-2.5 py-1 text-xs uppercase font-mono font-bold tracking-wider rounded border border-white/10 transition cursor-pointer hover:bg-white/5 select-none text-indigo-300"
             >
               {wizardOpen ? "Collapse Onboarding [-]" : "Expand Onboarding [+]"}
             </button>
@@ -767,74 +767,74 @@ export default function GcpCompanion(props: GcpCompanionProps) {
           {wizardOpen && (
             <div className="space-y-4 animate-fadeIn animate-duration-300">
               {/* Dynamic Step Indicator Block */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-black/35 p-3 rounded-lg border border-white/5 text-[10.5px]">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-black/35 p-3 rounded-lg border border-white/5 text-xs">
                 {/* Step 1 Selector */}
                 <div className="p-2.5 rounded bg-[#111622]/40 border border-indigo-500/10">
-                  <span className="text-[8.5px] font-mono text-indigo-400 uppercase font-bold tracking-wider block mb-1">Step 1: Proximity Target</span>
+                  <span className="text-xs font-mono text-indigo-400 uppercase font-bold tracking-wider block mb-1">Step 1: Proximity Target</span>
                   <div className="flex items-center gap-1.5 font-bold text-slate-200">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
                     <span className="uppercase">{cloudProvider} Frankfurt</span>
                   </div>
-                  <span className="text-[9px] text-slate-500 block mt-0.5 font-sans">Change Cloud Provider above at any time.</span>
+                  <span className="text-xs text-slate-500 block mt-0.5 font-sans">Change Cloud Provider above at any time.</span>
                 </div>
 
                 {/* Step 2 Failsafe Selector */}
                 <div className="p-2.5 rounded bg-[#111622]/40 border border-[#00ff88]/20">
-                  <span className="text-[8.5px] font-mono text-[#00ff88] uppercase font-bold tracking-wider block mb-1">Step 2: API Delivery Method</span>
+                  <span className="text-xs font-mono text-[#00ff88] uppercase font-bold tracking-wider block mb-1">Step 2: API Delivery Method</span>
                   <div className="relative">
                     <select
                       value={apiEngineType}
                       onChange={(e: any) => setApiEngineType(e.target.value)}
-                      className="w-full bg-[#0c101b]/95 border border-[#00ff88]/30 rounded px-1.5 py-1 text-slate-200 text-[10px] font-mono focus:outline-none focus:border-[#00ff88] cursor-pointer"
+                      className="w-full bg-[#0c101b]/95 border border-[#00ff88]/30 rounded px-1.5 py-1 text-slate-200 text-xs font-mono focus:outline-none focus:border-[#00ff88] cursor-pointer"
                     >
                       <option value="local-build">🛠️ DIRECT LOCAL CUSTOM BUILD</option>
                       <option value="portal">🌐 REST CLIENT PORTAL GATEWAY</option>
                       <option value="legacy">📦 LEGACY DOCKER IMAGE LOCK</option>
                     </select>
                   </div>
-                  <span className="text-[9px] text-[#00ff88]/70 block mt-0.5 font-sans leading-none">Downloads directly from official IBKR servers.</span>
+                  <span className="text-xs text-[#00ff88]/70 block mt-0.5 font-sans leading-none">Downloads directly from official IBKR servers.</span>
                 </div>
 
                 {/* Step 3 Credentials */}
                 <div className="p-2.5 rounded bg-[#111622]/40 border border-indigo-500/10">
-                  <span className="text-[8.5px] font-mono text-blue-400 uppercase font-bold tracking-wider block mb-1">Step 3: Access Rules</span>
+                  <span className="text-xs font-mono text-blue-400 uppercase font-bold tracking-wider block mb-1">Step 3: Access Rules</span>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-300 font-mono">Lane: {selectedRouterLane.toUpperCase()}</span>
-                    <span className="text-[9px] text-indigo-400">{isKeylessMode ? "🛡️ KEYLESS ACTIVE" : "⚙️ MANUAL KEYS"}</span>
+                    <span className="text-xs text-slate-300 font-mono">Lane: {selectedRouterLane.toUpperCase()}</span>
+                    <span className="text-xs text-indigo-400">{isKeylessMode ? "🛡️ KEYLESS ACTIVE" : "⚙️ MANUAL KEYS"}</span>
                   </div>
-                  <span className="text-[9px] text-slate-500 block mt-0.5 font-sans">Secure KMS variables active.</span>
+                  <span className="text-xs text-slate-500 block mt-0.5 font-sans">Secure KMS variables active.</span>
                 </div>
 
                 {/* Step 4 Save and Complete */}
                 <div className="p-2.5 rounded bg-emerald-500/5 border border-emerald-500/10">
-                  <span className="text-[8.5px] font-mono text-[#00ff88] uppercase font-bold tracking-wider block mb-1">Step 4: Launch Node</span>
+                  <span className="text-xs font-mono text-[#00ff88] uppercase font-bold tracking-wider block mb-1">Step 4: Launch Node</span>
                   <button
                     type="button"
                     onClick={() => {
                       setVmConfigured(true);
                       alert("CONGRATULATIONS! Your co-located Frankfurt node setup parameter is set to configured. The Dashboard has been unlocked and optimized strictly for high-frequency trading execution monitoring!");
                     }}
-                    className="w-full py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-[9px] uppercase rounded transition cursor-pointer select-none border border-emerald-400/20"
+                    className="w-full py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs uppercase rounded transition cursor-pointer select-none border border-emerald-400/20"
                   >
                     🚀 FINALIZE & LOCK VM
                   </button>
-                  <span className="text-[8.5px] text-slate-500 block mt-0.5 font-sans text-center">Toggles dashboard into compact trading view.</span>
+                  <span className="text-xs text-slate-500 block mt-0.5 font-sans text-center">Toggles dashboard into compact trading view.</span>
                 </div>
               </div>
 
               {/* Explanatory banner details on the Failsafe APIs */}
               <div className="bg-[#111622]/80 border border-white/5 rounded-lg p-3.5 space-y-2.5 font-sans">
-                <span className="text-[10.5px] font-bold text-slate-200 uppercase tracking-wide font-mono block flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-200 uppercase tracking-wide font-mono block flex items-center gap-1.5">
                   🛡️ IBKR API Failsafe Delivery Standard (Direct Connection Mode)
                 </span>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
+                <p className="text-xs text-slate-400 leading-relaxed">
                   Third-party Docker Hub images can be unreliable, lagging behind with deprecated login parameters or protocol version mismatch. To ensure your trading remains robust, we recommend bypassing Docker Hub locks completely:
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 text-[10.5px]">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 text-xs">
                   <div className={`p-3 rounded border transition ${apiEngineType === "local-build" ? "bg-indigo-500/10 border-indigo-500/40 animate-pulse" : "bg-black/30 border-white/5 text-slate-500"}`}>
                     <strong className="text-slate-200 block font-semibold mb-1">🛠️ Direct Custom Headless Build (Recommended)</strong>
                     <p className="leading-normal">
-                      Instructs the bootstrap script to curl the official Linux standalone installer (<code className="bg-black/40 text-indigo-300 px-1 rounded text-[10px]">ibgateway-stable-linux-x64.sh</code>) directly from IBKR's official CDN, compiling a pristine Docker gateway on-the-fly natively on your VM.
+                      Instructs the bootstrap script to curl the official Linux standalone installer (<code className="bg-black/40 text-indigo-300 px-1 rounded text-xs">ibgateway-stable-linux-x64.sh</code>) directly from IBKR's official CDN, compiling a pristine Docker gateway on-the-fly natively on your VM.
                     </p>
                   </div>
                   <div className={`p-3 rounded border transition ${apiEngineType === "portal" ? "bg-indigo-500/10 border-indigo-500/40 animate-pulse" : "bg-black/30 border-white/5 text-slate-500"}`}>
@@ -855,33 +855,33 @@ export default function GcpCompanion(props: GcpCompanionProps) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
               {/* Box 1: GitHub Secure Transport config */}
               <div className="p-3.5 rounded-lg border border-white/5 bg-black/40 space-y-3">
-                <div className="flex items-center gap-1.5 text-orange-400 font-bold text-[10.5px]">
+                <div className="flex items-center gap-1.5 text-orange-400 font-bold text-xs">
                   <Github className="w-4 h-4" />
                   <span>1. GitHub Storage Syncer</span>
                 </div>
-                <p className="text-[10px] text-slate-400 normal-case leading-relaxed font-sans">
+                <p className="text-xs text-slate-400 normal-case leading-relaxed font-sans">
                   Saves and synchronizes your algorithmic trading strategies securely using secure REST push pathways directly inside the VM.
                 </p>
                 <div className="space-y-2 font-sans">
                   <div>
-                    <label className="text-[9px] uppercase font-mono text-slate-500 block mb-1 font-bold">Token (Personal Access Token PAT)</label>
+                    <label className="text-xs uppercase font-mono text-slate-500 block mb-1 font-bold">Token (Personal Access Token PAT)</label>
                     <input
                       type="password"
                       value={githubToken}
                       onChange={(e) => setGithubToken(e.target.value)}
                       placeholder="ghp_****************"
-                      className="w-full bg-black/50 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 text-[10.5px] focus:outline-none focus:border-indigo-500/50 font-mono"
+                      className="w-full bg-black/50 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-indigo-500/50 font-mono"
                       title="Enter your GitHub PAT. Requires 'repo' scope activated in GitHub -> Developer Settings -> Personal Access Tokens (Classic or Fine-grained)."
                     />
                   </div>
                   <div>
-                    <label className="text-[9px] uppercase font-mono text-slate-500 block mb-1 font-bold">Destination Repository</label>
+                    <label className="text-xs uppercase font-mono text-slate-500 block mb-1 font-bold">Destination Repository</label>
                     <input
                       type="text"
                       value={githubRepo}
                       onChange={(e) => setGithubRepo(e.target.value)}
                       placeholder="username/repo-name"
-                      className="w-full bg-black/50 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 text-[10.5px] focus:outline-none focus:border-indigo-500/50 font-mono"
+                      className="w-full bg-black/50 border border-white/10 rounded px-2.5 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-indigo-500/50 font-mono"
                       title="Enter your custom GitHub repository destination, e.g. mstouff/alpha-trading-engine."
                     />
                   </div>
@@ -890,22 +890,22 @@ export default function GcpCompanion(props: GcpCompanionProps) {
 
               {/* Box 2: IBKR Headless Container Configuration */}
               <div className="p-3.5 rounded-lg border border-white/5 bg-black/40 space-y-3">
-                <div className="flex items-center gap-1.5 text-blue-400 font-bold text-[10.5px]">
+                <div className="flex items-center gap-1.5 text-blue-400 font-bold text-xs">
                   <Server className="w-4 h-4" />
                   <span>2. IBKR Execution Socket Setup</span>
                 </div>
-                <p className="text-[10px] text-slate-400 normal-case leading-relaxed font-sans">
+                <p className="text-xs text-slate-400 normal-case leading-relaxed font-sans">
                   Populates execution parameters into the VM's headless TWS container secure secrets environment variables framework automatically.
                 </p>
                 <div className="space-y-2 font-sans">
                   {/* Keyless Mode Selector */}
-                  <div className="flex items-center justify-between bg-black/55 border border-white/5 rounded p-1.5 font-mono text-[8px] leading-none">
+                  <div className="flex items-center justify-between bg-black/55 border border-white/5 rounded p-1.5 font-mono text-xs leading-none">
                     <span className="text-slate-400 font-bold uppercase pl-0.5">AUTH STRATEGY:</span>
                     <div className="flex gap-1">
                       <button
                         type="button"
                         onClick={() => setIsKeylessMode(true)}
-                        className={`px-1.5 py-0.5 rounded transition font-bold text-[8px] cursor-pointer select-none ${
+                        className={`px-1.5 py-0.5 rounded transition font-bold text-xs cursor-pointer select-none ${
                           isKeylessMode
                             ? "bg-blue-500/20 text-[#00ff88] border border-blue-500/30"
                             : "text-slate-500 hover:text-slate-300"
@@ -916,7 +916,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                       <button
                         type="button"
                         onClick={() => setIsKeylessMode(false)}
-                        className={`px-1.5 py-0.5 rounded transition font-bold text-[8px] cursor-pointer select-none ${
+                        className={`px-1.5 py-0.5 rounded transition font-bold text-xs cursor-pointer select-none ${
                           !isKeylessMode
                             ? "bg-slate-700 text-slate-200 border border-slate-600"
                             : "text-slate-500 hover:text-slate-300"
@@ -929,32 +929,32 @@ export default function GcpCompanion(props: GcpCompanionProps) {
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[9px] uppercase font-mono text-slate-500 block mb-1 font-bold">IBKR User</label>
+                      <label className="text-xs uppercase font-mono text-slate-500 block mb-1 font-bold">IBKR User</label>
                       <input
                         type="text"
                         value={isKeylessMode ? "[INSTANCE_IAM_ROLE]" : ibkrUser}
                         onChange={(e) => !isKeylessMode && setIbkrUser(e.target.value)}
                         disabled={isKeylessMode}
                         placeholder={isKeylessMode ? "[INSTANCE_IAM_ROLE]" : "e.g. tradingID"}
-                        className="w-full bg-black/50 border border-white/10 rounded px-2 py-1.5 text-slate-200 text-[10.5px] focus:outline-none focus:border-indigo-500/50 font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full bg-black/50 border border-white/10 rounded px-2 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-indigo-500/50 font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                         title={isKeylessMode ? "Automated keyless Google IAM Service Account mapping active." : "Your Interactive Brokers trade interface login ID."}
                       />
                     </div>
                     <div>
-                      <label className="text-[9px] uppercase font-mono text-slate-500 block mb-1 font-bold">IBKR Password</label>
+                      <label className="text-xs uppercase font-mono text-slate-500 block mb-1 font-bold">IBKR Password</label>
                       <input
                         type="password"
                         value={isKeylessMode ? "••••••••••••" : ibkrPass}
                         onChange={(e) => !isKeylessMode && setIbkrPass(e.target.value)}
                         disabled={isKeylessMode}
                         placeholder={isKeylessMode ? "••••••••••••" : "••••••••"}
-                        className="w-full bg-black/50 border border-white/10 rounded px-2 py-1.5 text-slate-400 text-[10.5px] focus:outline-none focus:border-indigo-500/50 font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full bg-black/50 border border-white/10 rounded px-2 py-1.5 text-slate-400 text-xs focus:outline-none focus:border-indigo-500/50 font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                         title={isKeylessMode ? "Secured dynamically with KMS Secret Manager variables." : "Your Interactive Brokers trade interface password."}
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="text-[9px] uppercase font-mono text-slate-500 block mb-1 font-bold">Operational Execution Lane</label>
+                    <label className="text-xs uppercase font-mono text-slate-500 block mb-1 font-bold">Operational Execution Lane</label>
                     <div className="grid grid-cols-2 gap-1.5 bg-black/50 p-1 border border-white/10 rounded font-mono">
                       <button
                         type="button"
@@ -962,7 +962,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                           setSelectedRouterLane("paper");
                           localStorage.setItem("alpha_router_lane", "paper");
                         }}
-                        className={`py-1 rounded text-center text-[8.5px] transition cursor-pointer font-bold select-none ${
+                        className={`py-1 rounded text-center text-xs transition cursor-pointer font-bold select-none ${
                           selectedRouterLane === "paper" ? "bg-amber-500/15 text-amber-400 border border-amber-500/20" : "text-slate-500"
                         }`}
                         title="TWS Paper Simulation Lane: Port 4002"
@@ -975,7 +975,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                           setSelectedRouterLane("live");
                           localStorage.setItem("alpha_router_lane", "live");
                         }}
-                        className={`py-1 rounded text-center text-[8.5px] transition cursor-pointer font-bold select-none ${
+                        className={`py-1 rounded text-center text-xs transition cursor-pointer font-bold select-none ${
                           selectedRouterLane === "live" ? "bg-red-500/15 text-red-500 border border-red-500/20" : "text-slate-500"
                         }`}
                         title="TWS LIVE Production Execution Lane: Port 4001"
@@ -989,25 +989,25 @@ export default function GcpCompanion(props: GcpCompanionProps) {
 
               {/* Box 3: Cloud Credentials Status & Vertex AI Keyless Integration */}
               <div className="p-3.5 rounded-lg border border-white/5 bg-black/40 space-y-3">
-                <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[10.5px]">
+                <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs">
                   <Cloud className="w-4 h-4" />
                   <span>3. Secure Keyless GCP Integration</span>
                 </div>
-                <p className="text-[10px] text-slate-400 normal-case leading-relaxed font-sans">
+                <p className="text-xs text-slate-400 normal-case leading-relaxed font-sans">
                   The Frankfurt Edge Daemon and Cloud Run frontend support secure <span className="text-[#00ff88] font-semibold">Keyless Authentication</span> via GCP Metadata service accounts. No JSON private service account key files need to be copied, created, or uploaded!
                 </p>
                 <div className="space-y-2">
                   <div className="p-2.5 bg-emerald-500/5 rounded border border-emerald-500/15 space-y-1">
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="text-[9.5px] text-slate-200 block font-semibold font-sans">Firestore Keyless Sync:</span>
-                        <span className="text-[8px] text-slate-400 font-mono">Automatic Instance-Level Auth</span>
+                        <span className="text-xs text-slate-200 block font-semibold font-sans">Firestore Keyless Sync:</span>
+                        <span className="text-xs text-slate-400 font-mono">Automatic Instance-Level Auth</span>
                       </div>
-                      <span className="px-1.5 py-0.5 text-[8px] rounded font-bold uppercase bg-emerald-500/15 text-[#00ff88] border border-emerald-500/25">
+                      <span className="px-1.5 py-0.5 text-xs rounded font-bold uppercase bg-emerald-500/15 text-[#00ff88] border border-emerald-500/25">
                         AUTOMATED KEYLESS
                       </span>
                     </div>
-                    <p className="text-[8.5px] text-slate-400 leading-normal font-sans">
+                    <p className="text-xs text-slate-400 leading-normal font-sans">
                       The GCE instance automatically logs in using the attached project metadata token. Your database sync is seamlessly active.
                     </p>
                   </div>
@@ -1015,15 +1015,15 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                   <div className="p-2.5 bg-indigo-500/5 rounded border border-indigo-500/10 space-y-1">
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="text-[9.5px] text-slate-200 block font-semibold font-sans">Vertex AI Integration:</span>
-                        <span className="text-[8px] text-slate-400 font-mono">Zero-Config AI Calibration</span>
+                        <span className="text-xs text-slate-200 block font-semibold font-sans">Vertex AI Integration:</span>
+                        <span className="text-xs text-slate-400 font-mono">Zero-Config AI Calibration</span>
                       </div>
-                      <span className="px-1.5 py-0.5 text-[8px] rounded font-bold uppercase bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20">
+                      <span className="px-1.5 py-0.5 text-xs rounded font-bold uppercase bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20">
                         ENABLED BY DEFAULT
                       </span>
                     </div>
-                    <p className="text-[8.5px] text-slate-400 leading-normal font-sans">
-                      No APIs require activation or subscription. Our Cloud Shell Deployment automatically enables <code className="bg-black/30 text-indigo-300 px-1 py-0.2 rounded font-mono text-[8.5px]">aiplatform.googleapis.com</code> on your project.
+                    <p className="text-xs text-slate-400 leading-normal font-sans">
+                      No APIs require activation or subscription. Our Cloud Shell Deployment automatically enables <code className="bg-black/30 text-indigo-300 px-1 py-0.2 rounded font-mono text-xs">aiplatform.googleapis.com</code> on your project.
                     </p>
                   </div>
                 </div>
@@ -1157,7 +1157,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
             </div>
 
             {saveMessage && (
-              <div className="p-3 rounded-lg text-[11.5px] font-mono leading-relaxed bg-indigo-500/10 border border-indigo-500/25 text-slate-200 space-y-1.5">
+              <div className="p-3 rounded-lg text-xs font-mono leading-relaxed bg-indigo-500/10 border border-indigo-500/25 text-slate-200 space-y-1.5">
                 <div className="flex items-center gap-1.5">
                   <Check className="w-3.5 h-3.5 text-[#00ff88] shrink-0" />
                   <span>{saveMessage}</span>
@@ -1168,7 +1168,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                       href={`https://github.com/${githubRepo}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10.5px] font-semibold text-white bg-indigo-600 hover:bg-indigo-500 font-sans tracking-wide rounded border border-indigo-500/40 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 font-sans tracking-wide rounded border border-indigo-500/40 transition-colors cursor-pointer"
                     >
                       <Github className="w-3.5 h-3.5" />
                       View Live Link on GitHub: <span className="underline">{githubRepo}</span>
@@ -1181,10 +1181,10 @@ export default function GcpCompanion(props: GcpCompanionProps) {
 
             {/* Quick Access Engine Shortcuts Section requested */}
             <div className="p-3.5 bg-black/50 rounded-lg border border-white/5 space-y-2">
-              <span className="text-[9.5px] uppercase text-slate-500 tracking-wider font-extrabold flex items-center gap-1 font-mono">
+              <span className="text-xs uppercase text-slate-500 tracking-wider font-extrabold flex items-center gap-1 font-mono">
                 <Activity className="w-3 h-3 text-[#00ff88]" /> Active Deployment shortcuts & direct operational access URLs
               </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-[10.5px] text-slate-300 font-mono">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs text-slate-300 font-mono">
                 <a
                   href={`https://shell.cloud.google.com/cloudshell/open?cloudshell_git_repo=${encodeURIComponent(
                     githubRepo ? `https://github.com/${githubRepo}` : "https://github.com/888luck/ALPHA-ENGINE-AIstudio"
@@ -1193,14 +1193,14 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                   rel="noreferrer"
                   className="p-2 rounded bg-[#4285F4]/5 border border-[#4285F4]/10 hover:border-[#4285F4]/35 hover:bg-[#4285F4]/10 transition flex items-center justify-between text-slate-200"
                 >
-                  <span className="flex items-center gap-1.5 font-sans font-medium text-[11px]">
+                  <span className="flex items-center gap-1.5 font-sans font-medium text-xs">
                     <Terminal className="w-3.5 h-3.5 text-blue-400" /> Auto-Clone Cloud Shell Launcher
                   </span>
                   <ExternalLink className="w-3 h-3 text-slate-500" />
                 </a>
 
                 <div className="p-2 rounded bg-white/5 border border-white/5 flex items-center justify-between relative group text-slate-200">
-                  <span className="flex items-center gap-1.5 text-slate-300 truncate font-sans font-medium text-[11px]">
+                  <span className="flex items-center gap-1.5 text-slate-300 truncate font-sans font-medium text-xs">
                     <Server className="w-3.5 h-3.5 text-blue-400" /> SSH Connection string
                   </span>
                   <button
@@ -1208,7 +1208,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                       navigator.clipboard.writeText("gcloud compute ssh alpha-trading-node --zone=europe-west3-a");
                       alert("Gcloud SSH command copied!");
                     }}
-                    className="px-1.5 py-0.5 text-[8.5px] rounded bg-white/15 hover:bg-[#00ff88]/15 text-slate-300 group-hover:text-[#00ff88] transition cursor-pointer select-none font-bold"
+                    className="px-1.5 py-0.5 text-xs rounded bg-white/15 hover:bg-[#00ff88]/15 text-slate-300 group-hover:text-[#00ff88] transition cursor-pointer select-none font-bold"
                     title="Copy command to securely login to your co-located VM host in Frankfurt instantly"
                   >
                     Copy Cmd
@@ -1216,7 +1216,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                 </div>
 
                 <div className="p-2 rounded bg-white/5 border border-white/5 flex items-center justify-between relative group text-slate-200">
-                  <span className="flex items-center gap-1.5 text-slate-300 truncate font-sans font-medium text-[11px]">
+                  <span className="flex items-center gap-1.5 text-slate-300 truncate font-sans font-medium text-xs">
                     <Activity className="w-3.5 h-3.5 text-[#00ff88]" /> systemd Log Streamer
                   </span>
                   <button
@@ -1224,7 +1224,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                       navigator.clipboard.writeText("sudo journalctl -u alpha-engine.service -f --no-tail");
                       alert("Journalctl service logging command copied!");
                     }}
-                    className="px-1.5 py-0.5 text-[8.5px] rounded bg-white/15 hover:bg-[#00ff88]/15 text-slate-300 group-hover:text-[#00ff88] transition cursor-pointer select-none font-bold"
+                    className="px-1.5 py-0.5 text-xs rounded bg-white/15 hover:bg-[#00ff88]/15 text-slate-300 group-hover:text-[#00ff88] transition cursor-pointer select-none font-bold"
                     title="Copy command to track live trades and system latency variables inside Debian Linux directly in real time!"
                   >
                     Copy Cmd
@@ -1241,14 +1241,14 @@ export default function GcpCompanion(props: GcpCompanionProps) {
         {/* Left Column: Financial & Physical Statistics */}
         <div className="space-y-4">
           <div className="bg-black/25 backdrop-blur-sm p-4 rounded-lg border border-white/5 space-y-3">
-            <div className="flex justify-between items-center text-[10px] text-slate-500 uppercase tracking-widest">
+            <div className="flex justify-between items-center text-xs text-slate-500 uppercase tracking-widest">
               <span>Financial Budget Planner</span>
               <Info className="w-3 h-3 text-slate-500" title="Dynamic price estimates for chosen cloud provider" />
             </div>
 
             {/* Dynamic Selector based on Cloud Provider */}
             {cloudProvider === "hetzner" ? (
-              <div className="flex items-center gap-2 bg-black/40 p-1 border border-white/5 rounded text-[10px]">
+              <div className="flex items-center gap-2 bg-black/40 p-1 border border-white/5 rounded text-xs">
                 <button
                   type="button"
                   onClick={() => setInstanceType("spot")}
@@ -1269,7 +1269,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                 </button>
               </div>
             ) : cloudProvider === "aws" ? (
-              <div className="flex items-center gap-2 bg-black/40 p-1 border border-white/5 rounded text-[10px]">
+              <div className="flex items-center gap-2 bg-black/40 p-1 border border-white/5 rounded text-xs">
                 <button
                   type="button"
                   onClick={() => setInstanceType("spot")}
@@ -1290,7 +1290,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                 </button>
               </div>
             ) : cloudProvider === "gcp" ? (
-              <div className="flex items-center gap-2 bg-black/40 p-1 border border-white/5 rounded text-[10px]">
+              <div className="flex items-center gap-2 bg-black/40 p-1 border border-white/5 rounded text-xs">
                 <button
                   type="button"
                   onClick={() => setInstanceType("spot")}
@@ -1311,7 +1311,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                 </button>
               </div>
             ) : (
-              <div className="bg-black/35 border border-white/5 p-2 rounded text-slate-500 text-[10px] text-center font-bold">
+              <div className="bg-black/35 border border-white/5 p-2 rounded text-slate-500 text-xs text-center font-bold">
                 Universal Private VPS Host (Free / Self-Hosted)
               </div>
             )}
@@ -1344,7 +1344,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
               </div>
             </div>
             
-            <p className="text-[10px] text-slate-400 leading-normal pt-1 flex items-start gap-1">
+            <p className="text-xs text-slate-400 leading-normal pt-1 flex items-start gap-1">
               <span className="text-indigo-400">♦</span> {
                 cloudProvider === "hetzner" 
                   ? instanceType === "standard" 
@@ -1360,8 +1360,8 @@ export default function GcpCompanion(props: GcpCompanionProps) {
           </div>
 
           <div className="bg-black/25 p-4 rounded-lg border border-white/5 space-y-1.5">
-            <span className="text-[10px] uppercase text-slate-500 tracking-widest block">Proximity Topology Matrix</span>
-            <div className="space-y-1 text-[11px] text-slate-300">
+            <span className="text-xs uppercase text-slate-500 tracking-widest block">Proximity Topology Matrix</span>
+            <div className="space-y-1 text-xs text-slate-300">
               <div className="flex justify-between items-center">
                 <span>VPS Deployment Node:</span>
                 <span className="text-slate-100 font-medium font-mono">
@@ -1392,19 +1392,19 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                 <h4 className="text-xs font-semibold text-slate-200 flex items-center gap-2">
                   <Github className="w-4 h-4 text-indigo-400" /> One-Click Direct-to-GitHub Syncer
                 </h4>
-                <span className="text-[9px] text-indigo-400 font-bold border border-indigo-500/30 px-2 py-0.5 rounded bg-indigo-500/5 block">
+                <span className="text-xs text-indigo-400 font-bold border border-indigo-500/30 px-2 py-0.5 rounded bg-indigo-500/5 block">
                   SECURE TUNNEL
                 </span>
               </div>
 
-              <p className="text-[11px] text-slate-400 leading-normal">
+              <p className="text-xs text-slate-400 leading-normal">
                 If the automated exporter in the AI Studio platform layout isn't accessible due to wrapper constraints, synchronize the absolute latest code directly to your repository! This operates purely server-side via the secure API, bypassing the UI safely.
               </p>
 
               <form onSubmit={handleGithubPush} className="space-y-3.5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[10px] text-slate-500 uppercase font-mono block mb-1">Target Repository Path</label>
+                    <label className="text-xs text-slate-500 uppercase font-mono block mb-1">Target Repository Path</label>
                     <input
                       type="text"
                       value={githubRepo}
@@ -1415,7 +1415,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-500 uppercase font-mono block mb-1">Target Commit Branch</label>
+                    <label className="text-xs text-slate-500 uppercase font-mono block mb-1">Target Commit Branch</label>
                     <input
                       type="text"
                       value={githubBranch}
@@ -1429,14 +1429,14 @@ export default function GcpCompanion(props: GcpCompanionProps) {
 
                 <div>
                   <div className="flex justify-between items-center mb-1">
-                    <label className="text-[10px] text-slate-500 uppercase font-mono flex items-center gap-1">
+                    <label className="text-xs text-slate-500 uppercase font-mono flex items-center gap-1">
                       GitHub Personal Access Token (PAT)
                     </label>
                     <a
                       href="https://github.com/settings/tokens/new?scopes=repo&description=AlphaEngineAIStudio"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center gap-0.5"
+                      className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-0.5"
                     >
                       Generate PAT <ExternalLink className="w-2.5 h-2.5" />
                     </a>
@@ -1446,10 +1446,10 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                     value={githubToken}
                     onChange={(e) => setGithubToken(e.target.value)}
                     placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                    className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 font-mono text-[11px] text-[#00ff88] focus:outline-none focus:border-indigo-500 placeholder-slate-700"
+                    className="w-full bg-black/45 border border-white/10 rounded px-2.5 py-1.5 font-mono text-xs text-[#00ff88] focus:outline-none focus:border-indigo-500 placeholder-slate-700"
                     required
                   />
-                  <div className="mt-1 text-[10px] text-slate-500 flex items-center gap-1">
+                  <div className="mt-1 text-xs text-slate-500 flex items-center gap-1">
                     <span className="text-yellow-600/75 font-semibold">♦ Security Mandate:</span> Token is executed only on server memory & never written to any public Firestore or client bundle.
                   </div>
                 </div>
@@ -1477,7 +1477,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
 
               {syncStatus && (
                 <div
-                  className={`p-3 rounded-lg border flex items-start gap-2.5 text-[11px] ${
+                  className={`p-3 rounded-lg border flex items-start gap-2.5 text-xs ${
                     syncStatus.success
                       ? "bg-[#00ff88]/10 border-[#00ff88]/30 text-emerald-200"
                       : "bg-red-500/10 border-red-500/30 text-rose-300"
@@ -1509,7 +1509,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
 
               {/* INTERACTIVE SYNC PIPELINE VISUALIZER */}
               <div className="mt-4 p-4 rounded-lg border border-indigo-500/10 bg-black/35 space-y-3">
-                <span className="text-[10px] text-indigo-400 font-extrabold uppercase tracking-widest flex items-center gap-1.5 font-mono">
+                <span className="text-xs text-indigo-400 font-extrabold uppercase tracking-widest flex items-center gap-1.5 font-mono">
                   <Play className="w-3 px-0.5 py-0.5 h-3 text-[#00ff88]" /> Core Deployment Pipeline Flow
                 </span>
                 
@@ -1517,44 +1517,44 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                   {/* Step 1 */}
                   <div className="p-2.5 rounded border border-white/5 bg-white/5 space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-400">STEP 1</span>
-                      <span className="px-1.5 py-0.5 text-[8px] font-mono rounded bg-white/10 text-slate-300 border border-white/10 uppercase font-bold tracking-wider scale-95 origin-right">
+                      <span className="text-xs font-bold text-slate-400">STEP 1</span>
+                      <span className="px-1.5 py-0.5 text-xs font-mono rounded bg-white/10 text-slate-300 border border-white/10 uppercase font-bold tracking-wider scale-95 origin-right">
                         Sandbox
                       </span>
                     </div>
-                    <p className="text-[10.5px] text-slate-200 font-semibold leading-snug">Local Workspace Changes</p>
-                    <p className="text-[9.5px] text-slate-400 leading-normal">You iterate on designs & algorithms inside the safe browser environment.</p>
+                    <p className="text-xs text-slate-200 font-semibold leading-snug">Local Workspace Changes</p>
+                    <p className="text-xs text-slate-400 leading-normal">You iterate on designs & algorithms inside the safe browser environment.</p>
                   </div>
 
                   {/* Step 2 */}
                   <div className="p-2.5 rounded border border-indigo-500/20 bg-indigo-500/5 space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-indigo-400">STEP 2</span>
-                      <span className="px-1.5 py-0.5 text-[8px] font-mono rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase font-bold tracking-wider scale-95 origin-right">
+                      <span className="text-xs font-bold text-indigo-400">STEP 2</span>
+                      <span className="px-1.5 py-0.5 text-xs font-mono rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase font-bold tracking-wider scale-95 origin-right">
                         Push
                       </span>
                     </div>
-                    <p className="text-[10.5px] text-indigo-200 font-semibold leading-snug">Transmit to GitHub (REST)</p>
-                    <p className="text-[9.5px] text-slate-400 leading-normal">Clicking <strong>Transmit Files</strong> pushes the absolute latest source code securely directly to your repository.</p>
+                    <p className="text-xs text-indigo-200 font-semibold leading-snug">Transmit to GitHub (REST)</p>
+                    <p className="text-xs text-slate-400 leading-normal">Clicking <strong>Transmit Files</strong> pushes the absolute latest source code securely directly to your repository.</p>
                   </div>
 
                   {/* Step 3 */}
                   <div className="p-2.5 rounded border border-emerald-500/30 bg-emerald-500/5 space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-emerald-400">STEP 3</span>
-                      <span className="px-1.5 py-0.5 text-[8px] font-mono rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase font-bold tracking-wider scale-95 origin-right">
+                      <span className="text-xs font-bold text-emerald-400">STEP 3</span>
+                      <span className="px-1.5 py-0.5 text-xs font-mono rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase font-bold tracking-wider scale-95 origin-right">
                         Pull & Run
                       </span>
                     </div>
-                    <p className="text-[10.5px] text-emerald-200 font-semibold leading-snug">Pull & Deploy on GCE Host</p>
-                    <p className="text-[9.5px] text-emerald-400 leading-normal">Your VM host runs <code className="bg-black/30 px-1 py-0.2 rounded text-[8.5px]">./deploy_to_gcp.sh</code> as configured in Tab 4 to pull changes and restart services.</p>
+                    <p className="text-xs text-emerald-200 font-semibold leading-snug">Pull & Deploy on GCE Host</p>
+                    <p className="text-xs text-emerald-400 leading-normal">Your VM host runs <code className="bg-black/30 px-1 py-0.2 rounded text-xs">./deploy_to_gcp.sh</code> as configured in Tab 4 to pull changes and restart services.</p>
                   </div>
                 </div>
 
-                <div className="text-[10px] text-amber-300 leading-normal pt-1.5 flex gap-1.5 items-start bg-amber-500/5 p-2 rounded border border-amber-500/10">
-                  <span className="font-extrabold text-[10.5px] shrink-0 mt-0.5">💡 PIPELINE RULE:</span>
+                <div className="text-xs text-amber-300 leading-normal pt-1.5 flex gap-1.5 items-start bg-amber-500/5 p-2 rounded border border-amber-500/10">
+                  <span className="font-extrabold text-xs shrink-0 mt-0.5">💡 PIPELINE RULE:</span>
                   <span>
-                    When you customize files like <code className="text-white font-mono bg-black/20 px-1 py-0.5 text-[8.5px]">main.py</code> or <code className="text-white font-mono bg-black/20 px-1 py-0.5 text-[8.5px]">backtester.py</code>, those updates are applied on your VM by running the VM's redeploy sequence. The syncer guarantees source storage safety, and the GCE deployment script updates the host execution environment dynamically!
+                    When you customize files like <code className="text-white font-mono bg-black/20 px-1 py-0.5 text-xs">main.py</code> or <code className="text-white font-mono bg-black/20 px-1 py-0.5 text-xs">backtester.py</code>, those updates are applied on your VM by running the VM's redeploy sequence. The syncer guarantees source storage safety, and the GCE deployment script updates the host execution environment dynamically!
                   </span>
                 </div>
               </div>
@@ -1568,12 +1568,12 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                 <h4 className="text-xs font-semibold text-slate-200 flex items-center gap-2">
                   <Sliders className="w-4 h-4 text-blue-400" /> Headless Docker + IBC Automation Orchestrator
                 </h4>
-                <span className="text-[9px] text-[#00ff88] font-bold border border-[#00ff88]/30 px-2 py-0.5 rounded bg-[#00ff88]/5 uppercase block">
+                <span className="text-xs text-[#00ff88] font-bold border border-[#00ff88]/30 px-2 py-0.5 rounded bg-[#00ff88]/5 uppercase block">
                   PRO LEVEL QUANT VM
                 </span>
               </div>
 
-              <p className="text-[11px] text-slate-400 leading-normal">
+              <p className="text-xs text-slate-400 leading-normal">
                 To run native IBKR Pro APIs continuously, you need a headless environment with auto-login capabilities. Input your IBKR credentials parameters below to bypass cloud firewalls and automatically build, provision, and deploy the Docker + IBC runtime co-located in Frankfurt.
               </p>
 
@@ -1584,7 +1584,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                     <ShieldCheck className="w-4 h-4 text-emerald-400" />
                     <span>Choose Automation Setup Method</span>
                   </h5>
-                  <p className="text-[10px] text-slate-400 leading-normal">
+                  <p className="text-xs text-slate-400 leading-normal">
                     Select standard manual login credentials or the advanced 100% keyless Secret Manager setup.
                   </p>
                 </div>
@@ -1593,7 +1593,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                   <button
                     type="button"
                     onClick={() => setIsKeylessMode(true)}
-                    className={`px-3 py-1.5 rounded text-[10px] font-bold transition flex items-center gap-1 cursor-pointer select-none ${
+                    className={`px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-1 cursor-pointer select-none ${
                       isKeylessMode
                         ? "bg-emerald-500/15 border border-emerald-500/35 text-[#00ff88]"
                         : "bg-black/30 border border-white/10 text-slate-500 hover:text-slate-300"
@@ -1604,7 +1604,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                   <button
                     type="button"
                     onClick={() => setIsKeylessMode(false)}
-                    className={`px-3 py-1.5 rounded text-[10px] font-bold transition flex items-center gap-1 cursor-pointer select-none ${
+                    className={`px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-1 cursor-pointer select-none ${
                       !isKeylessMode
                         ? "bg-blue-600/15 border border-blue-500/35 text-blue-400"
                         : "bg-black/30 border border-white/10 text-slate-500 hover:text-slate-300"
@@ -1617,7 +1617,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="text-[10px] text-slate-500 uppercase font-mono block mb-1">IBKR Username</label>
+                  <label className="text-xs text-slate-500 uppercase font-mono block mb-1">IBKR Username</label>
                   <input
                     type="text"
                     value={isKeylessMode ? "[INSTANCE_IAM_ROLE]" : ibkrUser}
@@ -1628,7 +1628,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-500 uppercase font-mono block mb-1">IBKR Password</label>
+                  <label className="text-xs text-slate-500 uppercase font-mono block mb-1">IBKR Password</label>
                   <input
                     type="password"
                     value={isKeylessMode ? "••••••••••••" : ibkrPass}
@@ -1639,7 +1639,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-500 uppercase font-mono block mb-1">Debit card / Security PIN (if applicable)</label>
+                  <label className="text-xs text-slate-500 uppercase font-mono block mb-1">Debit card / Security PIN (if applicable)</label>
                   <input
                     type="password"
                     value={isKeylessMode ? "••••" : ibkrPin}
@@ -1673,13 +1673,13 @@ export default function GcpCompanion(props: GcpCompanionProps) {
 
               {/* SSH Terminal Logs box */}
               {orchLogs.length > 0 && (
-                <div className="bg-black/85 border border-white/10 rounded p-4 text-[11px] text-slate-300 font-mono mt-3 space-y-1.5 min-h-36 max-h-56 overflow-y-auto leading-relaxed select-none relative pt-7">
+                <div className="bg-black/85 border border-white/10 rounded p-4 text-xs text-slate-300 font-mono mt-3 space-y-1.5 min-h-36 max-h-56 overflow-y-auto leading-relaxed select-none relative pt-7">
                   <div className="absolute top-1.5 left-2.5 flex gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
                     <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                   </div>
-                  <span className="absolute top-1 right-2 text-[9px] text-slate-500 uppercase font-mono tracking-widest leading-none">VM TELEMETRY CONSOLE</span>
+                  <span className="absolute top-1 right-2 text-xs text-slate-500 uppercase font-mono tracking-widest leading-none">VM TELEMETRY CONSOLE</span>
                   <div className="space-y-1">
                     {orchLogs.map((log, lIdx) => (
                       <div key={lIdx} className="fade-in">
@@ -1705,18 +1705,18 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                 <h4 className="text-xs font-semibold text-slate-200 flex items-center gap-2">
                   <ChartIcon className="w-4 h-4 text-[#00ff88]" /> Master Alpha Strategy Backtest Engine (Python Engine)
                 </h4>
-                <span className="text-[9px] text-[#00ff88] font-bold border border-[#00ff88]/30 px-2 py-0.5 rounded bg-[#00ff88]/5 tracking-wider uppercase font-mono block animate-pulse">
+                <span className="text-xs text-[#00ff88] font-bold border border-[#00ff88]/30 px-2 py-0.5 rounded bg-[#00ff88]/5 tracking-wider uppercase font-mono block animate-pulse">
                   SIMULATOR LIVE
                 </span>
               </div>
 
-              <p className="text-[11px] text-slate-400 leading-normal">
+              <p className="text-xs text-slate-400 leading-normal">
                 Run backtests on historic tick and bar data using the local quantitative Python simulation engine. It models the real **Alpha Intraday Strategy Rules** with a 1% capital risk constraint, dynamic stop calculations, commissions limits, and transaction friction filters:
               </p>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
-                  <label className="text-[10px] text-slate-500 uppercase block mb-1">Ticker ID</label>
+                  <label className="text-xs text-slate-500 uppercase block mb-1">Ticker ID</label>
                   <select
                     value={btTicker}
                     onChange={(e) => setBtTicker(e.target.value)}
@@ -1731,7 +1731,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-slate-500 uppercase block mb-1">Candle Size</label>
+                  <label className="text-xs text-slate-500 uppercase block mb-1">Candle Size</label>
                   <select
                     value={btTimeframe}
                     onChange={(e) => setBtTimeframe(e.target.value)}
@@ -1745,7 +1745,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-slate-500 uppercase block mb-1">Starting Date</label>
+                  <label className="text-xs text-slate-500 uppercase block mb-1">Starting Date</label>
                   <input
                     type="date"
                     value={btStartDate}
@@ -1755,7 +1755,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-slate-500 uppercase block mb-1">Ending Date</label>
+                  <label className="text-xs text-slate-500 uppercase block mb-1">Ending Date</label>
                   <input
                     type="date"
                     value={btEndDate}
@@ -1770,18 +1770,18 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                 <div className="flex items-center justify-between border-b border-white/5 pb-2">
                   <div className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#00ff88]" />
-                    <span className="text-[10px] text-[#00ff88] uppercase font-bold tracking-wider font-mono">
+                    <span className="text-xs text-[#00ff88] uppercase font-bold tracking-wider font-mono">
                       Tactical Controls: Option 1 Institutional Quantitative Parameters
                     </span>
                   </div>
-                  <span className="text-[9px] text-slate-400 font-mono">
+                  <span className="text-xs text-slate-400 font-mono">
                     Upgraded active parameters
                   </span>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                   <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 block font-mono">Stop ATR Multiplier: <span className="text-[#00ff88] font-bold">{btStopAtr}</span></label>
+                    <label className="text-xs text-slate-400 block font-mono">Stop ATR Multiplier: <span className="text-[#00ff88] font-bold">{btStopAtr}</span></label>
                     <input
                       type="range"
                       min="1.0"
@@ -1794,7 +1794,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 block font-mono">Max Hold Duration: <span className="text-[#00ff88] font-bold">{btMaxHoldBars} bars</span></label>
+                    <label className="text-xs text-slate-400 block font-mono">Max Hold Duration: <span className="text-[#00ff88] font-bold">{btMaxHoldBars} bars</span></label>
                     <input
                       type="number"
                       min="5"
@@ -1813,7 +1813,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                       onChange={(e) => setBtPartialProfit(e.target.checked)}
                       className="rounded border-white/10 text-emerald-500 focus:ring-emerald-500 w-3.5 h-3.5 accent-[#00ff88] cursor-pointer"
                     />
-                    <label htmlFor="btPartialProfit" className="text-[10.5px] text-slate-300 font-mono cursor-pointer select-none">
+                    <label htmlFor="btPartialProfit" className="text-xs text-slate-300 font-mono cursor-pointer select-none">
                       Partial Profit Taking (Scale-Outs)
                     </label>
                   </div>
@@ -1826,7 +1826,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                       onChange={(e) => setBtBreakevenLock(e.target.checked)}
                       className="rounded border-white/10 text-emerald-500 focus:ring-emerald-500 w-3.5 h-3.5 accent-[#00ff88] cursor-pointer"
                     />
-                    <label htmlFor="btBreakevenLock" className="text-[10.5px] text-slate-300 font-mono cursor-pointer select-none">
+                    <label htmlFor="btBreakevenLock" className="text-xs text-slate-300 font-mono cursor-pointer select-none">
                       Trailing Breakeven Lock
                     </label>
                   </div>
@@ -1839,7 +1839,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                       onChange={(e) => setBtOfiFilter(e.target.checked)}
                       className="rounded border-white/10 text-emerald-500 focus:ring-emerald-500 w-3.5 h-3.5 accent-[#00ff88] cursor-pointer"
                     />
-                    <label htmlFor="btOfiFilter" className="text-[10.5px] text-slate-300 font-mono cursor-pointer select-none">
+                    <label htmlFor="btOfiFilter" className="text-xs text-slate-300 font-mono cursor-pointer select-none">
                       OFI Level 2 Trend Filter
                     </label>
                   </div>
@@ -1852,7 +1852,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                       onChange={(e) => setBtAdaptiveStop(e.target.checked)}
                       className="rounded border-white/10 text-emerald-500 focus:ring-emerald-500 w-3.5 h-3.5 accent-[#00ff88] cursor-pointer"
                     />
-                    <label htmlFor="btAdaptiveStop" className="text-[10.5px] text-slate-300 font-mono cursor-pointer select-none">
+                    <label htmlFor="btAdaptiveStop" className="text-xs text-slate-300 font-mono cursor-pointer select-none">
                       Adaptive Volatility Stop
                     </label>
                   </div>
@@ -1879,7 +1879,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
 
               {/* Error Alert Box */}
               {btError && (
-                <div className="p-3 rounded border border-red-500/30 bg-red-500/10 text-rose-300 text-[11px] leading-normal font-mono flex items-start gap-2">
+                <div className="p-3 rounded border border-red-500/30 bg-red-500/10 text-rose-300 text-xs leading-normal font-mono flex items-start gap-2">
                   <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 select-none" />
                   <div>
                     <p className="font-bold">Algorithmic Engine Exception:</p>
@@ -1931,47 +1931,47 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                     {/* Performance Metrics Stats Grid */}
                     <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-center select-all">
                       <div className="bg-black/35 p-2.5 rounded border border-white/5 relative group">
-                        <span className="text-[9px] text-slate-500 block uppercase font-bold">Total Net PnL</span>
+                        <span className="text-xs text-slate-500 block uppercase font-bold">Total Net PnL</span>
                         <span className={`text-xs font-bold leading-normal block ${displayedPnL >= 0 ? "text-[#00ff88]" : "text-rose-400"}`}>
                           {displayedPnL >= 0 ? "+" : ""}${displayedPnL.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
-                        <span className={`text-[9.5px] font-bold block ${displayedPnL >= 0 ? "text-[#00ff88]" : "text-rose-400"}`}>
+                        <span className={`text-xs font-bold block ${displayedPnL >= 0 ? "text-[#00ff88]" : "text-rose-400"}`}>
                           ({displayedPnLPercent}%)
                         </span>
                         {deductAiOpEx && (
-                          <span className="absolute -top-1.5 -right-1 bg-indigo-500 text-[7px] text-white px-1 rounded-full scale-75 origin-top-right border border-black uppercase font-bold">
+                          <span className="absolute -top-1.5 -right-1 bg-indigo-500 text-xs text-white px-1 rounded-full scale-75 origin-top-right border border-black uppercase font-bold">
                             Net Cost
                           </span>
                         )}
                       </div>
 
                       <div className="bg-black/35 p-2.5 rounded border border-white/5">
-                        <span className="text-[9px] text-slate-500 block uppercase font-bold">Win Rate</span>
+                        <span className="text-xs text-slate-500 block uppercase font-bold">Win Rate</span>
                         <span className="text-xs text-slate-200 font-bold block pt-1">{btResults.winRate}%</span>
-                        <span className="text-[9px] text-slate-450 block font-normal leading-normal">
+                        <span className="text-xs text-slate-450 block font-normal leading-normal">
                           ({btResults.winningTrades}/{btResults.totalTrades})
                         </span>
                       </div>
 
                       <div className="bg-black/35 p-2.5 rounded border border-white/5">
-                        <span className="text-[9px] text-slate-500 block uppercase font-bold">Profit Factor</span>
+                        <span className="text-xs text-slate-500 block uppercase font-bold">Profit Factor</span>
                         <span className={`text-xs font-bold block pt-1.5 leading-normal ${btResults.profitFactor >= 1.5 ? "text-emerald-400" : (btResults.profitFactor >= 1 ? "text-slate-300" : "text-rose-300")}`}>
                           {btResults.profitFactor}
                         </span>
                       </div>
 
                       <div className="bg-black/35 p-2.5 rounded border border-white/5">
-                        <span className="text-[9px] text-slate-500 block uppercase font-bold">Max Drawdown</span>
+                        <span className="text-xs text-slate-500 block uppercase font-bold">Max Drawdown</span>
                         <span className="text-xs text-rose-400 font-bold block pt-1.5 leading-normal">-{btResults.maxDrawdownPercent}%</span>
                       </div>
 
                       <div className="bg-black/35 p-2.5 rounded border border-white/5">
-                        <span className="text-[9px] text-slate-500 block uppercase font-bold">Total Fees</span>
+                        <span className="text-xs text-slate-500 block uppercase font-bold">Total Fees</span>
                         <span className="text-xs text-slate-350 font-bold block pt-1.5 leading-normal">${btResults.totalCommissions}</span>
                       </div>
 
                       <div className="bg-black/35 p-2.5 rounded border border-white/5">
-                        <span className="text-[9px] text-slate-500 block uppercase font-bold">Final Cap</span>
+                        <span className="text-xs text-slate-500 block uppercase font-bold">Final Cap</span>
                         <span className="text-xs text-[#00ff88] font-bold block pt-1.5 leading-normal">
                           ${(deductAiOpEx ? (btResults.finalCapital - cumulativeAiOpEx) : btResults.finalCapital).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
@@ -1979,10 +1979,10 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                     </div>
 
                     {/* Option 2 Friction & Commission Explanation Callout */}
-                    <div className="p-3 bg-[#1e1e30]/30 border border-indigo-500/20 rounded-lg text-[10.5px] leading-relaxed text-indigo-200 font-sans flex items-start gap-2">
+                    <div className="p-3 bg-[#1e1e30]/30 border border-indigo-500/20 rounded-lg text-xs leading-relaxed text-indigo-200 font-sans flex items-start gap-2">
                       <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
                       <div>
-                        <span className="font-extrabold text-white uppercase font-mono tracking-wider text-[10px] block mb-1">🔌 OPTION 2 INTEGRITY ALERT: IBKR COMMISSION POLLING DELAY</span>
+                        <span className="font-extrabold text-white uppercase font-mono tracking-wider text-xs block mb-1">🔌 OPTION 2 INTEGRITY ALERT: IBKR COMMISSION POLLING DELAY</span>
                         To guarantee microsecond-accurate routing priority on the co-located Frankfurt VM, regulatory clearing fees and IBKR Europe hub commissions are modeled locally using static quantitative configurations. Real-time dynamic polling over IBKR sockets adds up to <strong className="text-white">40ms</strong> of network transit latency per transaction, completely destroying the speed edge of Frankfurt co-location. Static simulation modeling is the only way to safeguard your execution.
                       </div>
                     </div>
@@ -1994,7 +1994,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                           <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5 font-mono uppercase">
                             <span>🤖 Multi-Provider AI Strategy Critique & OpEx Engine</span>
                           </h4>
-                          <p className="text-[10px] text-slate-400">
+                          <p className="text-xs text-slate-400">
                             Deploy neural networks to audit this intraday backtest, evaluate curve-fitting, and review friction efficiency.
                           </p>
                         </div>
@@ -2003,7 +2003,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                           <select
                             value={aiProvider}
                             onChange={(e) => setAiProvider(e.target.value)}
-                            className="bg-black border border-white/10 rounded px-2.5 py-1 text-[11px] text-slate-200 font-mono outline-none focus:border-[#00ff88] cursor-pointer"
+                            className="bg-black border border-white/10 rounded px-2.5 py-1 text-xs text-slate-200 font-mono outline-none focus:border-[#00ff88] cursor-pointer"
                           >
                             <option value="gemini-flash">Gemini 2.5 Flash ($0.075 / 1M)</option>
                             <option value="gemini-pro">Gemini 2.5 Pro ($1.25 / 1M)</option>
@@ -2014,7 +2014,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                           <button
                             onClick={handleAiAudit}
                             disabled={aiAuditLoading}
-                            className="px-3 py-1 bg-[#00ff88]/15 hover:bg-[#00ff88]/20 border border-[#00ff88]/30 hover:border-[#00ff88]/50 text-[#00ff88] text-[11px] font-bold rounded shadow transition flex items-center gap-1 cursor-pointer select-none"
+                            className="px-3 py-1 bg-[#00ff88]/15 hover:bg-[#00ff88]/20 border border-[#00ff88]/30 hover:border-[#00ff88]/50 text-[#00ff88] text-xs font-bold rounded shadow transition flex items-center gap-1 cursor-pointer select-none"
                           >
                             {aiAuditLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                             <span>AUDIT STRATEGY</span>
@@ -2025,21 +2025,21 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                       {/* AI OpEx Cost Tally Banner */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs border-b border-white/5 pb-2.5 font-mono">
                         <div className="bg-black/20 p-1.5 rounded border border-white/5">
-                          <span className="text-[8px] text-slate-500 block">CURRENT AUDIT COST</span>
+                          <span className="text-xs text-slate-500 block">CURRENT AUDIT COST</span>
                           <span className="text-[#00ff88] font-bold block">${aiAuditResult ? aiAuditResult.cost.toFixed(6) : "0.000000"}</span>
                         </div>
                         <div className="bg-black/20 p-1.5 rounded border border-white/5">
-                          <span className="text-[8px] text-slate-500 block">CUMULATIVE AI OPEX</span>
+                          <span className="text-xs text-slate-500 block">CUMULATIVE AI OPEX</span>
                           <span className="text-indigo-300 font-bold block">${cumulativeAiOpEx.toFixed(6)}</span>
                         </div>
                         <div className="bg-black/20 p-1.5 rounded border border-white/5">
-                          <span className="text-[8px] text-slate-500 block">TOKENS CONSUMED</span>
+                          <span className="text-xs text-slate-500 block">TOKENS CONSUMED</span>
                           <span className="text-slate-300 font-bold block">
                             {aiAuditResult ? `${aiAuditResult.tokensUsed.total.toLocaleString()} t` : "0 t"}
                           </span>
                         </div>
                         <div className="bg-black/20 p-1.5 rounded border border-white/5 flex flex-col justify-center items-center gap-0.5">
-                          <span className="text-[8px] text-slate-500 block leading-none font-sans uppercase">Deduct AI OpEx</span>
+                          <span className="text-xs text-slate-500 block leading-none font-sans uppercase">Deduct AI OpEx</span>
                           <label className="relative inline-flex items-center cursor-pointer scale-75 origin-center select-none">
                             <input 
                               type="checkbox" 
@@ -2054,8 +2054,8 @@ export default function GcpCompanion(props: GcpCompanionProps) {
 
                       {/* Audit critique block */}
                       {aiAuditResult ? (
-                        <div className="bg-black/45 border border-white/5 rounded-lg p-3 max-h-72 overflow-y-auto font-mono text-slate-300 space-y-2 select-text text-[11.5px] leading-relaxed relative pt-7">
-                          <span className="absolute top-1 right-2 text-[8px] text-slate-500 font-bold uppercase tracking-widest leading-none">AI OPEX CRITIQUE VERDICT</span>
+                        <div className="bg-black/45 border border-white/5 rounded-lg p-3 max-h-72 overflow-y-auto font-mono text-slate-300 space-y-2 select-text text-xs leading-relaxed relative pt-7">
+                          <span className="absolute top-1 right-2 text-xs text-slate-500 font-bold uppercase tracking-widest leading-none">AI OPEX CRITIQUE VERDICT</span>
                           <div className="prose prose-invert max-w-none">
                             {renderMarkdown(aiAuditResult.critique)}
                           </div>
@@ -2065,7 +2065,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                           {aiAuditError}
                         </div>
                       ) : (
-                        <p className="text-[10.5px] text-slate-500 text-center py-2 italic font-mono">
+                        <p className="text-xs text-slate-500 text-center py-2 italic font-mono">
                           Select an AI provider and click "Audit Strategy" to receive contextual parameter analysis.
                         </p>
                       )}
@@ -2074,41 +2074,41 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                     {/* Option 1 Institutional Upgrades Performance Dashboard */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3.5 bg-[#141a29] rounded-lg border border-[#00ff88]/15 text-xs">
                       <div className="space-y-1">
-                        <span className="text-[9.5px] text-slate-500 uppercase tracking-wider block font-bold font-mono">OFI & Friction Filtered</span>
+                        <span className="text-xs text-slate-500 uppercase tracking-wider block font-bold font-mono">OFI & Friction Filtered</span>
                         <span className="text-slate-100 font-bold font-mono text-xs flex items-center gap-1">
                           🛡️ {btResults.rejectedTradesCount ?? 0} Bad Trades Blocked
                         </span>
-                        <span className="text-[9px] text-slate-400 block leading-normal font-sans">
+                        <span className="text-xs text-slate-400 block leading-normal font-sans">
                           Saves capital from false breakout traps & low momentum
                         </span>
                       </div>
 
                       <div className="space-y-1">
-                        <span className="text-[9.5px] text-slate-500 uppercase tracking-wider block font-bold font-mono">Partial Scale-Outs</span>
+                        <span className="text-xs text-slate-500 uppercase tracking-wider block font-bold font-mono">Partial Scale-Outs</span>
                         <span className="text-emerald-400 font-bold font-mono text-xs flex items-center gap-1">
                           ⚖️ {btResults.tranche1ScaledOutCount ?? 0} Scale-Outs
                         </span>
-                        <span className="text-[9px] text-slate-400 block leading-normal font-sans">
+                        <span className="text-xs text-slate-400 block leading-normal font-sans">
                           Tranche 1 (50%) closed at Target 1, moving stop to Breakeven
                         </span>
                       </div>
 
                       <div className="space-y-1">
-                        <span className="text-[9.5px] text-slate-500 uppercase tracking-wider block font-bold font-mono">Friction Slippage Saved</span>
+                        <span className="text-xs text-slate-500 uppercase tracking-wider block font-bold font-mono">Friction Slippage Saved</span>
                         <span className="text-[#00ff88] font-bold font-mono text-xs flex items-center gap-1">
                           💎 +${(btResults.slippageFrictionSaved ?? 0).toLocaleString()} Saved
                         </span>
-                        <span className="text-[9px] text-slate-400 block leading-normal font-sans">
+                        <span className="text-xs text-slate-400 block leading-normal font-sans">
                           Commission & spread slippage avoided prior to routing
                         </span>
                       </div>
 
                       <div className="space-y-1">
-                        <span className="text-[9.5px] text-slate-500 uppercase tracking-wider block font-bold font-mono">Target 2 Runs Completed</span>
+                        <span className="text-xs text-slate-500 uppercase tracking-wider block font-bold font-mono">Target 2 Runs Completed</span>
                         <span className="text-indigo-400 font-bold font-mono text-xs flex items-center gap-1">
                           🎯 {btResults.tranche2HitCount ?? 0} Runs Completed
                         </span>
-                        <span className="text-[9px] text-slate-400 block leading-normal font-sans">
+                        <span className="text-xs text-slate-400 block leading-normal font-sans">
                           Remaining 50% ran all the way to extended target (2.5x ATR)
                         </span>
                       </div>
@@ -2116,14 +2116,14 @@ export default function GcpCompanion(props: GcpCompanionProps) {
 
                     {/* DUAL CHART SECTION WITH EXECUTION MARKERS */}
                     <div className="bg-black/25 rounded-lg border border-white/5 p-4 relative pt-10">
-                      <span className="absolute top-2 left-4 text-[9px] text-slate-500 uppercase font-bold leading-none">
+                      <span className="absolute top-2 left-4 text-xs text-slate-500 uppercase font-bold leading-none">
                         {btChartTab === "equity" ? "Continuous Portfolio Equity Curve ($)" : "Intraday Asset Price & Execution Markers"}
                       </span>
                       
                       <div className="absolute top-1.5 right-4 flex gap-1 font-mono">
                         <button
                           onClick={() => setBtChartTab("equity")}
-                          className={`px-2.5 py-0.5 text-[9px] font-bold rounded transition cursor-pointer select-none ${
+                          className={`px-2.5 py-0.5 text-xs font-bold rounded transition cursor-pointer select-none ${
                             btChartTab === "equity"
                               ? "bg-[#00ff88]/15 border border-[#00ff88]/30 text-[#00ff88]"
                               : "bg-black/30 border border-white/5 text-slate-500 hover:text-slate-300"
@@ -2133,7 +2133,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                         </button>
                         <button
                           onClick={() => setBtChartTab("price")}
-                          className={`px-2.5 py-0.5 text-[9px] font-bold rounded transition cursor-pointer select-none ${
+                          className={`px-2.5 py-0.5 text-xs font-bold rounded transition cursor-pointer select-none ${
                             btChartTab === "price"
                               ? "bg-amber-500/15 border border-amber-500/30 text-amber-400"
                               : "bg-black/30 border border-white/5 text-slate-500 hover:text-slate-300"
@@ -2271,9 +2271,9 @@ export default function GcpCompanion(props: GcpCompanionProps) {
 
                   {/* Trade Detailed Logs list */}
                   <div className="space-y-2">
-                    <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold block">Engine Executions Ledger ({btResults.tradesList.length} Fills)</span>
+                    <span className="text-xs text-slate-500 uppercase tracking-widest font-bold block">Engine Executions Ledger ({btResults.tradesList.length} Fills)</span>
                     <div className="border border-white/5 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
-                      <table className="w-full text-[10.5px] border-collapse">
+                      <table className="w-full text-xs border-collapse">
                         <thead>
                           <tr className="bg-black/45 border-b border-white/5 text-slate-400 font-bold select-none text-left">
                             <th className="p-2">ID</th>
@@ -2291,7 +2291,7 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                             <tr key={tr.id} className="hover:bg-white/5 transition">
                               <td className="p-2 text-slate-400 font-bold">{tr.id}</td>
                               <td className="p-2 font-bold">
-                                <span className={`px-1.5 py-0.5 rounded text-[9.5px] ${tr.direction === "BUY" ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"}`}>
+                                <span className={`px-1.5 py-0.5 rounded text-xs ${tr.direction === "BUY" ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"}`}>
                                   {tr.direction}
                                 </span>
                               </td>
@@ -2326,13 +2326,13 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                   <h4 className="text-xs font-semibold text-slate-200 flex items-center gap-2">
                     <Terminal className="w-4 h-4 text-indigo-400" /> Multi-Cloud Server Orchestration Guide
                   </h4>
-                  <span className="text-[9px] text-[#00ff88] font-bold border border-[#00ff88]/30 px-1.5 py-0.5 rounded animate-pulse bg-[#00ff88]/5 font-mono uppercase">
+                  <span className="text-xs text-[#00ff88] font-bold border border-[#00ff88]/30 px-1.5 py-0.5 rounded animate-pulse bg-[#00ff88]/5 font-mono uppercase">
                     {cloudProvider.toUpperCase()} COMPLIANT
                   </span>
                 </div>
 
                 {/* ENVIRONMENTAL SANITY WARNING */}
-                <div className="p-2.5 rounded border border-amber-500/20 bg-amber-500/5 text-[10.5px] text-amber-300 leading-normal font-sans">
+                <div className="p-2.5 rounded border border-amber-500/20 bg-amber-500/5 text-xs text-amber-300 leading-normal font-sans">
                   <span className="font-bold">⚠️ PROXIMITY SERVER TARGET ENVIRONMENT:</span>
                   <p className="mt-1">
                     Your background trading daemon executes in **Frankfurt, Germany** directly co-located with the Interactive Brokers Europe hub. It runs as a self-healing background systemd service called <code className="bg-black/30 px-1 py-0.5 rounded text-amber-400 font-mono">alpha-engine.service</code>.
@@ -2343,12 +2343,12 @@ export default function GcpCompanion(props: GcpCompanionProps) {
                   <>
                     {/* BOX 1: PROVISION HETZNER VM */}
                     <div className="space-y-1">
-                      <span className="text-[10px] text-[#00ff88] font-bold uppercase tracking-wider block">1. Provision Hetzner Server (Console or hcloud CLI)</span>
-                      <p className="text-[10.5px] text-slate-400 font-sans">
+                      <span className="text-xs text-[#00ff88] font-bold uppercase tracking-wider block">1. Provision Hetzner Server (Console or hcloud CLI)</span>
+                      <p className="text-xs text-slate-400 font-sans">
                         Create a server in Frankfurt (Location <code className="font-mono text-slate-300">fsn1</code>) using Debian 11. To completely eliminate hyperthread scheduling jitter, we recommend the <strong>Dedicated CCX22 vCPU</strong>:
                       </p>
-                      <div className="relative bg-black/50 border border-white/10 rounded p-2.5 text-[11px] text-indigo-300 font-mono select-all">
-                        <span className="absolute top-1 right-2 text-[8px] text-slate-500 font-bold uppercase">HETZNER hcloud CLI</span>
+                      <div className="relative bg-black/50 border border-white/10 rounded p-2.5 text-xs text-indigo-300 font-mono select-all">
+                        <span className="absolute top-1 right-2 text-xs text-slate-500 font-bold uppercase">HETZNER hcloud CLI</span>
                         <pre className="overflow-x-auto leading-relaxed max-h-16"># Deploy a dedicated-core low-latency server instantly
 hcloud server create --name alpha-edge-node --type ccx22 --location fsn1 --image debian-11</pre>
                       </div>
@@ -2356,12 +2356,12 @@ hcloud server create --name alpha-edge-node --type ccx22 --location fsn1 --image
 
                     {/* BOX 2: RUN DEPLOYER */}
                     <div className="space-y-1 pt-1">
-                      <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider block">2. Run Local SSH Setup Script (No Manual Credentials Needed)</span>
-                      <p className="text-[10.5px] text-slate-400 font-sans">
+                      <span className="text-xs text-indigo-400 font-bold uppercase tracking-wider block">2. Run Local SSH Setup Script (No Manual Credentials Needed)</span>
+                      <p className="text-xs text-slate-400 font-sans">
                         Deploy the compiled trading node directly via secure SSH. It compresses local assets and bootstraps the remote systemd service:
                       </p>
-                      <div className="relative bg-black/50 border border-white/10 rounded p-2.5 text-[11px] text-indigo-300 font-mono select-all">
-                        <span className="absolute top-1 right-2 text-[8px] text-slate-500 font-bold uppercase">Local Terminal Session</span>
+                      <div className="relative bg-black/50 border border-white/10 rounded p-2.5 text-xs text-indigo-300 font-mono select-all">
+                        <span className="absolute top-1 right-2 text-xs text-slate-500 font-bold uppercase">Local Terminal Session</span>
                         <pre className="overflow-x-auto leading-relaxed max-h-24"># Make script executable
 chmod +x deploy_to_hetzner.sh
 
@@ -2374,24 +2374,24 @@ chmod +x deploy_to_hetzner.sh
                   <>
                     {/* BOX 1: PROVISION AWS VM */}
                     <div className="space-y-1">
-                      <span className="text-[10px] text-[#00ff88] font-bold uppercase tracking-wider block">1. Provision AWS EC2 Instance (Frankfurt eu-central-1)</span>
-                      <p className="text-[10.5px] text-slate-400 font-sans">
+                      <span className="text-xs text-[#00ff88] font-bold uppercase tracking-wider block">1. Provision AWS EC2 Instance (Frankfurt eu-central-1)</span>
+                      <p className="text-xs text-slate-400 font-sans">
                         Create a standard Debian or Ubuntu EC2 node in the Frankfurt region:
                       </p>
-                      <div className="relative bg-black/50 border border-white/10 rounded p-2.5 text-[11px] text-indigo-300 font-mono select-all">
-                        <span className="absolute top-1 right-2 text-[8px] text-slate-500 font-bold uppercase">AWS CLI EC2 LAUNCH</span>
+                      <div className="relative bg-black/50 border border-white/10 rounded p-2.5 text-xs text-indigo-300 font-mono select-all">
+                        <span className="absolute top-1 right-2 text-xs text-slate-500 font-bold uppercase">AWS CLI EC2 LAUNCH</span>
                         <pre className="overflow-x-auto leading-relaxed max-h-16">aws ec2 run-instances --image-id ami-04df93f3501235165 --instance-type t4g.micro --region eu-central-1 --key-name MyTradingKey</pre>
                       </div>
                     </div>
 
                     {/* BOX 2: RUN DEPLOYER */}
                     <div className="space-y-1 pt-1">
-                      <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider block">2. Run Local SSH Setup Script</span>
-                      <p className="text-[10.5px] text-slate-400 font-sans">
+                      <span className="text-xs text-indigo-400 font-bold uppercase tracking-wider block">2. Run Local SSH Setup Script</span>
+                      <p className="text-xs text-slate-400 font-sans">
                         Upload the container structures and daemon to AWS seamlessly using standard SSH:
                       </p>
-                      <div className="relative bg-black/50 border border-white/10 rounded p-2.5 text-[11px] text-indigo-300 font-mono select-all">
-                        <span className="absolute top-1 right-2 text-[8px] text-slate-500 font-bold uppercase">Local Terminal Session</span>
+                      <div className="relative bg-black/50 border border-white/10 rounded p-2.5 text-xs text-indigo-300 font-mono select-all">
+                        <span className="absolute top-1 right-2 text-xs text-slate-500 font-bold uppercase">Local Terminal Session</span>
                         <pre className="overflow-x-auto leading-relaxed max-h-24">chmod +x deploy_to_hetzner.sh
 ./deploy_to_hetzner.sh &lt;YOUR_AWS_INSTANCE_PUBLIC_IP&gt; admin 22</pre>
                       </div>
@@ -2401,20 +2401,20 @@ chmod +x deploy_to_hetzner.sh
                   <>
                     {/* BOX 1: PRE-REQUISITE */}
                     <div className="space-y-1">
-                      <span className="text-[10px] text-[#00ff88] font-bold uppercase tracking-wider block">1. Standard SSH Linux Server Configuration</span>
-                      <p className="text-[10.5px] text-slate-400 font-sans">
+                      <span className="text-xs text-[#00ff88] font-bold uppercase tracking-wider block">1. Standard SSH Linux Server Configuration</span>
+                      <p className="text-xs text-slate-400 font-sans">
                         This deployer works on any standard Debian, Ubuntu, or RedHat Linux server with SSH access enabled.
                       </p>
                     </div>
 
                     {/* BOX 2: RUN DEPLOYER */}
                     <div className="space-y-1 pt-1">
-                      <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider block">2. Run Universal Agnostic Deployer Script</span>
-                      <p className="text-[10.5px] text-slate-400 font-sans">
+                      <span className="text-xs text-indigo-400 font-bold uppercase tracking-wider block">2. Run Universal Agnostic Deployer Script</span>
+                      <p className="text-xs text-slate-400 font-sans">
                         Push the codebase directly to your server:
                       </p>
-                      <div className="relative bg-black/50 border border-white/10 rounded p-2.5 text-[11px] text-indigo-300 font-mono select-all">
-                        <span className="absolute top-1 right-2 text-[8px] text-slate-500 font-bold uppercase">Local Terminal Session</span>
+                      <div className="relative bg-black/50 border border-white/10 rounded p-2.5 text-xs text-indigo-300 font-mono select-all">
+                        <span className="absolute top-1 right-2 text-xs text-slate-500 font-bold uppercase">Local Terminal Session</span>
                         <pre className="overflow-x-auto leading-relaxed max-h-24">chmod +x deploy_to_hetzner.sh
 # Syntax: ./deploy_to_hetzner.sh &lt;IP_ADDRESS&gt; [SSH_USER] [SSH_PORT]
 ./deploy_to_hetzner.sh &lt;YOUR_SERVER_IP&gt; root 22</pre>
@@ -2425,12 +2425,12 @@ chmod +x deploy_to_hetzner.sh
                   <>
                     {/* BOX 1: RUN IN CLOUD SHELL (DEPLOYING / SYNCHRONIZING CODE) */}
                     <div className="space-y-1">
-                      <span className="text-[10px] text-[#00ff88] font-bold uppercase tracking-wider block">1. Run first inside Google Cloud Shell (To Deploy or Update)</span>
-                      <p className="text-[10.5px] text-slate-400">
+                      <span className="text-xs text-[#00ff88] font-bold uppercase tracking-wider block">1. Run first inside Google Cloud Shell (To Deploy or Update)</span>
+                      <p className="text-xs text-slate-400">
                         Use these commands to clone the code initially, sync changes to your VM, or update files from your platform:
                       </p>
-                      <div className="relative bg-black/50 border border-white/10 rounded p-2.5 text-[11px] text-indigo-300 font-mono select-all">
-                        <span className="absolute top-1 right-2 text-[8px] text-slate-500 font-bold uppercase">Cloud Shell Tab</span>
+                      <div className="relative bg-black/50 border border-white/10 rounded p-2.5 text-xs text-indigo-300 font-mono select-all">
+                        <span className="absolute top-1 right-2 text-xs text-slate-500 font-bold uppercase">Cloud Shell Tab</span>
                         <pre className="overflow-x-auto leading-relaxed max-h-20">cd ~
 # If NOT cloned yet:
 git clone https://github.com/888luck/ALPHA-ENGINE-AIstudio.git
@@ -2445,12 +2445,12 @@ chmod +x deploy_to_gcp.sh
 
                     {/* BOX 2: RUN INSIDE GCE VM (CONTROL DAEMON PROCESSES) */}
                     <div className="space-y-1 pt-1">
-                      <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider block">2. Run on GCE Virtual Machine (To Control & Manage Node)</span>
-                      <p className="text-[10.5px] text-slate-400 font-sans">
+                      <span className="text-xs text-indigo-400 font-bold uppercase tracking-wider block">2. Run on GCE Virtual Machine (To Control & Manage Node)</span>
+                      <p className="text-xs text-slate-400 font-sans">
                         Connect directly to the GCE VM from Cloud Shell and manage the real background service. <span className="text-amber-300 font-bold">Important: The correct service name is `alpha-engine` (not `alpha-edge`)</span>:
                       </p>
-                      <div className="relative bg-black/50 border border-white/10 rounded p-2.5 text-[11px] text-indigo-300 font-mono select-all">
-                        <span className="absolute top-1 right-2 text-[8px] text-slate-500 font-bold uppercase">GCE VM Session</span>
+                      <div className="relative bg-black/50 border border-white/10 rounded p-2.5 text-xs text-indigo-300 font-mono select-all">
+                        <span className="absolute top-1 right-2 text-xs text-slate-500 font-bold uppercase">GCE VM Session</span>
                         <pre className="overflow-x-auto leading-relaxed max-h-32"># A. SSH into your VM from Cloud Shell:
 gcloud compute ssh alpha-edge-node --zone=europe-west3-a
 
@@ -2463,7 +2463,7 @@ sudo systemctl restart alpha-engine.service
 # C. Follow real-time market stream & OFI logs:
 journalctl -u alpha-engine.service -f</pre>
                       </div>
-                      <p className="text-[10px] text-slate-500 leading-normal leading-tight font-sans">
+                      <p className="text-xs text-slate-500 leading-normal leading-tight font-sans">
                         💡 <em>Note: Since `/opt/alpha-engine` is dynamically loaded via scp bundles, you do not need to deal with Git passwords or complex credential logins inside the GCE VM itself. Just use Cloud Shell to deploy!</em>
                       </p>
                     </div>
@@ -2472,11 +2472,11 @@ journalctl -u alpha-engine.service -f</pre>
 
                 {/* REMOTE MANAGEMENT COMMAND CHEATSHEETS */}
                 <div className="space-y-1 pt-1">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Universal Remote CLI Controls</span>
-                  <p className="text-[10.5px] text-slate-450 font-sans">
+                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Universal Remote CLI Controls</span>
+                  <p className="text-xs text-slate-450 font-sans">
                     Once deployed, connect to your server terminal directly to manage system processes easily:
                   </p>
-                  <div className="bg-black/40 border border-[#white]/5 rounded p-2 text-[10.5px] font-mono text-slate-300 space-y-1">
+                  <div className="bg-black/40 border border-[#white]/5 rounded p-2 text-xs font-mono text-slate-300 space-y-1">
                     <div><code className="text-[#00ff88]">sudo systemctl status alpha-engine.service</code> - View live active signals</div>
                     <div><code className="text-[#00ff88]">sudo systemctl restart alpha-engine.service</code> - Apply code updates or pulls</div>
                     <div><code className="text-[#00ff88]">journalctl -u alpha-engine.service -f</code> - Track real-time order flow trades</div>
@@ -2486,8 +2486,8 @@ journalctl -u alpha-engine.service -f</pre>
 
               {/* Progress Tracker Checklist */}
               <div className="border-t border-white/5 pt-3 space-y-2">
-                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-mono block">Cloud Onboarding Tracker</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                <span className="text-xs text-slate-500 uppercase tracking-widest font-mono block">Cloud Onboarding Tracker</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   {checklist.map((item) => (
                     <div
                       key={item.id}
@@ -2518,17 +2518,17 @@ journalctl -u alpha-engine.service -f</pre>
                   <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
                     <Zap className="w-4.5 h-4.5 text-[#00ff88]" /> AI-Powered Strategy Forge (Universal Intelligence)
                   </h4>
-                  <p className="text-[11px] text-slate-400 font-sans">
+                  <p className="text-xs text-slate-400 font-sans">
                     Design and generate quantitative Alpha strategies using your preferred AI model.
                   </p>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-slate-500 font-mono uppercase font-bold tracking-widest">Model:</span>
+                  <span className="text-xs text-slate-500 font-mono uppercase font-bold tracking-widest">Model:</span>
                   <select
                     value={aiProvider}
                     onChange={(e) => setAiProvider(e.target.value)}
-                    className="bg-black/60 border border-white/10 rounded px-2.5 py-1.5 text-[10.5px] text-slate-200 font-mono focus:border-[#00ff88] focus:outline-none"
+                    className="bg-black/60 border border-white/10 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:border-[#00ff88] focus:outline-none"
                   >
                     <option value="auto">System Selection</option>
                     <option value="gemini-flash">Gemini 2.5 Flash (Low Latency)</option>
@@ -2556,7 +2556,7 @@ journalctl -u alpha-engine.service -f</pre>
                     <button
                       onClick={handleForge}
                       disabled={isForging}
-                      className={`px-4 py-1.5 rounded-md font-bold text-[11px] uppercase tracking-wider flex items-center gap-2 transition cursor-pointer ${
+                      className={`px-4 py-1.5 rounded-md font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition cursor-pointer ${
                         isForging ? "bg-slate-800 text-slate-500 animate-pulse" : "bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/30"
                       }`}
                     >
@@ -2567,7 +2567,7 @@ journalctl -u alpha-engine.service -f</pre>
                 </div>
 
                 {forgeError && (
-                  <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded text-[11px] text-rose-400 font-mono flex items-center gap-2">
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded text-xs text-rose-400 font-mono flex items-center gap-2">
                     <ShieldAlert className="w-4 h-4" /> ERROR: {forgeError}
                   </div>
                 )}
@@ -2576,27 +2576,27 @@ journalctl -u alpha-engine.service -f</pre>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
                     <div className="bg-indigo-500/5 border border-indigo-500/15 rounded-lg p-4 space-y-4">
                       <div className="border-b border-white/5 pb-2">
-                        <h5 className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">Strategy Blueprint</h5>
+                        <h5 className="text-xs text-indigo-400 font-bold uppercase tracking-widest">Strategy Blueprint</h5>
                         <h2 className="text-base font-extrabold text-slate-100 font-mono mt-1">{forgeResult.strategyName || "Quantum Mean Reversion"}</h2>
                       </div>
                       
                       <div className="space-y-3">
                         <div>
-                          <span className="text-[9px] text-slate-500 font-bold uppercase block mb-1 font-mono">Core Logic</span>
-                          <p className="text-[11.5px] text-slate-300 leading-relaxed font-sans">{forgeResult.logic}</p>
+                          <span className="text-xs text-slate-500 font-bold uppercase block mb-1 font-mono">Core Logic</span>
+                          <p className="text-xs text-slate-300 leading-relaxed font-sans">{forgeResult.logic}</p>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-3">
                           <div className="bg-black/30 p-2 rounded border border-white/5">
-                            <span className="text-[8px] text-slate-500 block uppercase font-mono">Indicators</span>
+                            <span className="text-xs text-slate-500 block uppercase font-mono">Indicators</span>
                             <div className="flex flex-wrap gap-1 mt-1">
                               {forgeResult.indicators?.map((ind: string, i: number) => (
-                                <span key={i} className="text-[9px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30 font-mono">{ind}</span>
+                                <span key={i} className="text-xs bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30 font-mono">{ind}</span>
                               ))}
                             </div>
                           </div>
                           <div className="bg-black/30 p-2 rounded border border-white/5">
-                            <span className="text-[8px] text-slate-500 block uppercase font-mono">Stop ATR</span>
+                            <span className="text-xs text-slate-500 block uppercase font-mono">Stop ATR</span>
                             <span className="text-xs text-[#00ff88] font-bold block mt-1">{forgeResult.suggestedAtrStop || 1.8}x ATR</span>
                           </div>
                         </div>
@@ -2605,25 +2605,25 @@ journalctl -u alpha-engine.service -f</pre>
 
                     <div className="bg-black/35 border border-white/10 rounded-lg p-4 space-y-4">
                       <div>
-                        <span className="text-[9px] text-indigo-400 font-bold uppercase block mb-2 font-mono flex items-center gap-1.5">
+                        <span className="text-xs text-indigo-400 font-bold uppercase block mb-2 font-mono flex items-center gap-1.5">
                           <CheckCircle2 className="w-3 h-3" /> Execution Rules Matrix
                         </span>
                         <div className="space-y-3">
                           <div>
-                            <span className="text-[9px] text-emerald-400 font-bold uppercase block mb-1">Entry Criteria</span>
+                            <span className="text-xs text-emerald-400 font-bold uppercase block mb-1">Entry Criteria</span>
                             <ul className="space-y-1">
                               {forgeResult.entryRules?.map((rule: string, i: number) => (
-                                <li key={i} className="text-[10.5px] text-slate-300 flex items-start gap-2">
+                                <li key={i} className="text-xs text-slate-300 flex items-start gap-2">
                                   <span className="text-emerald-500 mt-1 shrink-0">•</span> {rule}
                                 </li>
                               ))}
                             </ul>
                           </div>
                           <div>
-                            <span className="text-[9px] text-rose-400 font-bold uppercase block mb-1">Exit Criteria</span>
+                            <span className="text-xs text-rose-400 font-bold uppercase block mb-1">Exit Criteria</span>
                             <ul className="space-y-1">
                               {forgeResult.exitRules?.map((rule: string, i: number) => (
-                                <li key={i} className="text-[10.5px] text-slate-300 flex items-start gap-2">
+                                <li key={i} className="text-xs text-slate-300 flex items-start gap-2">
                                   <span className="text-rose-500 mt-1 shrink-0">•</span> {rule}
                                 </li>
                               ))}
@@ -2640,13 +2640,13 @@ journalctl -u alpha-engine.service -f</pre>
                             setBtMaxHoldBars(forgeResult.suggestedMaxHold || 15);
                             setActiveTab("backtest");
                           }}
-                          className="flex-1 bg-[#00ff88]/10 hover:bg-[#00ff88]/20 border border-[#00ff88]/30 text-[#00ff88] py-2 rounded text-[10px] font-bold uppercase transition flex items-center justify-center gap-2 cursor-pointer"
+                          className="flex-1 bg-[#00ff88]/10 hover:bg-[#00ff88]/20 border border-[#00ff88]/30 text-[#00ff88] py-2 rounded text-xs font-bold uppercase transition flex items-center justify-center gap-2 cursor-pointer"
                         >
                           <TrendingUp className="w-3.5 h-3.5" /> Initialize Backtest
                         </button>
                         <button
                           onClick={() => window.alert("Strategy Export: Logic added to alpha_strategy.py repository structure.")}
-                          className="px-3 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 py-2 rounded text-[10px] font-bold uppercase transition cursor-pointer"
+                          className="px-3 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 py-2 rounded text-xs font-bold uppercase transition cursor-pointer"
                         >
                           Export
                         </button>
@@ -2661,12 +2661,12 @@ journalctl -u alpha-engine.service -f</pre>
                   <div className="p-2 bg-indigo-500/10 rounded-full">
                     <Info className="w-3.5 h-3.5 text-indigo-400" />
                   </div>
-                  <div className="text-[10px] text-slate-400 leading-normal">
+                  <div className="text-xs text-slate-400 leading-normal">
                     <span className="text-slate-200 font-bold">Agnostic Strategy Generation:</span> You can switch models mid-conversation to compare logic. Results are standardized for the Alpha Engine Backtester.
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-[9px] text-slate-500 block uppercase font-mono">Current AI OpEx</span>
+                  <span className="text-xs text-slate-500 block uppercase font-mono">Current AI OpEx</span>
                   <span className="text-xs text-indigo-300 font-bold font-mono">€{cumulativeAiOpEx.toFixed(4)}</span>
                 </div>
               </div>
@@ -2679,7 +2679,7 @@ journalctl -u alpha-engine.service -f</pre>
               <h4 className="text-xs font-semibold text-slate-200 flex items-center gap-2">
                 <Activity className="w-4 h-4 text-indigo-400" /> Frankfurt Cloud Co-location Performance Comparison
               </h4>
-              <p className="text-[11px] text-slate-400 leading-normal">
+              <p className="text-xs text-slate-400 leading-normal">
                 Executing level 2 book metrics requires ultra-high priority fiber pipelines. To minimize transaction slippage, we deploy Python modules directly within Frankfurt to remain adjacent to the IBKR Europe Hub:
               </p>
 
@@ -2698,22 +2698,22 @@ journalctl -u alpha-engine.service -f</pre>
                         <Server className={`w-3.5 h-3.5 ${reg.active ? "text-indigo-400 animate-spin" : "text-slate-600"}`} />
                         <span className={`font-semibold ${reg.active ? "text-slate-100" : "text-slate-350"}`}>{reg.zone}</span>
                         {reg.active && (
-                          <span className="text-[8px] bg-indigo-500/25 border border-indigo-400/30 text-indigo-300 uppercase font-mono tracking-wider font-bold px-1.5 py-0.5 rounded leading-none block">
+                          <span className="text-xs bg-indigo-500/25 border border-indigo-400/30 text-indigo-300 uppercase font-mono tracking-wider font-bold px-1.5 py-0.5 rounded leading-none block">
                             CO-COLATED NODE
                           </span>
                         )}
                       </div>
-                      <span className="text-[10px] text-slate-500 font-normal leading-normal">{reg.desc}</span>
+                      <span className="text-xs text-slate-500 font-normal leading-normal">{reg.desc}</span>
                     </div>
 
                     <div className="flex items-center gap-4 text-right">
                       <div>
                         <div className={`font-bold ${reg.active ? "text-[#00ff88]" : "text-slate-300"}`}>{reg.latency} ms</div>
-                        <span className="text-[9px] text-slate-500 block">Proximity Delay</span>
+                        <span className="text-xs text-slate-500 block">Proximity Delay</span>
                       </div>
                       <div className="hidden sm:block">
                         <div className="font-semibold text-slate-300">{reg.cost}</div>
-                        <span className="text-[9px] text-slate-500 block">Host Price</span>
+                        <span className="text-xs text-slate-500 block">Host Price</span>
                       </div>
                     </div>
                   </div>
@@ -2724,10 +2724,10 @@ journalctl -u alpha-engine.service -f</pre>
               <div className="bg-[#141a29] rounded-lg border border-[#00ff88]/15 p-4.5 space-y-3.5 font-mono text-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-2.5">
                   <div>
-                    <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider block">📡 Option 4 Live Telemetry Stream (Colo-Node Frankfurt)</span>
-                    <span className="text-[10.5px] text-slate-300">Continuous bidirectional telemetry bridged via Firestore secure tunnel</span>
+                    <span className="text-xs text-indigo-400 font-bold uppercase tracking-wider block">📡 Option 4 Live Telemetry Stream (Colo-Node Frankfurt)</span>
+                    <span className="text-xs text-slate-300">Continuous bidirectional telemetry bridged via Firestore secure tunnel</span>
                   </div>
-                  <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 text-[#00ff88] text-[10px] font-bold px-2 py-0.5 rounded leading-none">
+                  <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 text-[#00ff88] text-xs font-bold px-2 py-0.5 rounded leading-none">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#00ff88] animate-ping" />
                     <span>STATUS: {telemetry.status}</span>
                   </div>
@@ -2735,29 +2735,29 @@ journalctl -u alpha-engine.service -f</pre>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
                   <div className="bg-black/35 p-2 rounded border border-white/5">
-                    <span className="text-[8px] text-slate-500 block">TCP LATENCY (IBKR)</span>
+                    <span className="text-xs text-slate-500 block">TCP LATENCY (IBKR)</span>
                     <span className="text-xs text-[#00ff88] font-bold block pt-1">{telemetry.latency} ms</span>
-                    <span className="text-[8.5px] text-slate-450 block font-sans">Co-location Jitter Free</span>
+                    <span className="text-xs text-slate-450 block font-sans">Co-location Jitter Free</span>
                   </div>
                   <div className="bg-black/35 p-2 rounded border border-white/5">
-                    <span className="text-[8px] text-slate-500 block">SOCKET QUEUE BUFFER</span>
+                    <span className="text-xs text-slate-500 block">SOCKET QUEUE BUFFER</span>
                     <span className="text-xs text-indigo-300 font-bold block pt-1">{telemetry.bufferPercent}%</span>
-                    <span className="text-[8.5px] text-slate-450 block font-sans">No queue accumulation</span>
+                    <span className="text-xs text-slate-450 block font-sans">No queue accumulation</span>
                   </div>
                   <div className="bg-black/35 p-2 rounded border border-white/5">
-                    <span className="text-[8px] text-slate-500 block">EDGE CPU / RAM LOAD</span>
+                    <span className="text-xs text-slate-500 block">EDGE CPU / RAM LOAD</span>
                     <span className="text-xs text-amber-400 font-bold block pt-1">{telemetry.cpuLoad}% / {telemetry.memoryUsed}MB</span>
-                    <span className="text-[8.5px] text-slate-450 block font-sans">Microdaemon low overhead</span>
+                    <span className="text-xs text-slate-450 block font-sans">Microdaemon low overhead</span>
                   </div>
                   <div className="bg-black/35 p-2 rounded border border-white/5">
-                    <span className="text-[8px] text-slate-500 block">TUNNEL / HEARTBEATS</span>
+                    <span className="text-xs text-slate-500 block">TUNNEL / HEARTBEATS</span>
                     <span className="text-xs text-slate-200 font-bold block pt-1">{telemetry.tunnelState} / {telemetry.heartbeatCount}</span>
-                    <span className="text-[8.5px] text-slate-450 block font-sans">Secure TCP SSL Handshake</span>
+                    <span className="text-xs text-slate-450 block font-sans">Secure TCP SSL Handshake</span>
                   </div>
                 </div>
 
-                <div className="p-3 bg-black/45 rounded-md border border-white/5 text-[10px] leading-relaxed text-slate-400 font-sans">
-                  <strong className="text-[#00ff88] font-mono">Edge Pipeline Diagnostics:</strong> Edge node daemon is bound to TCP ports <code className="bg-white/10 px-1 py-0.2 rounded text-[9px]">4001</code> (LIVE Production) and <code className="bg-white/10 px-1 py-0.2 rounded text-[9px]">4002</code> (PAPER simulation). Dynamic socket payloads are streamed into Firestore under <code className="bg-white/10 px-1 py-0.2 rounded text-[9px]">system_risk_state/telemetry</code> to guarantee real-time synchronization with this web client without browser-side port forward requirements.
+                <div className="p-3 bg-black/45 rounded-md border border-white/5 text-xs leading-relaxed text-slate-400 font-sans">
+                  <strong className="text-[#00ff88] font-mono">Edge Pipeline Diagnostics:</strong> Edge node daemon is bound to TCP ports <code className="bg-white/10 px-1 py-0.2 rounded text-xs">4001</code> (LIVE Production) and <code className="bg-white/10 px-1 py-0.2 rounded text-xs">4002</code> (PAPER simulation). Dynamic socket payloads are streamed into Firestore under <code className="bg-white/10 px-1 py-0.2 rounded text-xs">system_risk_state/telemetry</code> to guarantee real-time synchronization with this web client without browser-side port forward requirements.
                 </div>
               </div>
             </div>
@@ -2800,7 +2800,7 @@ journalctl -u alpha-engine.service -f</pre>
                       {basketSizeToggle} {basketSizeToggle === 1 ? "INSTRUMENT" : "INSTRUMENTS"}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                  <p className="text-xs text-slate-400 leading-relaxed">
                     Configures maximum simultaneous active instruments traded. Conforms to IBKR basic Level 2 depth limit (~3 streams).
                   </p>
                   <div className="flex items-center gap-2 pt-1">
@@ -2829,13 +2829,13 @@ journalctl -u alpha-engine.service -f</pre>
                     <span className="text-xs font-bold text-slate-200 font-mono flex items-center gap-1.5">
                       <ShieldCheck className="w-4 h-4 text-emerald-400" /> EXECUTION ENVIRONMENT GATE
                     </span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono ${
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded font-mono ${
                       isLiveUnlocked ? "bg-red-500/20 text-red-400 border border-red-500/30" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                     }`}>
                       {isLiveUnlocked ? "🔴 LIVE DMA ROUTING" : "🟢 PAPER SIMULATION (PORT 4002)"}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                  <p className="text-xs text-slate-400 leading-relaxed">
                     Paper trading is active by default. Live real-capital execution requires manual administrator confirmation token.
                   </p>
                   <div className="flex items-center gap-2 pt-1">
@@ -2870,7 +2870,7 @@ journalctl -u alpha-engine.service -f</pre>
                     <Globe className="w-4 h-4 text-cyan-400" />
                     GLOBAL EXCHANGE SESSIONS & DYNAMIC CLOCKS (IBIE PRO IRELAND CO-LOCATION)
                   </span>
-                  <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                  <span className="text-xs text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                     REAL-TIME SYNC
                   </span>
                 </div>
@@ -2881,10 +2881,10 @@ journalctl -u alpha-engine.service -f</pre>
                       <span className="font-bold text-emerald-300 flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> 🇪🇺 EURONEXT (PARIS/AMST)
                       </span>
-                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 rounded">DMA LIVE</span>
+                      <span className="text-xs bg-emerald-500/20 text-emerald-300 px-1.5 rounded">DMA LIVE</span>
                     </div>
-                    <p className="text-[11px] text-slate-300">Session: 09:00 - 17:30 CET</p>
-                    <p className="text-[10px] text-slate-400">Auto-Flatten: 17:25 CET (3h 12m remaining)</p>
+                    <p className="text-xs text-slate-300">Session: 09:00 - 17:30 CET</p>
+                    <p className="text-xs text-slate-400">Auto-Flatten: 17:25 CET (3h 12m remaining)</p>
                   </div>
                   {/* XETRA */}
                   <div className="bg-black/30 border border-amber-500/20 p-2.5 rounded-lg space-y-1">
@@ -2892,10 +2892,10 @@ journalctl -u alpha-engine.service -f</pre>
                       <span className="font-bold text-amber-300 flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" /> 🇩🇪 XETRA (FRANKFURT)
                       </span>
-                      <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 rounded">DMA LIVE</span>
+                      <span className="text-xs bg-amber-500/20 text-amber-300 px-1.5 rounded">DMA LIVE</span>
                     </div>
-                    <p className="text-[11px] text-slate-300">Session: 09:00 - 17:30 CET</p>
-                    <p className="text-[10px] text-slate-400">Auto-Flatten: 17:25 CET (3h 12m remaining)</p>
+                    <p className="text-xs text-slate-300">Session: 09:00 - 17:30 CET</p>
+                    <p className="text-xs text-slate-400">Auto-Flatten: 17:25 CET (3h 12m remaining)</p>
                   </div>
                   {/* US NYSE / NASDAQ */}
                   <div className="bg-black/30 border border-blue-500/20 p-2.5 rounded-lg space-y-1">
@@ -2903,10 +2903,10 @@ journalctl -u alpha-engine.service -f</pre>
                       <span className="font-bold text-blue-300 flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-blue-400" /> 🇺🇸 NYSE / NASDAQ (WALL ST)
                       </span>
-                      <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 rounded">PRE-MARKET</span>
+                      <span className="text-xs bg-blue-500/20 text-blue-300 px-1.5 rounded">PRE-MARKET</span>
                     </div>
-                    <p className="text-[11px] text-slate-300">Session: 09:30 - 16:00 EST (15:30 CET)</p>
-                    <p className="text-[10px] text-blue-400 font-bold">Opens in: 42m (Discovery buffer armed)</p>
+                    <p className="text-xs text-slate-300">Session: 09:30 - 16:00 EST (15:30 CET)</p>
+                    <p className="text-xs text-blue-400 font-bold">Opens in: 42m (Discovery buffer armed)</p>
                   </div>
                 </div>
               </div>
@@ -2920,7 +2920,7 @@ journalctl -u alpha-engine.service -f</pre>
                       <h4 className="text-sm font-bold text-white font-mono">
                         DYNAMIC CALIBRATED FOCUS UNIVERSE (TOP {basketSizeToggle})
                       </h4>
-                      <p className="text-[10px] text-slate-400 font-mono">
+                      <p className="text-xs text-slate-400 font-mono">
                         Filtered via 15% friction ceiling & Critic-Verifier opening challenge
                       </p>
                     </div>
@@ -2957,7 +2957,7 @@ journalctl -u alpha-engine.service -f</pre>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left font-mono text-xs">
-                    <thead className="bg-black/40 text-slate-400 text-[10px] uppercase border-b border-white/5">
+                    <thead className="bg-black/40 text-slate-400 text-xs uppercase border-b border-white/5">
                       <tr>
                         <th className="py-2.5 px-3">Rank</th>
                         <th className="py-2.5 px-3">Symbol</th>
@@ -2986,13 +2986,13 @@ journalctl -u alpha-engine.service -f</pre>
                               <td className="py-2.5 px-3 font-bold text-white flex items-center gap-1.5">
                                 {cand.symbol}
                                 {cand.isEuropean ? (
-                                  <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1 rounded font-bold">EUR</span>
+                                  <span className="text-xs bg-emerald-500/20 text-emerald-300 px-1 rounded font-bold">EUR</span>
                                 ) : (
-                                  <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1 rounded font-bold">USD</span>
+                                  <span className="text-xs bg-blue-500/20 text-blue-300 px-1 rounded font-bold">USD</span>
                                 )}
                                 {cand.isRecursiveSwap && (
                                   <span 
-                                    className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.2 rounded font-bold flex items-center gap-0.5 cursor-help"
+                                    className="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.2 rounded font-bold flex items-center gap-0.5 cursor-help"
                                     title={cand.invalidationReason || "Recursively substituted after opening reality challenge refuted original candidate."}
                                   >
                                     🔄 RECURSIVE SWAP
@@ -3003,7 +3003,7 @@ journalctl -u alpha-engine.service -f</pre>
                                 {cand.isEuropean ? "Euronext / XETRA" : "NYSE / NASDAQ"}
                               </td>
                               <td className="py-2.5 px-3">
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                                <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${
                                   cand.sessionPhase === "ACTIVE_EXECUTION"
                                     ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                                     : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
@@ -3012,7 +3012,7 @@ journalctl -u alpha-engine.service -f</pre>
                                 </span>
                               </td>
                               <td className="py-2.5 px-3">
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${
                                   cand.direction === "BUY" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
                                 }`}>
                                   {cand.direction}
@@ -3021,7 +3021,7 @@ journalctl -u alpha-engine.service -f</pre>
                               <td className="py-2.5 px-3 text-slate-300">{cand.winRate}%</td>
                               <td className="py-2.5 px-3 text-emerald-400 font-bold">{cand.friction}%</td>
                               <td className="py-2.5 px-3">
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${
                                   cand.challengeStatus === "VALIDATED"
                                     ? "bg-emerald-500/20 text-emerald-400"
                                     : cand.challengeStatus === "PENDING_OPEN"
@@ -3033,7 +3033,7 @@ journalctl -u alpha-engine.service -f</pre>
                               </td>
                               <td className="py-2.5 px-3 text-slate-300 max-w-xs truncate" title={cand.catalyst}>{cand.catalyst}</td>
                               <td className="py-2.5 px-3">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                                   isActive ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-slate-700/30 text-slate-500"
                                 }`}>
                                   {isActive ? "ARMED" : "STANDBY"}
@@ -3054,15 +3054,15 @@ journalctl -u alpha-engine.service -f</pre>
                     <span className="text-xs font-bold text-slate-200 font-mono flex items-center gap-1.5">
                       <Bot className="w-3.5 h-3.5 text-green-400" /> GENERATOR (NVIDIA NIM)
                     </span>
-                    <span className="text-[10px] text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded font-mono">PRIMARY</span>
+                    <span className="text-xs text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded font-mono">PRIMARY</span>
                   </div>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-xs text-slate-400">
                     Model: <code className="text-indigo-300">nemotron-3-ultra</code>
                   </p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-xs text-slate-400">
                     Role: Event extraction, GICS sector mapping, initial candidate proposals.
                   </p>
-                  <div className="pt-1 text-[10px] text-slate-500 flex justify-between font-mono">
+                  <div className="pt-1 text-xs text-slate-500 flex justify-between font-mono">
                     <span>Daily Quota Guard:</span>
                     <span className="text-slate-300">500 calls/day (5/min)</span>
                   </div>
@@ -3073,15 +3073,15 @@ journalctl -u alpha-engine.service -f</pre>
                     <span className="text-xs font-bold text-slate-200 font-mono flex items-center gap-1.5">
                       <ShieldAlert className="w-3.5 h-3.5 text-orange-400" /> VERIFIER 1 (GROQ)
                     </span>
-                    <span className="text-[10px] text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded font-mono">CRITIC</span>
+                    <span className="text-xs text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded font-mono">CRITIC</span>
                   </div>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-xs text-slate-400">
                     Model: <code className="text-indigo-300">llama-3.1-70b-versatile</code>
                   </p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-xs text-slate-400">
                     Role: Anti-hallucination screening, economic validity check, ticker verification.
                   </p>
-                  <div className="pt-1 text-[10px] text-slate-500 flex justify-between font-mono">
+                  <div className="pt-1 text-xs text-slate-500 flex justify-between font-mono">
                     <span>Daily Quota Guard:</span>
                     <span className="text-slate-300">5,000 calls/day (30/min)</span>
                   </div>
@@ -3092,15 +3092,15 @@ journalctl -u alpha-engine.service -f</pre>
                     <span className="text-xs font-bold text-slate-200 font-mono flex items-center gap-1.5">
                       <Award className="w-3.5 h-3.5 text-purple-400" /> JUDGE (GEMINI 2.5 PRO)
                     </span>
-                    <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded font-mono">SYNTHESIS</span>
+                    <span className="text-xs text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded font-mono">SYNTHESIS</span>
                   </div>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-xs text-slate-400">
                     Model: <code className="text-indigo-300">gemini-2.5-pro</code>
                   </p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-xs text-slate-400">
                     Role: Tie-breaker adjudication, conflict synthesis, final universe sign-off.
                   </p>
-                  <div className="pt-1 text-[10px] text-slate-500 flex justify-between font-mono">
+                  <div className="pt-1 text-xs text-slate-500 flex justify-between font-mono">
                     <span>Daily Quota Guard:</span>
                     <span className="text-slate-300">1,400 calls/day (15/min)</span>
                   </div>

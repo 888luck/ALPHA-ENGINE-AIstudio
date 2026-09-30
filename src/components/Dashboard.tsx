@@ -1348,7 +1348,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
             <div>
               <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2 flex-wrap">
                 Alpha Engine 
-                <span className="text-[10px] bg-indigo-50 text-indigo-600 font-mono px-2 py-0.5 rounded border border-indigo-100 uppercase tracking-tight font-bold">IRLAND SYSTEM</span>
+                <span className="text-xs bg-indigo-50 text-indigo-600 font-mono px-2 py-0.5 rounded border border-indigo-100 uppercase tracking-tight font-bold">IRLAND SYSTEM</span>
                 <button
                   type="button"
                   onClick={toggleTradingMode}
@@ -1356,12 +1356,12 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                   className="transition active:scale-95 duration-150 cursor-pointer select-none border-none bg-transparent p-0 rounded-md focus:outline-none"
                 >
                   {settings?.tradingMode === "LIVE" ? (
-                    <span className="text-[10px] bg-red-50 text-red-600 font-mono px-2 py-0.5 rounded border border-red-200 animate-pulse font-bold flex items-center gap-1 shadow-sm select-none">
-                      🔴 IBIE LIVE PROD <span className="text-[8px] opacity-75 font-normal ml-0.5 underline decoration-red-200">CLICK TO FLIP</span>
+                    <span className="text-xs bg-red-50 text-red-600 font-mono px-2 py-0.5 rounded border border-red-200 animate-pulse font-bold flex items-center gap-1 shadow-sm select-none">
+                      🔴 IBIE LIVE PROD <span className="text-xs opacity-75 font-normal ml-0.5 underline decoration-red-200">CLICK TO FLIP</span>
                     </span>
                   ) : (
-                    <span className="text-[10px] bg-indigo-50 text-indigo-600 font-mono px-2 py-0.5 rounded border border-indigo-200 font-bold flex items-center gap-1 shadow-sm select-none">
-                      🎮 PAPER SIMULATION <span className="text-[8px] opacity-75 font-normal ml-0.5 underline decoration-indigo-200">CLICK TO FLIP</span>
+                    <span className="text-xs bg-indigo-50 text-indigo-600 font-mono px-2 py-0.5 rounded border border-indigo-200 font-bold flex items-center gap-1 shadow-sm select-none">
+                      🎮 PAPER SIMULATION <span className="text-xs opacity-75 font-normal ml-0.5 underline decoration-indigo-200">CLICK TO FLIP</span>
                     </span>
                   )}
                 </button>
@@ -1455,7 +1455,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     Firebase Firestore Command Tunnel
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-bold border ${
+                    <span className={`text-xs px-1.5 py-0.5 rounded font-mono font-bold border ${
                       firebaseStatus === "authorized" 
                         ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
                         : "bg-amber-50 text-amber-700 border-amber-100"
@@ -1485,10 +1485,10 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
 
                 {currentUser ? (
                   <div className="flex items-center gap-2 font-mono">
-                    <span className="text-[10px] text-slate-500 hidden sm:inline">{currentUser.email}</span>
+                    <span className="text-xs text-slate-500 hidden sm:inline">{currentUser.email}</span>
                     <button
                       onClick={handleFirebaseLogout}
-                      className="px-2.5 py-1 text-[10px] bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-md font-bold cursor-pointer transition"
+                      className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-md font-bold cursor-pointer transition"
                     >
                       Disconnect Port
                     </button>
@@ -1512,7 +1512,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                   {isCustomConfigActive && (
                     <button
                       onClick={resetCustomFirebaseConfig}
-                      className="text-[10px] bg-red-100 hover:bg-red-200 border border-red-200 text-red-700 px-3 py-1 rounded-lg cursor-pointer transition font-black"
+                      className="text-xs bg-red-100 hover:bg-red-200 border border-red-200 text-red-700 px-3 py-1 rounded-lg cursor-pointer transition font-black"
                     >
                       Reset Default
                     </button>
@@ -1523,7 +1523,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                   Default developer credentials are key-restricted. To authenticate on your custom Cloud Run production domain, configure your custom Firebase Project's web client values below.
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-slate-700 font-mono text-[11px]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-slate-700 font-mono text-xs">
                   <div className="space-y-1.5">
                     <label className="block text-slate-500 font-black uppercase tracking-tighter">API KEY (apiKey)</label>
                     <input
@@ -1569,13 +1569,13 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                 <div className="flex justify-end gap-3 pt-3">
                   <button
                     onClick={() => setShowFirebaseConfigPanel(false)}
-                    className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 rounded-xl cursor-pointer transition font-black uppercase tracking-widest text-[10px]"
+                    className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 rounded-xl cursor-pointer transition font-black uppercase tracking-widest text-xs"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={saveCustomFirebaseConfig}
-                    className="px-6 py-2 bg-amber-500 hover:bg-amber-600 border border-amber-400 text-white rounded-xl cursor-pointer transition font-black uppercase tracking-widest text-[10px] shadow-lg shadow-amber-100"
+                    className="px-6 py-2 bg-amber-500 hover:bg-amber-600 border border-amber-400 text-white rounded-xl cursor-pointer transition font-black uppercase tracking-widest text-xs shadow-lg shadow-amber-100"
                   >
                     Save & Initialize Pipeline
                   </button>
@@ -1587,13 +1587,13 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
             {firebaseStatus === "authorized" ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 font-mono text-xs space-y-2">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-widest font-black">Firestore Nodes Status</div>
+                  <div className="text-xs text-slate-500 uppercase tracking-widest font-black">Firestore Nodes Status</div>
                   {isTestingConn || !syncSummary ? (
-                    <div className="text-slate-400 flex items-center gap-1.5 text-[11px] py-1">
+                    <div className="text-slate-400 flex items-center gap-1.5 text-xs py-1">
                       <RefreshCw className="w-3 h-3 animate-spin text-indigo-500" /> Verifying structure integrity...
                     </div>
                   ) : (
-                    <div className="space-y-1.5 text-[11px] text-slate-700">
+                    <div className="space-y-1.5 text-xs text-slate-700">
                       <div className="flex justify-between items-center bg-white px-2 py-1 rounded border border-slate-100 shadow-sm">
                         <span>active_trades:</span>
                         <span className="font-bold text-emerald-600">{syncSummary.activeCount} docs</span>
@@ -1611,7 +1611,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                 </div>
 
                 <div className="flex flex-col gap-2 justify-center">
-                  <div className="text-[10px] text-slate-500 font-mono uppercase tracking-widest mb-1">Bidirectional Tunnel Operations</div>
+                  <div className="text-xs text-slate-500 font-mono uppercase tracking-widest mb-1">Bidirectional Tunnel Operations</div>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={pushStateToCloud}
@@ -1630,7 +1630,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                       {isSyncingWithFirebase ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Restore Logs
                     </button>
                   </div>
-                  <p className="text-[9px] text-slate-500 font-mono text-center mt-1">
+                  <p className="text-xs text-slate-500 font-mono text-center mt-1">
                     Updates will propagate via strict Firestore security filter.
                   </p>
                 </div>
@@ -1650,16 +1650,16 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                 <div className="text-red-400 font-bold font-mono uppercase tracking-wider flex items-center gap-1.5 border-b border-red-500/15 pb-2">
                   <AlertOctagon className="w-4 h-4 text-red-400 animate-pulse" /> SECURITY / PERSISTENCE EXCEPTION
                 </div>
-                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 font-mono text-[10px] text-red-600 overflow-x-auto whitespace-pre-wrap shadow-inner">
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 font-mono text-xs text-red-600 overflow-x-auto whitespace-pre-wrap shadow-inner">
                   {firebaseError}
                 </div>
                 
                 {firebaseError.includes("configuration-not-found") && (
                   <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded text-slate-300 space-y-2 leading-relaxed">
-                    <p className="font-semibold text-amber-200 font-mono text-[11px] uppercase tracking-wider">
+                    <p className="font-semibold text-amber-200 font-mono text-xs uppercase tracking-wider">
                       🛠️ HOW TO RESOLVE IN GOOGLE/FIREBASE CONSOLE:
                     </p>
-                    <ol className="list-decimal list-inside space-y-1.5 text-[11px] text-slate-300">
+                    <ol className="list-decimal list-inside space-y-1.5 text-xs text-slate-300">
                       <li>
                         Go to the <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-400 underline hover:text-indigo-300 font-semibold font-mono">Firebase Console</a> and select your project.
                       </li>
@@ -1673,7 +1673,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                         Configure and enable the <strong>Google</strong> provider (enter your support email, then click <strong>Save</strong>).
                       </li>
                       <li>
-                        Under top tab <strong>Settings</strong> &gt; <strong>Authorized domains</strong>, ensure your production host URL (<code className="text-amber-200 font-mono text-[10px]">alpha-engine-aistudio-138990607360.europe-west3.run.app</code>) is listed.
+                        Under top tab <strong>Settings</strong> &gt; <strong>Authorized domains</strong>, ensure your production host URL (<code className="text-amber-200 font-mono text-xs">alpha-engine-aistudio-138990607360.europe-west3.run.app</code>) is listed.
                       </li>
                     </ol>
                   </div>
@@ -1681,10 +1681,10 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
 
                 {(firebaseError.toLowerCase().includes("permission") || firebaseError.toLowerCase().includes("insufficient")) && (
                   <div className="bg-amber-500/5 border border-amber-500/20 p-3.5 rounded text-slate-300 space-y-3 leading-relaxed">
-                    <p className="font-semibold text-amber-200 font-mono text-[11px] uppercase tracking-wider">
+                    <p className="font-semibold text-amber-200 font-mono text-xs uppercase tracking-wider">
                       🛡️ ACTION REQUIRED: UPDATE FIRESTORE SECURITY RULES
                     </p>
-                    <p className="text-[11px] text-slate-300">
+                    <p className="text-xs text-slate-300">
                       Your Firestore database is currently blocking read/write requests. Paste our production-ready, security-hardened rules into your Firebase Console to authorize synchronized real-time data flow for your logged-in session.
                     </p>
                     
@@ -1702,8 +1702,8 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     </button>
 
                     {copyFailed && (
-                      <div className="bg-rose-950/40 border border-rose-500/30 text-rose-300 p-3 rounded text-[11px] space-y-1.5 font-sans">
-                        <p className="font-bold font-mono text-rose-200 uppercase tracking-wider text-[10px] flex items-center gap-1">
+                      <div className="bg-rose-950/40 border border-rose-500/30 text-rose-300 p-3 rounded text-xs space-y-1.5 font-sans">
+                        <p className="font-bold font-mono text-rose-200 uppercase tracking-wider text-xs flex items-center gap-1">
                           ⚠️ IFRAME CLIPBOARD PROTECTION ACTIVE
                         </p>
                         <p className="leading-relaxed">
@@ -1715,7 +1715,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                       </div>
                     )}
 
-                    <ol className="list-decimal list-inside space-y-1.5 text-[11px] text-slate-300 pt-1.5 border-t border-white/5">
+                    <ol className="list-decimal list-inside space-y-1.5 text-xs text-slate-300 pt-1.5 border-t border-white/5">
                       <li>
                         Go to the <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-400 underline hover:text-indigo-300 font-semibold font-mono">Firebase Console</a> and select your project.
                       </li>
@@ -1732,7 +1732,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
 
                     {securityRulesText && (
                       <div className="mt-3 space-y-1.5">
-                        <span className="block text-[10px] text-slate-400 font-mono uppercase">Full Hardened Rules (Click to select all):</span>
+                        <span className="block text-xs text-slate-400 font-mono uppercase">Full Hardened Rules (Click to select all):</span>
                         <textarea
                           ref={rulesTextareaRef}
                           readOnly
@@ -1743,10 +1743,10 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                             elem.select();
                           }}
                           rows={12}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-[10px] text-indigo-700 font-mono focus:outline-none focus:border-indigo-500 shadow-inner select-all leading-normal resize-y"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-indigo-700 font-mono focus:outline-none focus:border-indigo-500 shadow-inner select-all leading-normal resize-y"
                           placeholder="Loading security rules..."
                         />
-                        <span className="text-[9px] text-slate-500 italic block font-mono leading-none">
+                        <span className="text-xs text-slate-500 italic block font-mono leading-none">
                           💡 Alternative: Click inside the box above, press Ctrl+A (Cmd+A) to select all, then copy.
                         </span>
                       </div>
@@ -1759,11 +1759,11 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
 
           <div className="frosted-glass frosted-glass-hover p-6 flex flex-col justify-between gap-4 font-sans">
             <div className="space-y-2">
-              <span className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">MiFIR (CBI) Profile</span>
+              <span className="text-xs uppercase tracking-wider text-slate-500 font-mono">MiFIR (CBI) Profile</span>
               <p className="text-xs text-slate-200 font-mono font-medium truncate flex items-center gap-2">
                 <UserCheck className="w-4 h-4 text-blue-400" /> {settings?.mifid2DecisionMaker || "NO_CODE"}
               </p>
-              <div className="text-[11px] text-slate-400 font-mono space-y-1">
+              <div className="text-xs text-slate-400 font-mono space-y-1">
                 <div>Client ID: <span className="text-slate-200">{settings?.ibkrClientId || 10}</span></div>
                 <div>Server Port: <span className="text-slate-200">{settings?.ibkrPort || 4002}</span></div>
               </div>
@@ -1803,27 +1803,27 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
 
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 relative group cursor-help shadow-sm">
-                  <span className="text-[10px] text-slate-500 block font-bold font-mono uppercase">NET LIQUIDATION</span>
+                  <span className="text-xs text-slate-500 block font-bold font-mono uppercase">NET LIQUIDATION</span>
                   <span className="text-base font-mono font-bold text-slate-900">
                     €{settings?.netLiquidation?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 text-[10px] text-white p-2 rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-48 z-50 text-center leading-normal">
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 text-xs text-white p-2 rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-48 z-50 text-center leading-normal">
                     Real-time valuation of total assets including premium cash balances and current security holdings.
                   </div>
                 </div>
 
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 relative group cursor-help shadow-sm">
-                  <span className="text-[10px] text-slate-500 block font-bold font-mono uppercase">INITIAL CAPITAL REF</span>
+                  <span className="text-xs text-slate-500 block font-bold font-mono uppercase">INITIAL CAPITAL REF</span>
                   <span className="text-base font-mono font-bold text-slate-700">
                     €{settings?.referenceEquity?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 text-[10px] text-white p-2 rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-48 z-50 text-center leading-normal">
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 text-xs text-white p-2 rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-48 z-50 text-center leading-normal">
                     Starting Reference Capital booked at the beginning of the trading week or month to benchmark drawdown.
                   </div>
                 </div>
 
                 <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 relative group cursor-help shadow-sm">
-                  <span className="text-[10px] text-emerald-700 block font-bold font-mono uppercase tracking-tight">Capital Shield</span>
+                  <span className="text-xs text-emerald-700 block font-bold font-mono uppercase tracking-tight">Capital Shield</span>
                   <span className="text-base font-mono font-bold text-emerald-600">
                     {settings?.virtualCapitalCeiling && settings.virtualCapitalCeiling > 0 ? (
                       `€${settings.virtualCapitalCeiling.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
@@ -1831,27 +1831,27 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                       <span className="text-slate-400 text-xs font-bold uppercase">UNLIMITED</span>
                     )}
                   </span>
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-emerald-900 text-[10px] text-white p-2 rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-48 z-50 text-center leading-normal">
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-emerald-900 text-xs text-white p-2 rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-48 z-50 text-center leading-normal">
                     Protective allocation risk limit. When enabled, trade sizes and leverage thresholds are capped based on this size rather than full pool equity.
                   </div>
                 </div>
 
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 relative group cursor-help shadow-sm">
-                  <span className="text-[10px] text-slate-500 block font-bold font-mono uppercase">MAINTENANCE MARGIN</span>
+                  <span className="text-xs text-slate-500 block font-bold font-mono uppercase">MAINTENANCE MARGIN</span>
                   <span className="text-base font-mono font-bold text-slate-600">
                     €{settings?.maintenanceMargin?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 text-[10px] text-white p-2 rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-48 z-50 text-center leading-normal">
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 text-xs text-white p-2 rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-48 z-50 text-center leading-normal">
                     Minimum buffer capital demanded by IBIE to keep premium leveraged positions open overnight.
                   </div>
                 </div>
 
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 relative group cursor-help shadow-sm">
-                  <span className="text-[10px] text-slate-500 block font-bold font-mono uppercase">DAILY SESSION P&L</span>
+                  <span className="text-xs text-slate-500 block font-bold font-mono uppercase">DAILY SESSION P&L</span>
                   <span className={`text-base font-mono font-bold ${totalPnL >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                     {totalPnL >= 0 ? "+" : ""}€{totalPnL.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 text-[10px] text-white p-2 rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-48 z-50 text-center leading-normal">
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 text-xs text-white p-2 rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 pointer-events-none w-48 z-50 text-center leading-normal">
                     Net aggregate profits or losses generated across all finalized transactions and working contracts today.
                   </div>
                 </div>
@@ -1879,7 +1879,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                   {/* Mark the spot */}
                   <div className="absolute right-0 top-0 bottom-0 w-1 bg-red-600/30" />
                 </div>
-                <div className="flex justify-between text-[10px] text-slate-400 font-bold font-mono uppercase">
+                <div className="flex justify-between text-xs text-slate-400 font-bold font-mono uppercase">
                   <span>0.0% P&L</span>
                   <span>-{(drawdownLimitPct / 2).toFixed(2)}% Buffer</span>
                   <span className="text-red-600 font-black">-{drawdownLimitPct}% Hard Lock</span>
@@ -1888,7 +1888,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                 {/* Cash Drawdown details & Router Lock overrides */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs font-mono shadow-sm">
                   <div className="space-y-1">
-                    <span className="text-[10px] text-slate-500 block font-bold uppercase">Cash Drawdown Threshold</span>
+                    <span className="text-xs text-slate-500 block font-bold uppercase">Cash Drawdown Threshold</span>
                     <span className={`text-sm font-bold ${totalPnL < 0 && Math.abs(totalPnL) >= (settings?.dailyDrawdownLimitCash ?? 1500) ? "text-red-600" : "text-slate-700"}`}>
                       €{totalPnL < 0 ? Math.abs(totalPnL).toFixed(2) : "0.00"} / €{settings?.dailyDrawdownLimitCash ?? "1,500.00"} Limit
                     </span>
@@ -1896,7 +1896,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
 
                   <div className="flex items-center justify-between sm:justify-end gap-4">
                     <div className="text-right">
-                      <span className="text-[10px] text-slate-500 block font-bold uppercase">Router State</span>
+                      <span className="text-xs text-slate-500 block font-bold uppercase">Router State</span>
                       <span className={`font-black text-sm ${settings?.routerLocked ? "text-red-600" : "text-emerald-600"}`}>
                         {settings?.routerLocked ? "● LOCKED" : "● ONLINE"}
                       </span>
@@ -1906,7 +1906,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                       <button
                         type="button"
                         onClick={handleResetDrawdownLock}
-                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-[10px] uppercase shadow-md transition cursor-pointer select-none"
+                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-xs uppercase shadow-md transition cursor-pointer select-none"
                       >
                         ADMIN UNLOCK
                       </button>
@@ -1954,7 +1954,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     >
                       <span className="font-bold">{symbol}</span>
                       {marketBooks[symbol]?.primaryExchange && (
-                        <span className={`px-1 py-0.5 rounded-[3px] text-[10px] font-bold ${
+                        <span className={`px-1 py-0.5 rounded-[3px] text-xs font-bold ${
                           marketBooks[symbol].primaryExchange === "SBF" || marketBooks[symbol].primaryExchange === "AEB" || marketBooks[symbol].primaryExchange === "SB"
                             ? "bg-emerald-50 text-emerald-700 border border-emerald-100" 
                             : marketBooks[symbol].primaryExchange === "IBIS"
@@ -1984,7 +1984,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     />
                     <select
                       id="custom-exchange-select"
-                      className="bg-black/40 border border-white/10 rounded px-1 py-1 text-slate-300 text-[9px] font-mono focus:outline-none"
+                      className="bg-black/40 border border-white/10 rounded px-1 py-1 text-slate-300 text-xs font-mono focus:outline-none"
                     >
                       <option value="NYSE">NYSE</option>
                       <option value="NASDAQ">NASDAQ</option>
@@ -2019,7 +2019,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                           }
                         }
                       }}
-                      className="px-2 py-1 bg-[#00ff88]/15 hover:bg-[#00ff88]/30 text-[#00ff88] border border-[#00ff88]/30 rounded text-[9px] font-mono flex items-center transition cursor-pointer"
+                      className="px-2 py-1 bg-[#00ff88]/15 hover:bg-[#00ff88]/30 text-[#00ff88] border border-[#00ff88]/30 rounded text-xs font-mono flex items-center transition cursor-pointer"
                     >
                       + INGEST
                     </button>
@@ -2031,7 +2031,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* Depth Chart viz */}
                   <div className="md:col-span-2 h-64 bg-slate-50 border border-slate-100 rounded-xl p-4 relative shadow-inner">
-                    <div className="absolute top-2 left-2 text-[10px] text-slate-400 font-bold font-mono uppercase tracking-wider">BID / ASK SHIFT HISTOGRAM</div>
+                    <div className="absolute top-2 left-2 text-xs text-slate-400 font-bold font-mono uppercase tracking-wider">BID / ASK SHIFT HISTOGRAM</div>
                     <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                       <BarChart data={chartData} margin={{ top: 15, right: 10, left: -15, bottom: 5 }}>
                         <XAxis dataKey="price" stroke="#94a3b8" fontSize={10} tickLine={false} />
@@ -2051,7 +2051,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                   {/* Order flow state calculator */}
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
                     <div>
-                      <span className="text-[10px] text-slate-500 font-bold font-mono uppercase tracking-widest block">ORDER FLOW IMBALANCE (OFI)</span>
+                      <span className="text-xs text-slate-500 font-bold font-mono uppercase tracking-widest block">ORDER FLOW IMBALANCE (OFI)</span>
                       
                       <div className="flex items-baseline gap-2 mt-2">
                         <span className={`text-4xl font-mono font-bold ${bookForChart.lastOfi > 0 ? "text-emerald-600" : bookForChart.lastOfi < 0 ? "text-red-600" : "text-slate-400"}`}>
@@ -2062,7 +2062,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
 
                       {/* Direction Meter indicator */}
                       <div className="mt-4 p-3 bg-slate-50 border border-slate-100 rounded-lg">
-                        <p className="text-[10px] text-slate-500 font-bold font-mono uppercase">Signal Suggestion:</p>
+                        <p className="text-xs text-slate-500 font-bold font-mono uppercase">Signal Suggestion:</p>
                         <div className="text-xs font-bold text-slate-900 mt-1.5 flex items-center gap-2">
                           {bookForChart.lastOfi > 250 ? (
                             <>
@@ -2085,19 +2085,19 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     </div>
 
                     <div className="pt-2">
-                      <p className="text-[10px] text-slate-500 font-mono mb-2">Simulate structural ticks manually:</p>
+                      <p className="text-xs text-slate-500 font-mono mb-2">Simulate structural ticks manually:</p>
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           onClick={() => handleManualTick("UP")}
                           disabled={settings?.routerLocked}
-                          className="px-2 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded text-[10px] font-black uppercase tracking-tighter transition border border-emerald-200 cursor-pointer disabled:opacity-40 shadow-sm"
+                          className="px-2 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded text-xs font-black uppercase tracking-tighter transition border border-emerald-200 cursor-pointer disabled:opacity-40 shadow-sm"
                         >
                           + Tick Bid Depth
                         </button>
                         <button
                           onClick={() => handleManualTick("DOWN")}
                           disabled={settings?.routerLocked}
-                          className="px-2 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded text-[10px] font-black uppercase tracking-tighter transition border border-red-200 cursor-pointer disabled:opacity-40 shadow-sm"
+                          className="px-2 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded text-xs font-black uppercase tracking-tighter transition border border-red-200 cursor-pointer disabled:opacity-40 shadow-sm"
                         >
                           - Tick Ask Depth
                         </button>
@@ -2127,7 +2127,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                 
                 {/* Ticker selector */}
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-black font-mono text-slate-500 block tracking-wider">TARGET INSTRUMENT</label>
+                  <label className="text-xs uppercase font-black font-mono text-slate-500 block tracking-wider">TARGET INSTRUMENT</label>
                   <select
                     value={tradeSymbol}
                     onChange={(e) => {
@@ -2145,7 +2145,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
 
                 {/* Direction switcher */}
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-black font-mono text-slate-500 block tracking-wider">ORDER DIRECTION</label>
+                  <label className="text-xs uppercase font-black font-mono text-slate-500 block tracking-wider">ORDER DIRECTION</label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
@@ -2175,7 +2175,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                 {/* Grid parameter entry */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] uppercase font-black font-mono text-slate-500 block tracking-wider">ENTRY ($)</label>
+                    <label className="text-xs uppercase font-black font-mono text-slate-500 block tracking-wider">ENTRY ($)</label>
                     <input
                       type="number"
                       step="0.01"
@@ -2185,7 +2185,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] uppercase font-black font-mono text-slate-500 block tracking-wider">STOP ($)</label>
+                    <label className="text-xs uppercase font-black font-mono text-slate-500 block tracking-wider">STOP ($)</label>
                     <input
                       type="number"
                       step="0.01"
@@ -2199,8 +2199,8 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                 {/* Estimated profit targets to verify friction */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <label className="text-[10px] uppercase font-black font-mono text-slate-500 tracking-wider">PROFIT CEILING ($)</label>
-                    <span className="text-[9px] font-bold text-slate-400 font-mono uppercase">15% Friction Guard</span>
+                    <label className="text-xs uppercase font-black font-mono text-slate-500 tracking-wider">PROFIT CEILING ($)</label>
+                    <span className="text-xs font-bold text-slate-400 font-mono uppercase">15% Friction Guard</span>
                   </div>
                   <input
                     type="number"
@@ -2209,7 +2209,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     onChange={(e) => setTradeTarget(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none transition shadow-inner"
                   />
-                  <div className="text-[10px] text-slate-500 font-bold font-mono uppercase text-right pt-1">
+                  <div className="text-xs text-slate-500 font-bold font-mono uppercase text-right pt-1">
                     Stop Distance: <span className="text-slate-900 font-black">${Math.abs(Number(tradeEntry) - Number(tradeStop)).toFixed(2)}</span>
                   </div>
                 </div>
@@ -2244,11 +2244,11 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 mb-1">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span className="uppercase tracking-widest text-[10px] font-black">SETUP CONFIRMED</span>
+                        <span className="uppercase tracking-widest text-xs font-black">SETUP CONFIRMED</span>
                       </div>
                       <p className="text-slate-700 leading-relaxed">{orderFeedback.success}</p>
                       {orderFeedback.allocatedQty && (
-                        <div className="text-[10px] space-y-1.5 border-t border-emerald-200/50 pt-3 mt-2 text-slate-600">
+                        <div className="text-xs space-y-1.5 border-t border-emerald-200/50 pt-3 mt-2 text-slate-600">
                           <div className="flex justify-between">Position Size: <strong className="text-slate-900 font-black">{orderFeedback.allocatedQty} shares</strong></div>
                           <div className="flex justify-between">Capital Risk: <strong className="text-slate-900 font-black">1.0% Pool Equity</strong></div>
                           <div className="flex justify-between">Efficiency Loss: <strong className={Number(orderFeedback.efficiencyRatio) > 10 ? "text-amber-600 font-black" : "text-emerald-600 font-black"}>{orderFeedback.efficiencyRatio}%</strong></div>
@@ -2272,20 +2272,20 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
               <form onSubmit={handleUpdateSettings} className="space-y-6">
                 <div id="system-control-center-anchor" className="space-y-6">
                   <div className="flex items-center justify-between">
-                    <label className="text-[10px] text-slate-400 uppercase font-mono block">
+                    <label className="text-xs text-slate-400 uppercase font-mono block">
                       Intelligence & Autonomy
                     </label>
-                    <span className="text-[8px] bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20 px-1.5 py-0.5 rounded font-mono uppercase font-bold">
+                    <span className="text-xs bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20 px-1.5 py-0.5 rounded font-mono uppercase font-bold">
                       Fully Independent Node
                     </span>
                   </div>
 
-                  <p className="text-[9px] text-slate-500 leading-normal mb-2 italic">
+                  <p className="text-xs text-slate-500 leading-normal mb-2 italic">
                     Alpha Engine is a standalone production node. While it operates autonomously on your infrastructure, it requires an AI Bridge (API Key) to perform high-reasoning market calibrations and news audits.
                   </p>
                   
                   <div>
-                    <label className="text-[9px] text-slate-500 uppercase font-mono block">Active Intelligence Provider</label>
+                    <label className="text-xs text-slate-500 uppercase font-mono block">Active Intelligence Provider</label>
                     <select
                       value={selectedAiProvider}
                       onChange={(e) => setSelectedAiProvider(e.target.value)}
@@ -2304,7 +2304,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                   <div>
                     <label className="text-xs text-slate-600 font-semibold uppercase font-mono block flex items-center gap-1">
                       Gemini API Key
-                      <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1.5 rounded border border-indigo-100">PRIMARY</span>
+                      <span className="text-xs text-indigo-600 bg-indigo-50 px-1.5 rounded border border-indigo-100">PRIMARY</span>
                     </label>
                     <input
                       id="config-gemini-key"
@@ -2354,15 +2354,15 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                 </div>
 
                 <div className="border-t border-white/10 pt-3 mt-3">
-                  <label className="text-[10px] text-slate-400 uppercase font-mono block mb-1.5 flex justify-between">
+                  <label className="text-xs text-slate-400 uppercase font-mono block mb-1.5 flex justify-between">
                     <span>Gateway Pipeline Mode</span>
-                    <span className="text-[8px] text-slate-500">TOGGLE LIVE IBKR GATEWAY LINK</span>
+                    <span className="text-xs text-slate-500">TOGGLE LIVE IBKR GATEWAY LINK</span>
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => setEditGatewayConnectionActive(false)}
-                      className={`py-1.5 px-3 rounded text-[10px] font-bold border transition duration-150 ${
+                      className={`py-1.5 px-3 rounded text-xs font-bold border transition duration-150 ${
                         !editGatewayConnectionActive
                           ? "bg-indigo-500/25 text-indigo-300 border-indigo-500/50"
                           : "bg-black/20 text-slate-400 border-white/5 hover:bg-black/40 hover:text-slate-200"
@@ -2373,7 +2373,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     <button
                       type="button"
                       onClick={() => setEditGatewayConnectionActive(true)}
-                      className={`py-1.5 px-3 rounded text-[10px] font-bold border transition duration-150 ${
+                      className={`py-1.5 px-3 rounded text-xs font-bold border transition duration-150 ${
                         editGatewayConnectionActive
                           ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
                           : "bg-black/20 text-slate-400 border-white/5 hover:bg-black/40 hover:text-slate-200"
@@ -2382,7 +2382,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                       ⚡️ ACTIVE IBKR SUB
                     </button>
                   </div>
-                  <p className="text-[8px] text-slate-500 mt-1 leading-normal uppercase">
+                  <p className="text-xs text-slate-500 mt-1 leading-normal uppercase">
                     {!editGatewayConnectionActive 
                       ? "Isolated sandbox. Generates synthetic Level 2 order books in-container." 
                       : "Engages headless Native API pipeline to local standard/TWS client gateway."}
@@ -2390,9 +2390,9 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                 </div>
 
                 <div className="border-t border-white/10 pt-3 mt-3">
-                  <label className="text-[10px] text-slate-400 uppercase font-mono block mb-1.5 flex justify-between">
+                  <label className="text-xs text-slate-400 uppercase font-mono block mb-1.5 flex justify-between">
                     <span>Trader Auth Mode</span>
-                    <span className="text-[8px] text-slate-500">SELECT TO PRE-SET PORT GATEWAYS</span>
+                    <span className="text-xs text-slate-500">SELECT TO PRE-SET PORT GATEWAYS</span>
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -2401,7 +2401,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                         setEditTradingMode("PAPER");
                         setEditIbkrPort(4002); // Standard TWS paper/gateway port
                       }}
-                      className={`py-1.5 px-3 rounded text-[10px] font-bold border transition duration-150 ${
+                      className={`py-1.5 px-3 rounded text-xs font-bold border transition duration-150 ${
                         editTradingMode === "PAPER"
                           ? "bg-indigo-500/25 text-indigo-300 border-indigo-500/50"
                           : "bg-black/20 text-slate-400 border-white/5 hover:bg-black/40 hover:text-slate-200"
@@ -2415,7 +2415,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                         setEditTradingMode("LIVE");
                         setEditIbkrPort(4001); // Standard TWS live/gateway port
                       }}
-                      className={`py-1.5 px-3 rounded text-[10px] font-bold border transition duration-150 ${
+                      className={`py-1.5 px-3 rounded text-xs font-bold border transition duration-150 ${
                         editTradingMode === "LIVE"
                           ? "bg-red-500/20 text-red-400 border-red-500/40"
                           : "bg-black/20 text-slate-400 border-white/5 hover:bg-black/40 hover:text-slate-200"
@@ -2428,7 +2428,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-[10px] text-slate-500 uppercase font-mono block">IB Gateway Target Port</label>
+                    <label className="text-xs text-slate-500 uppercase font-mono block">IB Gateway Target Port</label>
                     <input
                       type="number"
                       value={editIbkrPort}
@@ -2436,10 +2436,10 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                       className="w-full mt-1 bg-black/35 border border-white/10 rounded p-1.5 text-slate-100 focus:outline-none focus:border-[#00ff88]/50 text-xs"
                       placeholder="e.g. 4001"
                     />
-                    <span className="text-[8px] text-slate-500 mt-0.5 block">Paper: 4002/7497 | Live: 4001/7496</span>
+                    <span className="text-xs text-slate-500 mt-0.5 block">Paper: 4002/7497 | Live: 4001/7496</span>
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-500 uppercase font-mono block">IB API Client ID</label>
+                    <label className="text-xs text-slate-500 uppercase font-mono block">IB API Client ID</label>
                     <input
                       type="number"
                       value={editIbkrClientId}
@@ -2447,16 +2447,16 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                       className="w-full mt-1 bg-black/35 border border-white/10 rounded p-1.5 text-slate-100 focus:outline-none focus:border-[#00ff88]/50 text-xs"
                       placeholder="e.g. 10"
                     />
-                    <span className="text-[8px] text-slate-500 mt-0.5 block">Allows parallel processes</span>
+                    <span className="text-xs text-slate-500 mt-0.5 block">Allows parallel processes</span>
                   </div>
                 </div>
 
                 <div className="border-t border-white/10 pt-3 mt-3 space-y-2">
-                  <span className="text-[10px] text-slate-400 uppercase font-mono block">Tactical Strategy Upgrades</span>
+                  <span className="text-xs text-slate-400 uppercase font-mono block">Tactical Strategy Upgrades</span>
                   
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[9px] text-slate-500 block uppercase font-mono font-black tracking-tighter">Stop ATR Mult</label>
+                      <label className="text-xs text-slate-500 block uppercase font-mono font-black tracking-tighter">Stop ATR Mult</label>
                       <input
                         type="number"
                         step="0.1"
@@ -2466,7 +2466,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                       />
                     </div>
                     <div>
-                      <label className="text-[9px] text-slate-500 block uppercase font-mono">Max Hold Bars</label>
+                      <label className="text-xs text-slate-500 block uppercase font-mono">Max Hold Bars</label>
                       <input
                         type="number"
                         value={editMaxHoldBars}
@@ -2484,7 +2484,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                         onChange={(e) => setEditPartialProfit(e.target.checked)}
                         className="accent-indigo-600"
                       />
-                      <span className="text-[9px] text-slate-600 font-bold uppercase tracking-tighter">Tranche Exit</span>
+                      <span className="text-xs text-slate-600 font-bold uppercase tracking-tighter">Tranche Exit</span>
                     </label>
                     <label className="flex items-center gap-1.5 p-1.5 rounded bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
                       <input
@@ -2493,7 +2493,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                         onChange={(e) => setEditBreakevenLock(e.target.checked)}
                         className="accent-indigo-600"
                       />
-                      <span className="text-[9px] text-slate-600 font-bold uppercase tracking-tighter">Breakeven Lock</span>
+                      <span className="text-xs text-slate-600 font-bold uppercase tracking-tighter">Breakeven Lock</span>
                     </label>
                     <label className="flex items-center gap-1.5 p-1.5 rounded bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
                       <input
@@ -2502,7 +2502,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                         onChange={(e) => setEditOfiFilter(e.target.checked)}
                         className="accent-indigo-600"
                       />
-                      <span className="text-[9px] text-slate-600 font-bold uppercase tracking-tighter">OFI L2 Filter</span>
+                      <span className="text-xs text-slate-600 font-bold uppercase tracking-tighter">OFI L2 Filter</span>
                     </label>
                     <label className="flex items-center gap-1.5 p-1.5 rounded bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
                       <input
@@ -2511,16 +2511,16 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                         onChange={(e) => setEditAdaptiveStop(e.target.checked)}
                         className="accent-indigo-600"
                       />
-                      <span className="text-[9px] text-slate-600 font-bold uppercase tracking-tighter">Adaptive Stop</span>
+                      <span className="text-xs text-slate-600 font-bold uppercase tracking-tighter">Adaptive Stop</span>
                     </label>
                   </div>
 
                   {/* Option 3 Drawdown Hard-locks */}
                   <div className="border-t border-white/10 pt-3 mt-3 space-y-2">
-                    <span className="text-[10px] text-slate-400 uppercase font-mono block">Option 3: Drawdown Hard-Locks</span>
+                    <span className="text-xs text-slate-400 uppercase font-mono block">Option 3: Drawdown Hard-Locks</span>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
-                          <label className="text-[9px] text-slate-500 font-black uppercase font-mono tracking-tighter block">Drawdown Limit (%)</label>
+                          <label className="text-xs text-slate-500 font-black uppercase font-mono tracking-tighter block">Drawdown Limit (%)</label>
                           <input
                             type="number"
                             step="0.1"
@@ -2532,7 +2532,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[9px] text-slate-500 font-black uppercase font-mono tracking-tighter block">Drawdown (Cash €)</label>
+                          <label className="text-xs text-slate-500 font-black uppercase font-mono tracking-tighter block">Drawdown (Cash €)</label>
                           <input
                             type="number"
                             step="100"
@@ -2550,7 +2550,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                 <div className="pt-4 border-t border-slate-100 mt-4">
                   <button
                     type="submit"
-                    className="w-full py-3 bg-slate-900 hover:bg-black text-white font-black rounded-xl text-[10px] uppercase tracking-widest shadow-lg shadow-slate-200 transition-all cursor-pointer transform active:scale-95"
+                    className="w-full py-3 bg-slate-900 hover:bg-black text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-slate-200 transition-all cursor-pointer transform active:scale-95"
                   >
                     Commit System Settings
                   </button>
@@ -2570,7 +2570,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
               <div>
                 <h3 className="text-base font-black text-slate-900 flex items-center gap-2 flex-wrap tracking-tight">
                   Geopolitical & Macro AI Calibrator
-                  <span className="text-[10px] px-2 py-0.5 rounded-md font-black bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase animate-pulse shadow-sm">
+                  <span className="text-xs px-2 py-0.5 rounded-md font-black bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase animate-pulse shadow-sm">
                     Autonomous
                   </span>
                 </h3>
@@ -2585,7 +2585,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
               <button
                 type="button"
                 onClick={() => setSelectedCalibrationModel("ai-studio")}
-                className={`py-1.5 px-3 rounded-lg text-[10px] font-black font-mono uppercase transition-all cursor-pointer ${
+                className={`py-1.5 px-3 rounded-lg text-xs font-black font-mono uppercase transition-all cursor-pointer ${
                   selectedCalibrationModel === "ai-studio"
                     ? "bg-white text-indigo-600 border border-slate-200 shadow-sm"
                     : "text-slate-400 hover:text-slate-600"
@@ -2596,7 +2596,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
               <button
                 type="button"
                 onClick={() => setSelectedCalibrationModel("vertex")}
-                className={`py-1.5 px-3 rounded-lg text-[10px] font-black font-mono uppercase transition-all cursor-pointer ${
+                className={`py-1.5 px-3 rounded-lg text-xs font-black font-mono uppercase transition-all cursor-pointer ${
                   selectedCalibrationModel === "vertex"
                     ? "bg-white text-indigo-600 border border-slate-200 shadow-sm"
                     : "text-slate-400 hover:text-slate-600"
@@ -2614,7 +2614,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-600" />
-                    <span className="font-black text-amber-800 uppercase tracking-widest text-[10px] font-mono">Model Lifecycle Advisory</span>
+                    <span className="font-black text-amber-800 uppercase tracking-widest text-xs font-mono">Model Lifecycle Advisory</span>
                   </div>
                   <p className="text-amber-900/70 leading-relaxed text-xs font-medium">
                     Locked to production-stable <strong>Gemini 2.5 Architecture</strong> for high-reasoning market audits.
@@ -2623,7 +2623,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] text-slate-500 font-black uppercase font-mono block tracking-wider">
+                <label className="text-xs text-slate-500 font-black uppercase font-mono block tracking-wider">
                   Describe Theme / Event
                 </label>
                 <textarea
@@ -2635,7 +2635,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
               </div>
 
               <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-2 text-[10px] text-slate-500 font-black font-mono uppercase tracking-tighter">
+                <div className="flex items-center gap-2 text-xs text-slate-500 font-black font-mono uppercase tracking-tighter">
                   <span>Targets:</span>
                   <span className="bg-slate-100 py-1 px-2 rounded text-slate-700 border border-slate-200">3.5-Flash</span>
                   <span className="bg-slate-100 py-1 px-2 rounded text-slate-700 border border-slate-200">1.8 ATR</span>
@@ -2717,7 +2717,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
             <div className="lg:col-span-5 space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col justify-between shadow-inner">
               <div>
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4 flex-wrap gap-2">
-                  <span className="text-[10px] text-indigo-600 font-black uppercase tracking-widest font-mono flex items-center gap-1.5" title="Real-time background ingester timeline showing policy events and market-impact reports">
+                  <span className="text-xs text-indigo-600 font-black uppercase tracking-widest font-mono flex items-center gap-1.5" title="Real-time background ingester timeline showing policy events and market-impact reports">
                     <div className="p-1 rounded bg-indigo-50 border border-indigo-100">
                       <Activity className="w-3 h-3 text-indigo-600" />
                     </div>
@@ -2728,7 +2728,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                   <select
                     value={selectedNewsSource}
                     onChange={(e: any) => setSelectedNewsSource(e.target.value)}
-                    className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[9px] text-slate-700 font-bold font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 shadow-sm cursor-pointer transition-all"
+                    className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-700 font-bold font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 shadow-sm cursor-pointer transition-all"
                   >
                     <option value="all">ALL FEEDS</option>
                     <option value="bloomberg">BLOOMBERG RSS</option>
@@ -2738,7 +2738,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                   </select>
                 </div>
 
-                <p className="text-[10px] text-slate-500 font-medium leading-relaxed mb-4 italic">
+                <p className="text-xs text-slate-500 font-medium leading-relaxed mb-4 italic">
                   Parsed global headlines used to calibrate order flow coefficients. Select a source to filter signals.
                 </p>
 
@@ -2798,7 +2798,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                         setIsAutomatingNews(false);
                       }
                     }}
-                    className="w-full py-2 px-3 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl text-[10px] font-black font-mono flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 cursor-pointer"
+                    className="w-full py-2 px-3 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl text-xs font-black font-mono flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 cursor-pointer"
                   >
                     {isAutomatingNews ? (
                       <>
@@ -2824,7 +2824,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     })
                     .map((log, i) => (
                       <div key={i} className="p-3 rounded-xl border border-slate-100 bg-white hover:border-indigo-500/30 hover:shadow-md transition-all space-y-2 group">
-                        <div className="flex items-center justify-between text-[9px] font-mono font-black leading-none">
+                        <div className="flex items-center justify-between text-xs font-mono font-black leading-none">
                           <span className="text-slate-400">{log.time}</span>
                           <span className="text-indigo-600 uppercase bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 leading-none">{log.source}</span>
                           <span className={`px-1.5 py-0.5 rounded font-black leading-none border ${
@@ -2833,15 +2833,15 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                             {log.sentiment > 0 ? "+" : ""}{log.sentiment.toFixed(2)}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-900 font-black leading-tight font-sans group-hover:text-indigo-600 transition-colors">
+                        <p className="text-xs text-slate-900 font-black leading-tight font-sans group-hover:text-indigo-600 transition-colors">
                           {log.headline}
                         </p>
-                        <div className="flex items-center justify-between pt-1 text-[9px] font-mono font-bold">
+                        <div className="flex items-center justify-between pt-1 text-xs font-mono font-bold">
                           <span className="text-slate-500 uppercase">Impact: <strong className={log.impact === "BULLISH" ? "text-emerald-600" : log.impact === "BEARISH" ? "text-red-600" : "text-amber-600"}>{log.impact}</strong></span>
                           <span className="text-slate-400">Target: <span className="text-slate-700">{log.targetSector}</span></span>
                         </div>
                         {log.circuitOverrideActive && (
-                          <div className="mt-2 bg-red-50 border border-red-100 p-1.5 rounded-lg text-[9px] text-red-700 font-black flex items-center gap-1.5 flex-wrap uppercase font-mono shadow-sm">
+                          <div className="mt-2 bg-red-50 border border-red-100 p-1.5 rounded-lg text-xs text-red-700 font-black flex items-center gap-1.5 flex-wrap uppercase font-mono shadow-sm">
                             <AlertOctagon className="w-3 h-3 text-red-600 animate-pulse" />
                             Macro Blanket Activated - Suspended Edge Routing
                           </div>
@@ -2853,7 +2853,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
               </div>
 
               {/* Interaction helper described in request */}
-              <div className="pt-4 border-t border-slate-100 text-[10px] text-slate-500 leading-relaxed flex items-start gap-2 font-medium">
+              <div className="pt-4 border-t border-slate-100 text-xs text-slate-500 leading-relaxed flex items-start gap-2 font-medium">
                 <div className="p-1 rounded bg-emerald-50 border border-emerald-100 shadow-sm shrink-0">
                   <Activity className="w-3 h-3 text-emerald-600" />
                 </div>
@@ -2876,13 +2876,13 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     <h4 className="text-xs font-bold text-slate-100 uppercase tracking-widest font-mono">
                       Latest AI Calibration Report Findings
                     </h4>
-                    <p className="text-[10px] text-slate-400 font-mono">
+                    <p className="text-xs text-slate-400 font-mono">
                       Engine Source: <span className="text-[#00ff88] font-bold">{latestNewsResult.modelUsed || "Dynamic AI Pipeline"}</span>
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-[10px] font-mono">
+                <div className="flex items-center gap-2 text-xs font-mono">
                   <span className={`px-2 py-0.5 rounded border ${
                     latestNewsResult.news.sentiment > 0
                       ? "bg-[#00ff88]/10 text-[#00ff88] border-[#00ff88]/30"
@@ -2905,13 +2905,13 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
               </div>
 
               <div className="p-3.5 rounded-lg bg-indigo-950/15 border border-indigo-500/15 space-y-2">
-                <div className="text-[10px] font-extrabold text-indigo-400 uppercase tracking-wider font-mono">
+                <div className="text-xs font-extrabold text-indigo-400 uppercase tracking-wider font-mono">
                   🚨 Breaking News Wire / Macro Trigger
                 </div>
                 <p className="text-xs text-slate-100 leading-relaxed font-semibold">
                   "{latestNewsResult.news.headline}"
                 </p>
-                <div className="text-[10px] text-slate-400 font-mono">
+                <div className="text-xs text-slate-400 font-mono">
                   Targeted Micro-Sectors: <span className="text-slate-200 font-semibold font-sans">{latestNewsResult.news.targetSector}</span>
                 </div>
               </div>
@@ -2920,27 +2920,27 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                 {latestNewsResult.baskets.map((b, bIdx) => (
                   <div key={bIdx} className="p-3 bg-white/5 border border-white/10 rounded-lg space-y-2 hover:border-indigo-500/35 transition">
                     <div className="flex items-start justify-between gap-1">
-                      <span className="text-[10.5px] font-bold text-slate-200 tracking-tight leading-tight block truncate" title={b.sector}>
+                      <span className="text-xs font-bold text-slate-200 tracking-tight leading-tight block truncate" title={b.sector}>
                         {b.sector}
                       </span>
-                      <span className="shrink-0 text-[8px] font-mono px-1 rounded bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20 uppercase">
+                      <span className="shrink-0 text-xs font-mono px-1 rounded bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/20 uppercase">
                         Basket {bIdx + 1}
                       </span>
                     </div>
 
                     <div className="flex gap-1 flex-wrap">
                       {b.tickers.map((ticker, tIdx) => (
-                        <span key={tIdx} className="text-[9px] font-mono px-1.5 py-0.5 bg-black/55 border border-white/5 rounded text-[#00ff88] font-bold">
+                        <span key={tIdx} className="text-xs font-mono px-1.5 py-0.5 bg-black/55 border border-white/5 rounded text-[#00ff88] font-bold">
                           {ticker}
                         </span>
                       ))}
                     </div>
 
-                    <p className="text-[9px] text-slate-400 font-sans leading-tight">
+                    <p className="text-xs text-slate-400 font-sans leading-tight">
                       {b.impliedOfiTrend}
                     </p>
 
-                    <div className="pt-2 border-t border-white/5 space-y-1 text-[9px] font-mono">
+                    <div className="pt-2 border-t border-white/5 space-y-1 text-xs font-mono">
                       <div className="flex justify-between">
                         <span className="text-slate-500">Proj. Win Rate:</span>
                         <span className="text-[#00ff88] font-bold">{b.winRate}%</span>
@@ -2961,8 +2961,8 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
               </div>
 
               {/* Informational guide on model flexibility addressing the second question */}
-              <div className="p-3 rounded-lg bg-black/35 border border-white/5 text-[9.5px] text-slate-400 leading-normal flex items-start gap-2">
-                <span className="text-[#00ff88] font-extrabold uppercase shrink-0 font-mono text-[9px]">🔧 Model Orchestration Protocol:</span>
+              <div className="p-3 rounded-lg bg-black/35 border border-white/5 text-xs text-slate-400 leading-normal flex items-start gap-2">
+                <span className="text-[#00ff88] font-extrabold uppercase shrink-0 font-mono text-xs">🔧 Model Orchestration Protocol:</span>
                 <span>
                   The Alpha Engine operates a dual-branch LLM calibrator that is <strong>not limited to Gemini</strong>. Although optimised for Google Gemini 3.5 & 2.5 server-side processing, the API controller is built as a generic router. It can ingest Vertex Enterprise, third-party provider overlays, or fail safe back to the co-located high-fidelity simulator when keys are offline. This guarantees uninterrupted risk blanketing across Frankfurt routing lanes regardless of network uptime.
                 </span>
@@ -2978,14 +2978,14 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
               <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight flex items-center gap-2 flex-wrap">
                 <Play className="w-4 h-4 text-emerald-500 fill-emerald-500/20" /> Pre-Flight Expectancy Calibrator
               </h2>
-              <p className="text-[11px] text-slate-500 font-medium font-mono mt-1 uppercase tracking-tighter">Statistical projections across structural baskets</p>
+              <p className="text-xs text-slate-500 font-medium font-mono mt-1 uppercase tracking-tighter">Statistical projections across structural baskets</p>
             </div>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left font-mono text-[11px]">
+            <table className="w-full text-left font-mono text-xs">
               <thead>
-                <tr className="border-b border-slate-100 text-slate-400 uppercase text-[9px] font-black tracking-widest">
+                <tr className="border-b border-slate-100 text-slate-400 uppercase text-xs font-black tracking-widest">
                   <th className="pb-3 pt-1 font-black">Asset Sector Strategy</th>
                   <th className="pb-3 pt-1 font-black">Tested Tickers</th>
                   <th className="pb-3 pt-1 font-black">Level 2 OFI Trend</th>
@@ -3005,7 +3005,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     <td className="py-3 text-right font-bold text-slate-900">{item.profitFactor.toFixed(2)}x</td>
                     <td className="py-3 text-right font-bold text-slate-900">{item.avgFrictionConsumed}%</td>
                     <td className="py-3 text-right">
-                      <span className={`px-2 py-0.5 text-[9px] font-black rounded uppercase tracking-tighter border shadow-sm ${
+                      <span className={`px-2 py-0.5 text-xs font-black rounded uppercase tracking-tighter border shadow-sm ${
                         item.avgFrictionConsumed <= 10 
                           ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
                           : "bg-amber-50 text-amber-700 border-amber-200"
@@ -3025,18 +3025,23 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
           
           {/* Active Positions holding list */}
           <div className="frosted-glass frosted-glass-hover p-6 bg-white shadow-sm border border-slate-200">
-            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-4 mb-5">
-              <div className="p-1.5 bg-indigo-50 rounded-lg">
-                <Lock className="w-4 h-4 text-indigo-600" />
-              </div>
-              ACTIVE HOLDINGS (INTRADAY)
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-4 mb-5">
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                <div className="p-1.5 bg-indigo-50 rounded-lg">
+                  <Lock className="w-4 h-4 text-indigo-600" />
+                </div>
+                ACTIVE HOLDINGS (INTRADAY)
+              </h2>
+              <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-md font-mono font-bold tracking-wider">
+                AUTHORITATIVE BROKER TELEMETRY
+              </span>
+            </div>
 
             {activeTrades.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-left font-mono text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-100 text-slate-500 uppercase text-[10px] font-black tracking-wider bg-slate-50/50">
+                    <tr className="border-b border-slate-100 text-slate-600 uppercase text-xs font-bold tracking-wider bg-slate-50/50">
                       <th className="px-3 py-3">Token</th>
                       <th className="px-3 py-3">Qty</th>
                       <th className="px-3 py-3">Side</th>
@@ -3048,10 +3053,10 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                   <tbody className="divide-y divide-slate-50 text-slate-700">
                     {activeTrades.map((trade) => (
                       <tr key={trade.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-3 py-3 font-black text-slate-900 flex items-center gap-1.5 flex-wrap">
+                        <td className="px-3 py-3 font-bold text-slate-900 flex items-center gap-2 flex-wrap text-xs">
                           <span>{trade.symbol}</span>
                           {marketBooks[trade.symbol]?.primaryExchange && (
-                            <span className={`px-1 py-0.5 rounded-[4px] text-[8px] font-black border ${
+                            <span className={`px-1.5 py-0.5 rounded text-xs font-bold border ${
                               marketBooks[trade.symbol].primaryExchange === "SBF" || marketBooks[trade.symbol].primaryExchange === "AEB" || marketBooks[trade.symbol].primaryExchange === "SB"
                                 ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
                                 : marketBooks[trade.symbol].primaryExchange === "IBIS"
@@ -3062,17 +3067,17 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                             </span>
                           )}
                         </td>
-                        <td className="px-3 py-3 font-bold">{trade.quantity}</td>
+                        <td className="px-3 py-3 font-bold text-xs">{trade.quantity}</td>
                         <td className="px-3 py-3">
-                          <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black border shadow-sm ${
+                          <span className={`px-2 py-0.5 rounded-md text-xs font-bold border shadow-sm ${
                             trade.direction === "BUY" ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-red-50 text-red-700 border-red-100"
                           }`}>
                             {trade.direction === "BUY" ? "LONG" : "SHORT"}
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-right font-bold">€{trade.entryPrice.toFixed(2)}</td>
-                        <td className="px-3 py-3 text-right font-bold text-indigo-600">€{trade.currentPrice.toFixed(2)}</td>
-                        <td className={`px-3 py-3 text-right font-black ${trade.unrealizedPnL >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                        <td className="px-3 py-3 text-right font-bold text-xs">€{trade.entryPrice.toFixed(2)}</td>
+                        <td className="px-3 py-3 text-right font-bold text-indigo-600 text-xs">€{trade.currentPrice.toFixed(2)}</td>
+                        <td className={`px-3 py-3 text-right font-bold text-xs ${trade.unrealizedPnL >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                           {trade.unrealizedPnL >= 0 ? "+" : ""}€{trade.unrealizedPnL.toLocaleString()}
                         </td>
                       </tr>
@@ -3083,7 +3088,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
             ) : (
               <div className="text-center py-12 text-slate-400 text-xs font-mono h-32 flex flex-col justify-center items-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
                 <Unlock className="w-8 h-8 text-slate-300 mb-2 opacity-50" />
-                <p className="font-bold uppercase tracking-widest text-[10px]">No active session holdings. All routes flat.</p>
+                <p className="font-bold uppercase tracking-widest text-xs">No active session holdings. All routes flat.</p>
               </div>
             )}
           </div>
@@ -3101,7 +3106,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
               <div className="overflow-x-auto max-h-[17rem]">
                 <table className="w-full text-left font-mono text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-100 text-slate-500 uppercase text-[10px] font-black tracking-wider bg-slate-50/50">
+                    <tr className="border-b border-slate-100 text-slate-600 uppercase text-xs font-bold tracking-wider bg-slate-50/50">
                       <th className="px-3 py-3">Token</th>
                       <th className="px-3 py-3">Side</th>
                       <th className="px-3 py-3 text-right">P&L</th>
@@ -3112,23 +3117,23 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                   <tbody className="divide-y divide-slate-50 text-slate-700">
                     {historicalLogs.map((log) => (
                       <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-3 py-3 font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
+                        <td className="px-3 py-3 font-bold text-slate-900 flex items-center gap-2 flex-wrap text-xs">
                           <span>{log.symbol}</span>
-                          <span className="text-[9px] text-slate-400 font-normal">({log.quantity})</span>
+                          <span className="text-xs text-slate-500 font-normal">({log.quantity})</span>
                         </td>
                         <td className="px-3 py-3">
-                          <span className={`text-[10px] font-black ${
+                          <span className={`text-xs font-bold ${
                             log.direction === "BUY" ? "text-emerald-600" : "text-red-600"
                           }`}>
                             {log.direction === "BUY" ? "LONG" : "SHORT"}
                           </span>
                         </td>
-                        <td className={`px-3 py-3 text-right font-black ${log.realizedPnL >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                        <td className={`px-3 py-3 text-right font-bold text-xs ${log.realizedPnL >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                           {log.realizedPnL >= 0 ? "+" : ""}€{log.realizedPnL.toFixed(2)}
                         </td>
-                        <td className="px-3 py-3 text-right text-slate-500 font-bold">€{log.commission.toFixed(2)}</td>
+                        <td className="px-3 py-3 text-right text-slate-500 font-bold text-xs">€{log.commission.toFixed(2)}</td>
                         <td className="px-3 py-3 text-right">
-                          <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black border shadow-sm ${
+                          <span className={`px-2 py-0.5 rounded-md text-xs font-bold border shadow-sm ${
                             log.efficiencyRatio > 15 
                               ? "bg-red-50 text-red-700 border-red-100" 
                               : "bg-emerald-50 text-emerald-700 border-emerald-100"
@@ -3143,7 +3148,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
               </div>
             ) : (
               <div className="text-center py-12 text-slate-400 text-xs font-mono h-32 flex flex-col justify-center items-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-                <p className="font-bold uppercase tracking-widest text-[10px]">System starting fresh. No archived records yet.</p>
+                <p className="font-bold uppercase tracking-widest text-xs">System starting fresh. No archived records yet.</p>
               </div>
             )}
           </div>
@@ -3162,7 +3167,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                 </div>
                 <div>
                   <h2 className="text-sm font-black tracking-tight text-slate-900 uppercase">Pre-Flight Diagnostics</h2>
-                  <p className="text-[10px] text-slate-500 font-bold font-mono uppercase tracking-widest mt-0.5">System Integrity & Credentials</p>
+                  <p className="text-xs text-slate-500 font-bold font-mono uppercase tracking-widest mt-0.5">System Integrity & Credentials</p>
                 </div>
               </div>
               <button
@@ -3193,25 +3198,25 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     </div>
                     <div className="flex items-center gap-1.5">
                       {serverHasKey || openaiConfigured || anthropicConfigured ? (
-                        <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-md font-mono font-black flex items-center gap-1.5 shadow-sm">
+                        <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-md font-mono font-black flex items-center gap-1.5 shadow-sm">
                           <CheckCircle2 className="w-3.5 h-3.5" /> SYSTEM ARMED
                         </span>
                       ) : (
-                        <span className="text-[10px] bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-md font-mono font-black animate-pulse flex items-center gap-1.5 shadow-sm">
+                        <span className="text-xs bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-md font-mono font-black animate-pulse flex items-center gap-1.5 shadow-sm">
                           <AlertOctagon className="w-3.5 h-3.5" /> AI DISARMED
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <p className="text-[11px] text-slate-500 leading-relaxed font-bold">
+                  <p className="text-xs text-slate-500 leading-relaxed font-bold">
                     Alpha Engine is <span className="text-indigo-600">AI Provider Agnostic</span>. Configure high-reasoning models for strategy generation.
                   </p>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {/* Model Selector */}
                     <div className="space-y-2">
-                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">Active Intelligence Provider:</label>
+                      <label className="text-xs text-slate-500 font-bold font-mono block uppercase">Active Intelligence Provider:</label>
                       <select
                         value={selectedAiProvider}
                         onChange={(e) => {
@@ -3236,7 +3241,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
 
                     {/* Gemini Key */}
                     <div className="space-y-2">
-                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">Gemini Override Key:</label>
+                      <label className="text-xs text-slate-500 font-bold font-mono block uppercase">Gemini Override Key:</label>
                       <input
                         type="password"
                         placeholder={serverHasKey ? "••••••••••••••••••••••••" : "Paste Gemini Key..."}
@@ -3248,7 +3253,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
 
                     {/* OpenAI Key */}
                     <div className="space-y-2">
-                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">OpenAI API Key (BYOK):</label>
+                      <label className="text-xs text-slate-500 font-bold font-mono block uppercase">OpenAI API Key (BYOK):</label>
                       <input
                         type="password"
                         placeholder={openaiConfigured ? "••••••••••••••••••••••••" : "Paste OpenAI Key..."}
@@ -3263,7 +3268,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
 
                     {/* Anthropic Key */}
                     <div className="space-y-2">
-                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">Anthropic API Key (BYOK):</label>
+                      <label className="text-xs text-slate-500 font-bold font-mono block uppercase">Anthropic API Key (BYOK):</label>
                       <input
                         type="password"
                         placeholder={anthropicConfigured ? "••••••••••••••••••••••••" : "Paste Anthropic Key..."}
@@ -3278,7 +3283,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
 
                     {/* NVIDIA Key */}
                     <div className="space-y-2">
-                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">NVIDIA NIM API Key:</label>
+                      <label className="text-xs text-slate-500 font-bold font-mono block uppercase">NVIDIA NIM API Key:</label>
                       <input
                         type="password"
                         placeholder={nvidiaConfigured ? "••••••••••••••••••••••••" : "Paste NVIDIA NIM Key..."}
@@ -3294,7 +3299,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     {/* Custom Bridge Section */}
                     <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-200">
                       <div className="space-y-2">
-                        <label className="text-[10px] text-indigo-600 font-bold font-mono block uppercase">Base URL:</label>
+                        <label className="text-xs text-indigo-600 font-bold font-mono block uppercase">Base URL:</label>
                         <input
                           type="text"
                           placeholder="e.g. https://api.groq.com/openai/v1"
@@ -3307,7 +3312,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] text-indigo-600 font-bold font-mono block uppercase">Model Name:</label>
+                        <label className="text-xs text-indigo-600 font-bold font-mono block uppercase">Model Name:</label>
                         <input
                           type="text"
                           placeholder="e.g. llama3-70b-8192"
@@ -3320,7 +3325,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] text-indigo-600 font-bold font-mono block uppercase">Bridge Key:</label>
+                        <label className="text-xs text-indigo-600 font-bold font-mono block uppercase">Bridge Key:</label>
                         <input
                           type="password"
                           placeholder={customAiConfigured ? "••••••••••••••••••••••••" : "Enter API Key..."}
@@ -3335,7 +3340,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     </div>
                   </div>
 
-                  <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-[10px] text-indigo-700 font-bold font-mono leading-relaxed shadow-inner">
+                  <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-700 font-bold font-mono leading-relaxed shadow-inner">
                     <div className="flex items-center gap-1.5 mb-1">
                       <ShieldCheck className="w-3.5 h-3.5" /> BACKEND PROXY SECURITY
                     </div>
@@ -3353,11 +3358,11 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                       <span className="text-xs font-black text-slate-900 font-mono uppercase tracking-tight">IBKR Gateway</span>
                     </div>
                     {editAccount === "U8129384" ? (
-                      <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-md font-mono font-black flex items-center gap-1.5 shadow-sm">
+                      <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-md font-mono font-black flex items-center gap-1.5 shadow-sm">
                         <AlertOctagon className="w-3.5 h-3.5" /> MOCK EMULATOR
                       </span>
                     ) : (
-                      <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-md font-mono font-black flex items-center gap-1.5 shadow-sm">
+                      <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-md font-mono font-black flex items-center gap-1.5 shadow-sm">
                         <CheckCircle2 className="w-3.5 h-3.5" /> DMA KEYED
                       </span>
                     )}
@@ -3365,7 +3370,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">Account Number:</label>
+                      <label className="text-xs text-slate-500 font-bold font-mono block uppercase">Account Number:</label>
                       <input
                         type="text"
                         value={editAccount}
@@ -3376,7 +3381,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">Socket Port:</label>
+                      <label className="text-xs text-slate-500 font-bold font-mono block uppercase">Socket Port:</label>
                       <select
                         value={editIbkrPort}
                         onChange={(e) => saveInlineSetting("ibkrPort", Number(e.target.value))}
@@ -3390,7 +3395,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">Client ID:</label>
+                      <label className="text-xs text-slate-500 font-bold font-mono block uppercase">Client ID:</label>
                       <input
                         type="number"
                         value={editIbkrClientId}
@@ -3400,7 +3405,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     </div>
                   </div>
                   
-                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 text-[10px] text-amber-800 font-bold font-mono shadow-inner">
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 text-xs text-amber-800 font-bold font-mono shadow-inner">
                     💡 <strong className="text-amber-900">TWS/Gateway Setup Hint:</strong> Ensure "Enable ActiveX and Socket Clients" is checked in your IBKR software global configuration.
                   </div>
                 </div>
@@ -3418,7 +3423,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">Decision Maker ID:</label>
+                      <label className="text-xs text-slate-500 font-bold font-mono block uppercase">Decision Maker ID:</label>
                       <input
                         type="text"
                         value={editDecisionMaker}
@@ -3429,7 +3434,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] text-slate-500 font-bold font-mono block uppercase">Execution Trader ID:</label>
+                      <label className="text-xs text-slate-500 font-bold font-mono block uppercase">Execution Trader ID:</label>
                       <input
                         type="text"
                         value={editTrader}
@@ -3451,16 +3456,16 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                       <span className="text-xs font-black text-slate-900 font-mono uppercase tracking-tight">FIRESTORE CONNECTION</span>
                     </div>
                     {firebaseStatus === "authorized" ? (
-                      <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-md font-mono font-black flex items-center gap-1.5 shadow-sm">
+                      <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-md font-mono font-black flex items-center gap-1.5 shadow-sm">
                         <CheckCircle2 className="w-3.5 h-3.5" /> AUTHORIZED
                       </span>
                     ) : (
-                      <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-md font-mono font-black flex items-center gap-1.5 shadow-sm">
+                      <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-md font-mono font-black flex items-center gap-1.5 shadow-sm">
                         <AlertOctagon className="w-3.5 h-3.5" /> IN-MEMORY EMULATION
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-500 leading-relaxed font-bold">
+                  <p className="text-xs text-slate-500 leading-relaxed font-bold">
                     Provides long-term, real-time synchronization between your Frankfurt edge execution nodes and your dashboard.
                   </p>
                   
@@ -3479,7 +3484,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                       </button>
                     </div>
                   ) : (
-                    <div className="text-[10.5px] text-slate-600 font-bold font-mono flex items-center gap-2 bg-emerald-50 p-2 rounded-xl border border-emerald-100">
+                    <div className="text-xs text-slate-600 font-bold font-mono flex items-center gap-2 bg-emerald-50 p-2 rounded-xl border border-emerald-100">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> 
                       Active logs synchronizing with cloud database: {syncSummary?.logsCount ?? 0} total records.
                     </div>
@@ -3493,17 +3498,17 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
                       <div className="p-1.5 rounded-lg bg-amber-100 border border-amber-200">
                         <Activity className="w-4.5 h-4.5 text-amber-600" />
                       </div>
-                      <span className="text-[10px] font-black text-slate-900 font-mono uppercase tracking-widest">External Market Feeds</span>
+                      <span className="text-xs font-black text-slate-900 font-mono uppercase tracking-widest">External Market Feeds</span>
                     </div>
-                    <span className="text-[10px] bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-mono font-black uppercase tracking-tighter shadow-sm">
+                    <span className="text-xs bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-mono font-black uppercase tracking-tighter shadow-sm">
                       Feed Ready
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+                  <p className="text-xs text-slate-500 leading-relaxed font-medium">
                     Real-time market scanning and news event sentiment scoring are powered by our global calendar APIs and geopolitical classifiers.
                   </p>
                   
-                  <div className="grid grid-cols-2 gap-3 text-[10px] font-mono font-bold">
+                  <div className="grid grid-cols-2 gap-3 text-xs font-mono font-bold">
                     <div className="bg-white p-2.5 rounded-xl border border-slate-200 flex items-center justify-between shadow-sm">
                       <span className="text-slate-500 uppercase tracking-tighter">Bloomberg:</span>
                       <span className="text-emerald-600 font-black">SIMULATED</span>

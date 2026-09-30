@@ -597,7 +597,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-black tracking-tight uppercase">4-Pillar API Connection & Feed Vault</h2>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold flex items-center gap-1">
+                <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                   ZERO-OMISSION READY
                 </span>
@@ -680,7 +680,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                   <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
                     <Coins className="w-4 h-4 text-amber-600" />
                     <span>Interactive Brokers TWS / IB Gateway TCP Socket</span>
-                    <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded font-mono font-black uppercase">
+                    <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-mono font-black uppercase">
                       Mandatory for Live Order Routing
                     </span>
                   </div>
@@ -693,7 +693,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
               {/* Form Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-mono font-bold text-slate-600 uppercase">Account Number:</label>
+                  <label className="text-xs font-mono font-bold text-slate-600 uppercase">Account Number:</label>
                   <input
                     type="text"
                     value={accountNumber}
@@ -701,11 +701,11 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     placeholder="e.g. DU1234567 or U1234567"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
-                  <span className="text-[9px] text-slate-400 font-mono block">DU... for Paper, U... for Live</span>
+                  <span className="text-xs text-slate-400 font-mono block">DU... for Paper, U... for Live</span>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-mono font-bold text-slate-600 uppercase">Socket Port:</label>
+                  <label className="text-xs font-mono font-bold text-slate-600 uppercase">Socket Port:</label>
                   <select
                     value={ibkrPort}
                     onChange={(e) => setIbkrPort(Number(e.target.value))}
@@ -716,18 +716,18 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     <option value={7497}>7497 (TWS Paper)</option>
                     <option value={7496}>7496 (TWS Live)</option>
                   </select>
-                  <span className="text-[9px] text-slate-400 font-mono block">Select port configured in IB Gateway/TWS</span>
+                  <span className="text-xs text-slate-400 font-mono block">Select port configured in IB Gateway/TWS</span>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-mono font-bold text-slate-600 uppercase">Client ID:</label>
+                  <label className="text-xs font-mono font-bold text-slate-600 uppercase">Client ID:</label>
                   <input
                     type="number"
                     value={ibkrClientId}
                     onChange={(e) => setIbkrClientId(Number(e.target.value))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
-                  <span className="text-[9px] text-slate-400 font-mono block">Must be unique per connecting client (default: 1)</span>
+                  <span className="text-xs text-slate-400 font-mono block">Must be unique per connecting client (default: 1)</span>
                 </div>
               </div>
 
@@ -739,7 +739,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-mono text-slate-500 block uppercase">Decision Maker ID (mifid2DecisionMaker):</label>
+                    <label className="text-xs font-mono text-slate-500 block uppercase">Decision Maker ID (mifid2DecisionMaker):</label>
                     <input
                       type="text"
                       value={mifidMaker}
@@ -748,7 +748,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-mono text-slate-500 block uppercase">Execution Trader ID (mifid2ExecutionTrader):</label>
+                    <label className="text-xs font-mono text-slate-500 block uppercase">Execution Trader ID (mifid2ExecutionTrader):</label>
                     <input
                       type="text"
                       value={mifidTrader}
@@ -767,24 +767,24 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs font-mono">
                   <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-xs space-y-1">
-                    <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-[10px]">1</span>
+                    <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">1</span>
                     <p className="font-bold text-slate-800">Global Config</p>
-                    <p className="text-[10px] text-slate-500">Go to File / Edit &rarr; Global Configuration &rarr; API &rarr; Settings.</p>
+                    <p className="text-xs text-slate-500">Go to File / Edit &rarr; Global Configuration &rarr; API &rarr; Settings.</p>
                   </div>
                   <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-xs space-y-1">
-                    <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-[10px]">2</span>
+                    <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">2</span>
                     <p className="font-bold text-slate-800">Enable Socket</p>
-                    <p className="text-[10px] text-slate-500">Check ✅ "Enable ActiveX and Socket Clients".</p>
+                    <p className="text-xs text-slate-500">Check ✅ "Enable ActiveX and Socket Clients".</p>
                   </div>
                   <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-xs space-y-1">
-                    <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-[10px]">3</span>
+                    <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">3</span>
                     <p className="font-bold text-slate-800">Uncheck Read-Only</p>
-                    <p className="text-[10px] text-slate-500">Uncheck ⬜ "Read-Only API" so AlphaEngine can place stops/orders.</p>
+                    <p className="text-xs text-slate-500">Uncheck ⬜ "Read-Only API" so AlphaEngine can place stops/orders.</p>
                   </div>
                   <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-xs space-y-1">
-                    <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-[10px]">4</span>
+                    <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">4</span>
                     <p className="font-bold text-slate-800">Trusted IP</p>
-                    <p className="text-[10px] text-slate-500">Add <code className="bg-slate-100 px-1 rounded">127.0.0.1</code> to "Trusted IP Addresses".</p>
+                    <p className="text-xs text-slate-500">Add <code className="bg-slate-100 px-1 rounded">127.0.0.1</code> to "Trusted IP Addresses".</p>
                   </div>
                 </div>
               </div>
@@ -826,12 +826,12 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     {testResults["ibkr"].success ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertTriangle className="w-4 h-4 text-red-600" />}
                     <span>{testResults["ibkr"].success ? "Socket Handshake Verified" : "Socket Connection Failed"}</span>
                     {testResults["ibkr"].latencyMs !== undefined && (
-                      <span className="text-[10px] bg-white/60 px-1.5 py-0.5 rounded border border-current">
+                      <span className="text-xs bg-white/60 px-1.5 py-0.5 rounded border border-current">
                         {testResults["ibkr"].latencyMs}ms
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] leading-relaxed">{testResults["ibkr"].message}</p>
+                  <p className="text-xs leading-relaxed">{testResults["ibkr"].message}</p>
                 </div>
               )}
             </div>
@@ -847,7 +847,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                   <div className="flex items-center gap-2 text-blue-900 font-bold text-sm">
                     <Database className="w-4 h-4 text-blue-600" />
                     <span>Google Cloud Platform & Firestore Real-Time Database</span>
-                    <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-mono font-black uppercase">
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-mono font-black uppercase">
                       State & Risk Persistence
                     </span>
                   </div>
@@ -866,7 +866,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-mono font-bold text-slate-600 uppercase">Firebase Project ID:</label>
+                  <label className="text-xs font-mono font-bold text-slate-600 uppercase">Firebase Project ID:</label>
                   <input
                     type="text"
                     value={projectId}
@@ -876,7 +876,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-mono font-bold text-slate-600 uppercase">Firestore Database ID:</label>
+                  <label className="text-xs font-mono font-bold text-slate-600 uppercase">Firestore Database ID:</label>
                   <input
                     type="text"
                     value={databaseId}
@@ -886,7 +886,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                 </div>
 
                 <div className="md:col-span-2 space-y-1.5">
-                  <label className="text-[10px] font-mono font-bold text-slate-600 uppercase">Firebase Web API Key:</label>
+                  <label className="text-xs font-mono font-bold text-slate-600 uppercase">Firebase Web API Key:</label>
                   <div className="relative">
                     <input
                       type={showKeys["webApiKey"] ? "text" : "password"}
@@ -909,7 +909,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
                 <div className="space-y-0.5">
                   <p className="text-xs font-bold text-slate-900">Google Cloud & Firebase Developer Console</p>
-                  <p className="text-[11px] text-slate-500 font-mono">
+                  <p className="text-xs text-slate-500 font-mono">
                     Inspect security rules, view live database documents, or generate new web credentials.
                   </p>
                 </div>
@@ -948,12 +948,12 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     {testResults["cloud"].success ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertTriangle className="w-4 h-4 text-amber-600" />}
                     <span>{testResults["cloud"].success ? "Firestore Tunnel Active" : "In-Memory Fallback Active"}</span>
                     {testResults["cloud"].latencyMs !== undefined && (
-                      <span className="text-[10px] bg-white/60 px-1.5 py-0.5 rounded border border-current">
+                      <span className="text-xs bg-white/60 px-1.5 py-0.5 rounded border border-current">
                         {testResults["cloud"].latencyMs}ms
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] leading-relaxed">{testResults["cloud"].message}</p>
+                  <p className="text-xs leading-relaxed">{testResults["cloud"].message}</p>
                 </div>
               )}
             </div>
@@ -969,7 +969,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                   <div className="flex items-center gap-2 text-indigo-900 font-bold text-sm">
                     <Sparkles className="w-4 h-4 text-indigo-600" />
                     <span>Multi-Model AI Consensus Engine & Universal Router</span>
-                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono font-black uppercase">
+                    <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono font-black uppercase">
                       Zero-Crash Fallback Active
                     </span>
                   </div>
@@ -990,8 +990,8 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-slate-900">Google Gemini API</span>
-                          <span className="text-[9px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-mono font-bold">PRIMARY JUDGE & ROUTER</span>
-                          <span className="text-[9px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-mono font-bold">FREE TIER (15 RPM)</span>
+                          <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-mono font-bold">PRIMARY JUDGE & ROUTER</span>
+                          <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-mono font-bold">FREE TIER (15 RPM)</span>
                         </div>
                       </div>
                     </div>
@@ -1035,7 +1035,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                   </div>
 
                   {testResults["gemini"] && (
-                    <div className={`p-2.5 rounded-lg font-mono text-[11px] ${
+                    <div className={`p-2.5 rounded-lg font-mono text-xs ${
                       testResults["gemini"].success ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"
                     }`}>
                       {testResults["gemini"].success ? "🟢 " : "🔴 "}
@@ -1052,8 +1052,8 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-slate-900">Groq Cloud (Llama 3.1 70B)</span>
-                          <span className="text-[9px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-mono font-bold">VERIFIER 1 (ULTRA-FAST)</span>
-                          <span className="text-[9px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-mono font-bold">GENEROUS FREE TIER</span>
+                          <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-mono font-bold">VERIFIER 1 (ULTRA-FAST)</span>
+                          <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-mono font-bold">GENEROUS FREE TIER</span>
                         </div>
                       </div>
                     </div>
@@ -1097,7 +1097,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                   </div>
 
                   {testResults["groq"] && (
-                    <div className={`p-2.5 rounded-lg font-mono text-[11px] ${
+                    <div className={`p-2.5 rounded-lg font-mono text-xs ${
                       testResults["groq"].success ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"
                     }`}>
                       {testResults["groq"].success ? "🟢 " : "🔴 "}
@@ -1114,8 +1114,8 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-slate-900">NVIDIA NIM (Nemotron / Llama 405B)</span>
-                          <span className="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono font-bold">GENERATOR</span>
-                          <span className="text-[9px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-mono font-bold">1,000 FREE CREDITS</span>
+                          <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono font-bold">GENERATOR</span>
+                          <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-mono font-bold">1,000 FREE CREDITS</span>
                         </div>
                       </div>
                     </div>
@@ -1159,7 +1159,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                   </div>
 
                   {testResults["nvidia"] && (
-                    <div className={`p-2.5 rounded-lg font-mono text-[11px] ${
+                    <div className={`p-2.5 rounded-lg font-mono text-xs ${
                       testResults["nvidia"].success ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"
                     }`}>
                       {testResults["nvidia"].success ? "🟢 " : "🔴 "}
@@ -1176,11 +1176,11 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-slate-900">Custom Local Endpoint (Ollama / vLLM / DeepSeek)</span>
-                          <span className="text-[9px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-mono font-bold">100% FREE & PRIVATE</span>
+                          <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-mono font-bold">100% FREE & PRIVATE</span>
                         </div>
                       </div>
                     </div>
-                    <span className="text-[10px] text-slate-500 font-mono">Run: <code className="bg-slate-200 px-1 rounded">ollama run llama3.1</code></span>
+                    <span className="text-xs text-slate-500 font-mono">Run: <code className="bg-slate-200 px-1 rounded">ollama run llama3.1</code></span>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1230,7 +1230,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                   <div className="flex items-center gap-2 text-emerald-900 font-bold text-sm">
                     <Radio className="w-4 h-4 text-emerald-600" />
                     <span>Authoritative Primary-Source Catalyst & Regulatory Feeds</span>
-                    <span className="text-[10px] bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded font-mono font-black uppercase">
+                    <span className="text-xs bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded font-mono font-black uppercase">
                       Zero Hallucination
                     </span>
                   </div>
@@ -1251,11 +1251,11 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                         <Dna className="w-4 h-4 text-emerald-600" />
                         <span className="text-xs font-bold text-slate-900">ClinicalTrials.gov Protocol Registry v2</span>
                       </div>
-                      <span className="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono font-bold">
+                      <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono font-bold">
                         PUBLIC OPEN (NO KEY)
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 leading-relaxed font-mono">
+                    <p className="text-xs text-slate-600 leading-relaxed font-mono">
                       Official NIH/NLM registry. Ingests Phase 2/3 trial readouts and triggers Gate 5 binary trading freezes 48h before trial completion.
                     </p>
                   </div>
@@ -1264,7 +1264,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       href="https://clinicaltrials.gov/data-api/api"
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[10px] text-indigo-600 hover:underline font-mono flex items-center gap-1"
+                      className="text-xs text-indigo-600 hover:underline font-mono flex items-center gap-1"
                     >
                       <span>API Docs</span>
                       <ExternalLink className="w-2.5 h-2.5" />
@@ -1280,7 +1280,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     </button>
                   </div>
                   {testResults["clinicaltrials"] && (
-                    <div className={`p-2 rounded-lg font-mono text-[10px] ${
+                    <div className={`p-2 rounded-lg font-mono text-xs ${
                       testResults["clinicaltrials"].success ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"
                     }`}>
                       {testResults["clinicaltrials"].success ? "🟢 " : "🔴 "}
@@ -1297,11 +1297,11 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                         <Activity className="w-4 h-4 text-blue-600" />
                         <span className="text-xs font-bold text-slate-900">OpenFDA Drug Regulatory API</span>
                       </div>
-                      <span className="text-[9px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-mono font-bold">
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-mono font-bold">
                         FREE TIER (KEY OPTIONAL)
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 leading-relaxed font-mono">
+                    <p className="text-xs text-slate-600 leading-relaxed font-mono">
                       Ingests NDA/BLA approvals, Complete Response Letters (CRLs), drug labeling updates, and PDUFA calendar actions.
                     </p>
                     <input
@@ -1317,7 +1317,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       href="https://open.fda.gov/apis/authentication/"
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[10px] text-indigo-600 hover:underline font-mono flex items-center gap-1"
+                      className="text-xs text-indigo-600 hover:underline font-mono flex items-center gap-1"
                     >
                       <span>Get Free Key</span>
                       <ExternalLink className="w-2.5 h-2.5" />
@@ -1333,7 +1333,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     </button>
                   </div>
                   {testResults["openfda"] && (
-                    <div className={`p-2 rounded-lg font-mono text-[10px] ${
+                    <div className={`p-2 rounded-lg font-mono text-xs ${
                       testResults["openfda"].success ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"
                     }`}>
                       {testResults["openfda"].success ? "🟢 " : "🔴 "}
@@ -1350,11 +1350,11 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                         <FileText className="w-4 h-4 text-purple-600" />
                         <span className="text-xs font-bold text-slate-900">SEC EDGAR Material Disclosures (8-K)</span>
                       </div>
-                      <span className="text-[9px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-mono font-bold">
+                      <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-mono font-bold">
                         PUBLIC OPEN (NO KEY)
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 leading-relaxed font-mono">
+                    <p className="text-xs text-slate-600 leading-relaxed font-mono">
                       Official US SEC submissions. Ingests Form 8-K material disclosures: executive departures, M&A filings, material contracts.
                     </p>
                     <input
@@ -1370,7 +1370,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       href="https://www.sec.gov/os/accessing-edgar-data"
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[10px] text-indigo-600 hover:underline font-mono flex items-center gap-1"
+                      className="text-xs text-indigo-600 hover:underline font-mono flex items-center gap-1"
                     >
                       <span>SEC Guidelines</span>
                       <ExternalLink className="w-2.5 h-2.5" />
@@ -1386,7 +1386,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     </button>
                   </div>
                   {testResults["sec_edgar"] && (
-                    <div className={`p-2 rounded-lg font-mono text-[10px] ${
+                    <div className={`p-2 rounded-lg font-mono text-xs ${
                       testResults["sec_edgar"].success ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"
                     }`}>
                       {testResults["sec_edgar"].success ? "🟢 " : "🔴 "}
@@ -1403,11 +1403,11 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                         <Globe className="w-4 h-4 text-emerald-600" />
                         <span className="text-xs font-bold text-slate-900">GDELT 2.0 Global Geopolitics</span>
                       </div>
-                      <span className="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono font-bold">
+                      <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono font-bold">
                         PUBLIC BIG DATA (NO KEY)
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 leading-relaxed font-mono">
+                    <p className="text-xs text-slate-600 leading-relaxed font-mono">
                       Global Database of Events, Language, and Tone. Computes Goldstein conflict scores and shipping/energy disruption indices.
                     </p>
                   </div>
@@ -1416,7 +1416,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       href="https://www.gdeltproject.org/"
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[10px] text-indigo-600 hover:underline font-mono flex items-center gap-1"
+                      className="text-xs text-indigo-600 hover:underline font-mono flex items-center gap-1"
                     >
                       <span>GDELT Portal</span>
                       <ExternalLink className="w-2.5 h-2.5" />
@@ -1432,7 +1432,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     </button>
                   </div>
                   {testResults["gdelt"] && (
-                    <div className={`p-2 rounded-lg font-mono text-[10px] ${
+                    <div className={`p-2 rounded-lg font-mono text-xs ${
                       testResults["gdelt"].success ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"
                     }`}>
                       {testResults["gdelt"].success ? "🟢 " : "🔴 "}
@@ -1449,11 +1449,11 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                         <Scale className="w-4 h-4 text-indigo-600" />
                         <span className="text-xs font-bold text-slate-900">USPTO PatentsView / IP Litigation</span>
                       </div>
-                      <span className="text-[9px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded font-mono font-bold">
+                      <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded font-mono font-bold">
                         FREE DEVELOPER KEY
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 leading-relaxed font-mono">
+                    <p className="text-xs text-slate-600 leading-relaxed font-mono">
                       Tracks patent grant dates, patent cliff expirations, and PTAB Inter Partes Review (IPR) patent challenges.
                     </p>
                     <input
@@ -1469,7 +1469,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       href="https://patentsview.org/apis/key-request"
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[10px] text-indigo-600 hover:underline font-mono flex items-center gap-1"
+                      className="text-xs text-indigo-600 hover:underline font-mono flex items-center gap-1"
                     >
                       <span>Get Free Key</span>
                       <ExternalLink className="w-2.5 h-2.5" />
@@ -1485,7 +1485,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     </button>
                   </div>
                   {testResults["patents"] && (
-                    <div className={`p-2 rounded-lg font-mono text-[10px] ${
+                    <div className={`p-2 rounded-lg font-mono text-xs ${
                       testResults["patents"].success ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"
                     }`}>
                       {testResults["patents"].success ? "🟢 " : "🔴 "}
@@ -1502,11 +1502,11 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                         <Clock className="w-4 h-4 text-amber-600" />
                         <span className="text-xs font-bold text-slate-900">Federal Reserve (FRED) Macro Calendar</span>
                       </div>
-                      <span className="text-[9px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-mono font-bold">
+                      <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-mono font-bold">
                         FREE DEVELOPER KEY
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 leading-relaxed font-mono">
+                    <p className="text-xs text-slate-600 leading-relaxed font-mono">
                       FOMC rate decisions, US CPI inflation releases, Non-Farm Payrolls (NFP), ECB announcements. Triggers pre-event risk locks.
                     </p>
                     <input
@@ -1522,7 +1522,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       href="https://fred.stlouisfed.org/docs/api/api_key.html"
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[10px] text-indigo-600 hover:underline font-mono flex items-center gap-1"
+                      className="text-xs text-indigo-600 hover:underline font-mono flex items-center gap-1"
                     >
                       <span>Get Free Key</span>
                       <ExternalLink className="w-2.5 h-2.5" />
@@ -1538,7 +1538,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     </button>
                   </div>
                   {testResults["fred"] && (
-                    <div className={`p-2 rounded-lg font-mono text-[10px] ${
+                    <div className={`p-2 rounded-lg font-mono text-xs ${
                       testResults["fred"].success ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"
                     }`}>
                       {testResults["fred"].success ? "🟢 " : "🔴 "}
@@ -1555,11 +1555,11 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                         <Building2 className="w-4 h-4 text-slate-700" />
                         <span className="text-xs font-bold text-slate-900">FTC & Antitrust / DOJ Enforcement</span>
                       </div>
-                      <span className="text-[9px] bg-slate-200 text-slate-800 px-2 py-0.5 rounded font-mono font-bold">
+                      <span className="text-xs bg-slate-200 text-slate-800 px-2 py-0.5 rounded font-mono font-bold">
                         PUBLIC OPEN (NO KEY)
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 leading-relaxed font-mono">
+                    <p className="text-xs text-slate-600 leading-relaxed font-mono">
                       Scans for antitrust lawsuits, Hart-Scott-Rodino (HSR) second requests, and regulatory injunctions in merger arbitrage setups.
                     </p>
                   </div>
@@ -1568,7 +1568,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       href="https://www.ftc.gov/news-events/news/press-releases"
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[10px] text-indigo-600 hover:underline font-mono flex items-center gap-1"
+                      className="text-xs text-indigo-600 hover:underline font-mono flex items-center gap-1"
                     >
                       <span>FTC Releases</span>
                       <ExternalLink className="w-2.5 h-2.5" />
@@ -1584,7 +1584,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     </button>
                   </div>
                   {testResults["ftc"] && (
-                    <div className={`p-2 rounded-lg font-mono text-[10px] ${
+                    <div className={`p-2 rounded-lg font-mono text-xs ${
                       testResults["ftc"].success ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"
                     }`}>
                       {testResults["ftc"].success ? "🟢 " : "🔴 "}
@@ -1601,16 +1601,16 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                         <Terminal className="w-4 h-4 text-amber-600" />
                         <span className="text-xs font-bold text-slate-900">IBKR BroadTape & Halt Bulletins</span>
                       </div>
-                      <span className="text-[9px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-mono font-bold">
+                      <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-mono font-bold">
                         INCLUDED WITH IBKR
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 leading-relaxed font-mono">
+                    <p className="text-xs text-slate-600 leading-relaxed font-mono">
                       Subscribed via native <code className="bg-slate-200 px-1 rounded">reqNewsBulletins</code>. Provides instant notifications on LULD exchange circuit breaker halts.
                     </p>
                   </div>
                   <div className="pt-2 border-t border-slate-200 flex items-center justify-between gap-2">
-                    <span className="text-[10px] text-slate-500 font-mono">Connected via Port {ibkrPort}</span>
+                    <span className="text-xs text-slate-500 font-mono">Connected via Port {ibkrPort}</span>
                     <button
                       type="button"
                       onClick={() => runTestProbe("ibkr", "/api/test-broker-connection", { port: ibkrPort })}

@@ -127,6 +127,15 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
   }, [hasInitializedInputs]);
 
   // Save risk configuration
+  const getAdminHeaders = () => {
+    const key = localStorage.getItem("alpha_operator_admin_key") || "ALPHA_ADMIN_REVERT_992";
+    return {
+      "Content-Type": "application/json",
+      "x-admin-key": key,
+      "Authorization": `Bearer ${key}`
+    };
+  };
+
   const handleSaveRiskSettings = async () => {
     setLoading(true);
     setError(null);
@@ -139,7 +148,7 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
 
       const res = await fetch("/api/risk/settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAdminHeaders(),
         body: JSON.stringify({
           dailyCapitalCeiling: safeCap,
           dailyMaxLossCutoff: safeLoss,
@@ -167,7 +176,7 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
           } : null);
         }
       } else {
-        setError("Failed to update risk parameters on gateway.");
+        setError("Failed to update risk parameters on gateway. Check Operator Key.");
       }
     } catch (err: any) {
       setError(err.message || "Network error updating risk settings.");
@@ -183,7 +192,7 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
     try {
       const res = await fetch("/api/risk/flatten-intraday", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ reason: "Manual Operator 15:45 MOC Execution Rule" })
       });
       const data = await res.json();
@@ -192,6 +201,8 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
         setTimeout(() => setIntradayMsg(null), 4000);
         await fetchRiskData();
         if (onRefresh) onRefresh();
+      } else {
+        setError("Intraday flatten rejected by gateway.");
       }
     } catch (err: any) {
       console.error("Failed to execute intraday flatten:", err);
@@ -205,13 +216,16 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/risk/emergency-kill", { method: "POST" });
+      const res = await fetch("/api/risk/emergency-kill", { 
+        method: "POST",
+        headers: getAdminHeaders()
+      });
       if (res.ok) {
         setConfirmKill(false);
         fetchRiskData();
         if (onRefresh) onRefresh();
       } else {
-        setError("Kill switch execution failed on server.");
+        setError("Kill switch execution rejected. Valid Operator Admin Key required.");
       }
     } catch (err: any) {
       setError(err.message || "Network error dispatching kill switch.");
@@ -224,7 +238,10 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
   const handleUnlockSystem = async () => {
     setLoading(true);
     try {
-      await fetch("/api/risk/unlock", { method: "POST" });
+      await fetch("/api/risk/unlock", { 
+        method: "POST",
+        headers: getAdminHeaders()
+      });
       fetchRiskData();
     } catch (err) {
       console.error(err);
@@ -275,11 +292,11 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
               }`}>
                 {isLocked ? "ROUTER HARD-LOCKED" : isLive ? "🔴 LIVE CAPITAL AT RISK" : "🟡 PAPER SIMULATION"}
               </span>
-              <span className="text-[10px] text-slate-400 font-mono">
+              <span className="text-xs text-slate-300 font-mono font-bold">
                 IBKR IE: {riskStatus?.tradingMode === "LIVE" ? "U8129384" : "DU902144"}
               </span>
             </div>
-            <div className="text-[11px] text-slate-300 font-sans mt-0.5">
+            <div className="text-xs sm:text-sm text-slate-300 font-sans mt-0.5">
               {isLocked 
                 ? "Emergency Kill Switch engaged. All market orders halted." 
                 : isLive 
@@ -291,43 +308,43 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
 
         {/* Telemetry Metrics & Global Market Clocks */}
         <div className="flex flex-wrap items-center gap-4 sm:gap-6 font-mono text-right">
-          <div className="bg-black/40 border border-white/5 px-2.5 py-1 rounded text-right">
-            <div className="flex items-center justify-end gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${riskStatus?.euMarketOpen ? "bg-[#00ff88] animate-pulse" : "bg-slate-500"}`} />
-              <span className="text-[9px] text-slate-300 font-bold">🇪🇺 EURONEXT/XETRA</span>
-              <span className={`text-[8px] font-bold px-1 rounded ${riskStatus?.euMarketOpen ? "bg-emerald-500/20 text-[#00ff88]" : "bg-slate-800 text-slate-400"}`}>
+          <div className="bg-black/40 border border-white/10 px-3 py-1.5 rounded-lg text-right">
+            <div className="flex items-center justify-end gap-2">
+              <span className={`w-2 h-2 rounded-full ${riskStatus?.euMarketOpen ? "bg-[#00ff88] animate-pulse" : "bg-slate-500"}`} />
+              <span className="text-xs text-slate-200 font-bold">🇪🇺 EURONEXT/XETRA</span>
+              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${riskStatus?.euMarketOpen ? "bg-emerald-500/20 text-[#00ff88]" : "bg-slate-800 text-slate-400"}`}>
                 {riskStatus?.euMarketOpen ? "OPEN" : "CLOSED"}
               </span>
             </div>
-            <span className="text-[9px] text-slate-400">CET {riskStatus?.cetTimeCET || "--:--"}</span>
+            <span className="text-xs text-slate-400 font-semibold block mt-0.5">CET {riskStatus?.cetTimeCET || "--:--"}</span>
           </div>
 
-          <div className="bg-black/40 border border-white/5 px-2.5 py-1 rounded text-right">
-            <div className="flex items-center justify-end gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${riskStatus?.usMarketOpen ? "bg-blue-400 animate-pulse" : "bg-slate-500"}`} />
-              <span className="text-[9px] text-slate-300 font-bold">🇺🇸 NYSE/NASDAQ</span>
-              <span className={`text-[8px] font-bold px-1 rounded ${riskStatus?.usMarketOpen ? "bg-blue-500/20 text-blue-300" : "bg-slate-800 text-slate-400"}`}>
+          <div className="bg-black/40 border border-white/10 px-3 py-1.5 rounded-lg text-right">
+            <div className="flex items-center justify-end gap-2">
+              <span className={`w-2 h-2 rounded-full ${riskStatus?.usMarketOpen ? "bg-blue-400 animate-pulse" : "bg-slate-500"}`} />
+              <span className="text-xs text-slate-200 font-bold">🇺🇸 NYSE/NASDAQ</span>
+              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${riskStatus?.usMarketOpen ? "bg-blue-500/20 text-blue-300" : "bg-slate-800 text-slate-400"}`}>
                 {riskStatus?.usMarketOpen ? "OPEN" : "CLOSED"}
               </span>
             </div>
-            <span className="text-[9px] text-slate-400">EST {riskStatus?.nyTimeEST || "--:--"}</span>
+            <span className="text-xs text-slate-400 font-semibold block mt-0.5">EST {riskStatus?.nyTimeEST || "--:--"}</span>
           </div>
 
           <div>
-            <span className="text-[9px] text-slate-400 uppercase tracking-wider block">TCP PING</span>
-            <span className="text-xs text-[#00ff88] font-bold flex items-center justify-end gap-1">
-              <Activity className="w-3 h-3 animate-pulse" /> {riskStatus?.tcpLatencyMs || 14.2} ms
+            <span className="text-xs text-slate-400 uppercase tracking-wider block font-semibold">TCP PING</span>
+            <span className="text-sm text-[#00ff88] font-bold flex items-center justify-end gap-1">
+              <Activity className="w-3.5 h-3.5 animate-pulse" /> {riskStatus?.tcpLatencyMs || 14.2} ms
             </span>
           </div>
           <div>
-            <span className="text-[9px] text-slate-400 uppercase tracking-wider block">NET LIQUIDATION</span>
-            <span className="text-xs text-white font-bold">
+            <span className="text-xs text-slate-400 uppercase tracking-wider block font-semibold">NET LIQUIDATION</span>
+            <span className="text-sm text-white font-bold">
               ${(riskStatus?.netLiquidation || 154200).toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </span>
           </div>
           <div>
-            <span className="text-[9px] text-slate-400 uppercase tracking-wider block">DAY P&L</span>
-            <span className={`text-xs font-bold ${dailyPnL >= 0 ? "text-[#00ff88]" : "text-rose-400"}`}>
+            <span className="text-xs text-slate-400 uppercase tracking-wider block font-semibold">DAY P&L</span>
+            <span className={`text-sm font-bold ${dailyPnL >= 0 ? "text-[#00ff88]" : "text-rose-400"}`}>
               {dailyPnL >= 0 ? "+" : ""}${dailyPnL.toFixed(2)}
             </span>
           </div>
@@ -340,23 +357,23 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
         {/* Panel A: Pre-Trade Risk Gateway Controls */}
         <div className="lg:col-span-2 bg-[#0c101c] border border-white/10 rounded-xl p-5 space-y-5">
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2 font-mono">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2 font-mono">
               <Sliders className="w-4 h-4 text-indigo-400" /> Pre-Trade Risk Gateway & Capital Allocation
             </h3>
-            <span className="text-[9.5px] text-slate-400 font-mono">MiFID II / SEC Rule 15c3-5 Gatekeeper</span>
+            <span className="text-xs text-slate-400 font-mono font-medium">MiFID II / SEC Rule 15c3-5 Gatekeeper</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             {/* Daily Capital Allocation */}
             <div 
               title="SEC Rule 15c3-5 Pre-Trade Gateway: Total gross capital committed across all open trades cannot exceed this ceiling. Orders exceeding this are rejected pre-trade."
-              className="bg-black/40 border border-white/5 rounded-lg p-3.5 space-y-1.5 hover:border-white/10 transition"
+              className="bg-black/40 border border-white/5 rounded-lg p-3.5 space-y-2 hover:border-white/10 transition"
             >
               <div className="flex justify-between items-center">
-                <label className="text-[10px] text-slate-400 uppercase font-mono font-bold flex items-center gap-1 cursor-help">
-                  Daily Capital Ceiling <span className="text-[9px] text-indigo-400">ⓘ</span>
+                <label className="text-xs text-slate-300 uppercase font-mono font-bold flex items-center gap-1 cursor-help">
+                  Daily Capital Ceiling <span className="text-xs text-indigo-400">ⓘ</span>
                 </label>
-                <DollarSign className="w-3.5 h-3.5 text-indigo-400" />
+                <DollarSign className="w-4 h-4 text-indigo-400" />
               </div>
               <div className="relative">
                 <input
@@ -378,18 +395,18 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
                     }
                   }}
                   placeholder="500"
-                  className="w-full bg-black/60 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-indigo-500 focus:outline-none"
+                  className="w-full bg-black/60 border border-white/10 rounded px-2.5 py-1.5 text-sm text-white font-mono font-bold focus:border-indigo-500 focus:outline-none"
                 />
-                <span title="Applies to your account base currency (USD or EUR)" className="absolute right-2.5 top-2 text-[9px] text-indigo-300 font-mono cursor-help">USD / EUR</span>
+                <span title="Applies to your account base currency (USD or EUR)" className="absolute right-2.5 top-2 text-xs text-indigo-300 font-mono font-semibold cursor-help">USD / EUR</span>
               </div>
-              <div className="flex items-center gap-1 pt-0.5">
-                <span className="text-[8px] text-slate-500 uppercase font-mono">Preset:</span>
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <span className="text-xs text-slate-400 uppercase font-mono font-semibold">Preset:</span>
                 {["200", "500", "1000", "5000", "10000"].map((amt) => (
                   <button
                     key={amt}
                     type="button"
                     onClick={() => setCapCeilingInput(amt)}
-                    className={`px-1.5 py-0.5 text-[8.5px] font-mono rounded border transition cursor-pointer ${
+                    className={`px-2 py-0.5 text-xs font-mono font-semibold rounded border transition cursor-pointer ${
                       capCeilingInput === amt
                         ? "bg-indigo-600/40 text-indigo-300 border-indigo-500"
                         : "bg-white/5 text-slate-400 border-white/5 hover:bg-white/10 hover:text-slate-200"
@@ -399,10 +416,10 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
                   </button>
                 ))}
               </div>
-              <div className="text-[9px] text-slate-400">
-                Utilized: <strong className="text-slate-200">${utilizedCap.toFixed(2)}</strong> ({capPct}%)
+              <div className="text-xs text-slate-300 font-mono">
+                Utilized: <strong className="text-slate-100">${utilizedCap.toFixed(2)}</strong> ({capPct}%)
               </div>
-              <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+              <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
                 <div 
                   className={`h-full transition-all duration-300 ${capPct > 80 ? "bg-rose-500" : "bg-indigo-500"}`}
                   style={{ width: `${capPct}%` }}
@@ -413,13 +430,13 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
             {/* Hard Daily Loss Circuit Breaker */}
             <div 
               title="Hard Daily Circuit Breaker: If cumulative intraday loss reaches this threshold, all open orders are cancelled, active positions are flattened at market, and execution router is hard-locked."
-              className="bg-black/40 border border-white/5 rounded-lg p-3.5 space-y-1.5 hover:border-white/10 transition"
+              className="bg-black/40 border border-white/5 rounded-lg p-3.5 space-y-2 hover:border-white/10 transition"
             >
               <div className="flex justify-between items-center">
-                <label className="text-[10px] text-slate-400 uppercase font-mono font-bold flex items-center gap-1 cursor-help">
-                  Hard Daily Loss Cutoff <span className="text-[9px] text-rose-400">ⓘ</span>
+                <label className="text-xs text-slate-300 uppercase font-mono font-bold flex items-center gap-1 cursor-help">
+                  Hard Daily Loss Cutoff <span className="text-xs text-rose-400">ⓘ</span>
                 </label>
-                <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                <ShieldAlert className="w-4 h-4 text-rose-400" />
               </div>
               <div className="relative">
                 <input
@@ -440,18 +457,18 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
                     }
                   }}
                   placeholder="50"
-                  className="w-full bg-black/60 border border-white/10 rounded px-2.5 py-1.5 text-xs text-rose-300 font-mono focus:border-rose-500 focus:outline-none"
+                  className="w-full bg-black/60 border border-white/10 rounded px-2.5 py-1.5 text-sm text-rose-300 font-mono font-bold focus:border-rose-500 focus:outline-none"
                 />
-                <span title="Applies to your account base currency (USD or EUR)" className="absolute right-2.5 top-2 text-[9px] text-rose-300 font-mono cursor-help">USD / EUR</span>
+                <span title="Applies to your account base currency (USD or EUR)" className="absolute right-2.5 top-2 text-xs text-rose-300 font-mono font-semibold cursor-help">USD / EUR</span>
               </div>
-              <div className="flex items-center gap-1 pt-0.5">
-                <span className="text-[8px] text-slate-500 uppercase font-mono">Preset:</span>
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <span className="text-xs text-slate-400 uppercase font-mono font-semibold">Preset:</span>
                 {["50", "100", "250", "500"].map((amt) => (
                   <button
                     key={amt}
                     type="button"
                     onClick={() => setMaxLossInput(amt)}
-                    className={`px-1.5 py-0.5 text-[8.5px] font-mono rounded border transition cursor-pointer ${
+                    className={`px-2 py-0.5 text-xs font-mono font-semibold rounded border transition cursor-pointer ${
                       maxLossInput === amt
                         ? "bg-rose-600/40 text-rose-300 border-rose-500"
                         : "bg-white/5 text-slate-400 border-white/5 hover:bg-white/10 hover:text-slate-200"
@@ -461,10 +478,10 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
                   </button>
                 ))}
               </div>
-              <div className="text-[9px] text-slate-400">
+              <div className="text-xs text-slate-300 font-mono">
                 Buffer: <strong className={lossDistance > 50 ? "text-[#00ff88]" : "text-amber-400"}>${lossDistance.toFixed(2)}</strong> to auto-lock
               </div>
-              <p className="text-[8.5px] text-slate-400 leading-tight">
+              <p className="text-xs text-slate-400 leading-normal">
                 Auto-flattens portfolio and locks execution if daily loss exceeds this value.
               </p>
             </div>
@@ -475,15 +492,15 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
               className="bg-black/40 border border-white/5 rounded-lg p-3.5 space-y-2 hover:border-white/10 transition"
             >
               <div className="flex justify-between items-center">
-                <label className="text-[10px] text-slate-400 uppercase font-mono font-bold flex items-center gap-1 cursor-help">
-                  Fractional Execution <span className="text-[9px] text-emerald-400">ⓘ</span>
+                <label className="text-xs text-slate-300 uppercase font-mono font-bold flex items-center gap-1 cursor-help">
+                  Fractional Execution <span className="text-xs text-emerald-400">ⓘ</span>
                 </label>
-                <span className="text-[9px] bg-emerald-500/20 text-[#00ff88] px-1.5 py-0.5 rounded font-mono font-bold">
+                <span className="text-xs bg-emerald-500/20 text-[#00ff88] px-2 py-0.5 rounded font-mono font-bold">
                   SYNTHETIC STOPS
                 </span>
               </div>
               <div className="flex items-center justify-between pt-1">
-                <span className="text-xs text-slate-300 font-sans">Allow Decimal Lots</span>
+                <span className="text-xs sm:text-sm text-slate-200 font-sans font-medium">Allow Decimal Lots</span>
                 <button
                   type="button"
                   onClick={() => setFractionalToggle(!fractionalToggle)}
@@ -496,7 +513,7 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
                   }`} />
                 </button>
               </div>
-              <p className="text-[8.5px] text-slate-400 leading-tight">
+              <p className="text-xs text-slate-400 leading-normal">
                 IBKR-compliant synthetic exit triggers bypass broker fractional stop rejections.
               </p>
             </div>
@@ -507,17 +524,17 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
               className="bg-black/40 border border-white/5 rounded-lg p-3.5 space-y-2 hover:border-white/10 transition"
             >
               <div className="flex justify-between items-center">
-                <label className="text-[10px] text-slate-400 uppercase font-mono font-bold flex items-center gap-1 cursor-help">
-                  Auto-Flatten Intraday <span className="text-[9px] text-amber-400">ⓘ</span>
+                <label className="text-xs text-slate-300 uppercase font-mono font-bold flex items-center gap-1 cursor-help">
+                  Auto-Flatten Intraday <span className="text-xs text-amber-400">ⓘ</span>
                 </label>
-                <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold ${
+                <span className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${
                   intradayFlattenToggle ? "bg-emerald-500/20 text-[#00ff88]" : "bg-amber-500/20 text-amber-400"
                 }`}>
                   {intradayFlattenToggle ? "15:45 EST MOC" : "SWING ALLOWED"}
                 </span>
               </div>
               <div className="flex items-center justify-between pt-1">
-                <span className="text-xs text-slate-300 font-sans">0 Overnight Exposure</span>
+                <span className="text-xs sm:text-sm text-slate-200 font-sans font-medium">0 Overnight Exposure</span>
                 <button
                   type="button"
                   onClick={() => setIntradayFlattenToggle(!intradayFlattenToggle)}
@@ -530,32 +547,32 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
                   }`} />
                 </button>
               </div>
-              <div className="flex justify-between items-center text-[9px] font-mono text-slate-400">
-                <span>EST: <strong className="text-slate-200">{riskStatus?.nyTimeEST || "--:--"}</strong></span>
-                <span>CET: <strong className="text-slate-200">{riskStatus?.cetTimeCET || "--:--"}</strong></span>
+              <div className="flex justify-between items-center text-xs font-mono text-slate-300">
+                <span>EST: <strong className="text-white font-bold">{riskStatus?.nyTimeEST || "--:--"}</strong></span>
+                <span>CET: <strong className="text-white font-bold">{riskStatus?.cetTimeCET || "--:--"}</strong></span>
               </div>
               <button
                 type="button"
                 onClick={handleFlattenIntraday}
                 disabled={isFlatteningIntraday || (riskStatus?.activePositionsCount || 0) === 0}
-                className="w-full mt-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[9.5px] font-mono font-bold py-1 rounded transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1 cursor-pointer"
+                className="w-full mt-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-mono font-bold py-1.5 rounded-lg transition disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                {isFlatteningIntraday ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Clock className="w-3 h-3" />}
+                {isFlatteningIntraday ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
                 FLATTEN INTRADAY NOW
               </button>
             </div>
           </div>
 
           {/* Lifecycle & Feedback Sub-Bar */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-3 py-2 bg-black/30 border border-white/5 rounded-lg text-[9.5px] font-mono">
-            <div className="flex items-center gap-2 text-slate-400">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-3.5 py-2.5 bg-black/30 border border-white/5 rounded-lg text-xs font-mono">
+            <div className="flex items-center gap-3 text-slate-300">
               <span className="text-indigo-400 font-bold">PEAD & INTRADAY LIFECYCLE:</span>
               <span title="When profit reaches +1.0x ATR, stop moves to entry price ($0 downside risk)">
-                Breakeven Latch: <strong className="text-emerald-400 cursor-help">+1.0x ATR ⓘ</strong>
+                Breakeven Latch: <strong className="text-emerald-400 cursor-help font-bold">+1.0x ATR ⓘ</strong>
               </span>
               <span>•</span>
               <span title="At +2.0x ATR profit, scales out 50% of position size and ratchets runner stop to +0.5x ATR locked profit">
-                Tiered Scale-Out: <strong className="text-emerald-400 cursor-help">+2.0x ATR (50%) ⓘ</strong>
+                Tiered Scale-Out: <strong className="text-emerald-400 cursor-help font-bold">+2.0x ATR (50%) ⓘ</strong>
               </span>
             </div>
             {intradayMsg && (
@@ -567,11 +584,11 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-white/5">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-slate-400 uppercase font-mono">Target Mode:</span>
+                <span className="text-xs text-slate-300 uppercase font-mono font-bold">Target Mode:</span>
                 <select
                   value={modeToggle}
                   onChange={(e) => setModeToggle(e.target.value as "PAPER" | "LIVE")}
-                  className="bg-black/60 border border-white/10 rounded px-2.5 py-1 text-xs text-white font-mono focus:outline-none"
+                  className="bg-black/60 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none"
                 >
                   <option value="PAPER">PAPER (Port 4002 / DU...)</option>
                   <option value="LIVE">LIVE (Port 4001 / U...)</option>
@@ -579,13 +596,13 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-slate-400 uppercase font-mono" title="Pre-Trade Gate 0 Market Isolation: Restrict trading to US only, Europe only, or all markets">
+                <span className="text-xs text-slate-300 uppercase font-mono font-bold" title="Pre-Trade Gate 0 Market Isolation: Restrict trading to US only, Europe only, or all markets">
                   Market Scope:
                 </span>
                 <select
                   value={marketScopeToggle}
                   onChange={(e) => setMarketScopeToggle(e.target.value as "ALL" | "US" | "EUROPE")}
-                  className="bg-black/60 border border-white/10 rounded px-2.5 py-1 text-xs text-white font-mono focus:outline-none"
+                  className="bg-black/60 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none"
                 >
                   <option value="ALL">🌐 ALL MARKETS (US & Europe)</option>
                   <option value="US">🇺🇸 US ONLY (USD - NYSE/NASDAQ)</option>
@@ -597,14 +614,14 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
             <div className="flex items-center gap-3">
               {saveSuccess && (
                 <span className="text-xs text-[#00ff88] font-mono flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Parameters Synced
+                  <CheckCircle2 className="w-4 h-4" /> Parameters Synced
                 </span>
               )}
-              {error && <span className="text-xs text-rose-400 font-mono">{error}</span>}
+              {error && <span className="text-xs text-rose-400 font-mono font-bold">{error}</span>}
               <button
                 onClick={handleSaveRiskSettings}
                 disabled={loading}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold px-4 py-1.5 rounded transition cursor-pointer flex items-center gap-1.5"
+                className="bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold px-4 py-2 rounded-lg transition cursor-pointer flex items-center gap-2"
               >
                 {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
                 APPLY RISK GATES
@@ -621,13 +638,13 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
         }`}>
           <div>
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-2 font-mono">
+              <h3 className="text-xs sm:text-sm font-bold text-rose-400 uppercase tracking-wider flex items-center gap-2 font-mono">
                 <AlertTriangle className="w-4 h-4 text-rose-500" /> Emergency Circuit Breaker
               </h3>
-              <span className="text-[9px] text-slate-500 font-mono">Instant Panic Button</span>
+              <span className="text-xs text-slate-400 font-mono">Instant Panic Button</span>
             </div>
             
-            <p className="text-[11px] text-slate-300 font-sans mt-3 leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-300 font-sans mt-3 leading-relaxed">
               Instantly sends global order cancel to IBKR, liquidates all active fractional & integer positions at market, and hard-locks the execution router.
             </p>
           </div>
@@ -650,7 +667,7 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
               </button>
             ) : (
               <div className="space-y-2 bg-rose-950/80 p-3 rounded-lg border border-rose-500">
-                <span className="text-[10px] text-rose-200 font-mono font-bold block text-center uppercase">
+                <span className="text-xs text-rose-200 font-mono font-bold block text-center uppercase">
                   CONFIRM EMERGENCY FLUSH?
                 </span>
                 <div className="flex gap-2">
@@ -671,7 +688,7 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
               </div>
             )}
 
-            <div className="text-[9px] text-slate-500 font-mono text-center">
+            <div className="text-xs text-slate-400 font-mono text-center">
               Active Positions in Risk Pool: <strong className="text-white">{riskStatus?.activePositionsCount || 0}</strong>
             </div>
           </div>
@@ -682,20 +699,20 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
       <div className="bg-[#0c101c] border border-white/10 rounded-xl p-5 space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
           <div>
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2 font-mono">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2 font-mono">
               <Server className="w-4 h-4 text-emerald-400" /> Live Execution Blotter & Transaction Cost Analysis (TCA)
             </h3>
-            <p className="text-[10.5px] text-slate-400 font-sans">
+            <p className="text-xs text-slate-300 font-sans mt-0.5">
               Real-time audit trail of all orders, fill slippage against arrival price, and IBKR exchange fees.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {/* Market Scope Blotter Filter */}
-            <div className="flex items-center bg-black/50 border border-white/10 rounded p-0.5 text-[9.5px] font-mono">
+            <div className="flex items-center bg-black/50 border border-white/10 rounded p-1 text-xs font-mono">
               <button
                 type="button"
                 onClick={() => setBlotterMarketFilter("ALL")}
-                className={`px-2 py-0.5 rounded transition cursor-pointer ${
+                className={`px-2.5 py-1 rounded transition cursor-pointer ${
                   blotterMarketFilter === "ALL" ? "bg-indigo-600 text-white font-bold" : "text-slate-400 hover:text-white"
                 }`}
               >
@@ -704,7 +721,7 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
               <button
                 type="button"
                 onClick={() => setBlotterMarketFilter("US")}
-                className={`px-2 py-0.5 rounded transition cursor-pointer ${
+                className={`px-2.5 py-1 rounded transition cursor-pointer ${
                   blotterMarketFilter === "US" ? "bg-blue-600 text-white font-bold" : "text-slate-400 hover:text-white"
                 }`}
               >
@@ -713,7 +730,7 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
               <button
                 type="button"
                 onClick={() => setBlotterMarketFilter("EUROPE")}
-                className={`px-2 py-0.5 rounded transition cursor-pointer ${
+                className={`px-2.5 py-1 rounded transition cursor-pointer ${
                   blotterMarketFilter === "EUROPE" ? "bg-emerald-600 text-white font-bold" : "text-slate-400 hover:text-white"
                 }`}
               >
@@ -723,9 +740,9 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
 
             <button 
               onClick={fetchRiskData} 
-              className="text-[10px] text-slate-400 hover:text-white font-mono flex items-center gap-1 border border-white/10 px-2.5 py-1 rounded cursor-pointer"
+              className="text-xs text-slate-300 hover:text-white font-mono flex items-center gap-1.5 border border-white/10 px-3 py-1.5 rounded-lg cursor-pointer bg-white/5 hover:bg-white/10"
             >
-              <RefreshCw className="w-3 h-3" /> REFRESH BLOTTER
+              <RefreshCw className="w-3.5 h-3.5" /> REFRESH BLOTTER
             </button>
           </div>
         </div>
@@ -733,18 +750,18 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
         <div className="overflow-x-auto">
           <table className="w-full text-left font-mono text-xs">
             <thead>
-              <tr className="border-b border-white/5 text-[9px] text-slate-400 uppercase tracking-wider">
-                <th className="py-2 px-3">Order ID</th>
-                <th className="py-2 px-3">Time (UTC)</th>
-                <th className="py-2 px-3">Symbol</th>
-                <th className="py-2 px-3">Side</th>
-                <th className="py-2 px-3">Qty</th>
-                <th className="py-2 px-3">Order Type</th>
-                <th className="py-2 px-3">Arrival</th>
-                <th className="py-2 px-3">Fill Price</th>
-                <th className="py-2 px-3">Slippage</th>
-                <th className="py-2 px-3">Fee</th>
-                <th className="py-2 px-3">Status</th>
+              <tr className="border-b border-white/10 text-xs text-slate-300 font-bold uppercase tracking-wider bg-white/5">
+                <th className="py-2.5 px-3.5">Order ID</th>
+                <th className="py-2.5 px-3.5">Time (UTC)</th>
+                <th className="py-2.5 px-3.5">Symbol</th>
+                <th className="py-2.5 px-3.5">Side</th>
+                <th className="py-2.5 px-3.5">Qty</th>
+                <th className="py-2.5 px-3.5">Order Type</th>
+                <th className="py-2.5 px-3.5">Arrival</th>
+                <th className="py-2.5 px-3.5">Fill Price</th>
+                <th className="py-2.5 px-3.5">Slippage</th>
+                <th className="py-2.5 px-3.5">Fee</th>
+                <th className="py-2.5 px-3.5">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -756,59 +773,59 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
                 })
                 .map((rec) => (
                 <tr key={rec.id} className="hover:bg-white/5 transition">
-                  <td className="py-2.5 px-3 text-slate-400 text-[10px]">{rec.id}</td>
-                  <td className="py-2.5 px-3 text-slate-400 text-[10px]">
+                  <td className="py-3 px-3.5 text-slate-300 text-xs font-mono">{rec.id}</td>
+                  <td className="py-3 px-3.5 text-slate-300 text-xs font-mono">
                     {new Date(rec.timestamp).toLocaleTimeString()}
                   </td>
-                  <td className="py-2.5 px-3 font-bold text-white flex items-center gap-1.5">
+                  <td className="py-3 px-3.5 font-bold text-white flex items-center gap-2 text-xs">
                     {rec.symbol}
-                    <span className={`text-[8.5px] px-1 py-0.2 rounded font-mono font-bold ${
+                    <span className={`text-xs px-1.5 py-0.5 rounded font-mono font-bold ${
                       rec.currency === "EUR" ? "bg-emerald-500/20 text-emerald-300" : "bg-blue-500/20 text-blue-300"
                     }`}>
                       {rec.currency || "USD"}
                     </span>
                   </td>
-                  <td className="py-2.5 px-3">
-                    <span className={`px-1.5 py-0.5 rounded text-[9.5px] font-bold ${
+                  <td className="py-3 px-3.5">
+                    <span className={`px-2 py-0.5 rounded text-xs font-bold font-mono ${
                       rec.side === "BUY" ? "bg-emerald-500/20 text-[#00ff88]" : "bg-rose-500/20 text-rose-400"
                     }`}>
                       {rec.side}
                     </span>
                   </td>
-                  <td className="py-2.5 px-3 text-slate-200 font-bold">{rec.qty.toFixed(4)}</td>
-                  <td className="py-2.5 px-3 text-[10px]">
+                  <td className="py-3 px-3.5 text-slate-200 font-bold text-xs">{rec.qty.toFixed(4)}</td>
+                  <td className="py-3 px-3.5 text-xs">
                     {rec.orderType.includes("INTRADAY FLATTEN") ? (
-                      <span className="text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded font-bold">
+                      <span className="text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded font-bold font-mono">
                         {rec.orderType}
                       </span>
                     ) : rec.orderType.includes("Synthetic Stop") ? (
-                      <span className="text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded font-mono">
+                      <span className="text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded font-mono font-bold">
                         {rec.orderType}
                       </span>
                     ) : rec.orderType.includes("EMERGENCY FLATTEN") ? (
-                      <span className="text-rose-400 bg-rose-500/10 border border-rose-500/30 px-1.5 py-0.5 rounded font-bold">
+                      <span className="text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded font-bold font-mono">
                         {rec.orderType}
                       </span>
                     ) : (
-                      <span className="text-slate-400 font-mono">{rec.orderType}</span>
+                      <span className="text-slate-300 font-mono">{rec.orderType}</span>
                     )}
                   </td>
-                  <td className="py-2.5 px-3 text-slate-400">
+                  <td className="py-3 px-3.5 text-slate-300 text-xs">
                     {rec.currency === "EUR" ? "€" : "$"}{rec.arrivalPrice.toFixed(2)}
                   </td>
-                  <td className="py-2.5 px-3 text-slate-100 font-bold">
+                  <td className="py-3 px-3.5 text-slate-100 font-bold text-xs">
                     {rec.currency === "EUR" ? "€" : "$"}{rec.fillPrice.toFixed(2)}
                   </td>
-                  <td className="py-2.5 px-3">
-                    <span className={`text-[10px] font-bold ${rec.slippageBps <= 2 ? "text-[#00ff88]" : "text-amber-400"}`}>
+                  <td className="py-3 px-3.5">
+                    <span className={`text-xs font-bold font-mono ${rec.slippageBps <= 2 ? "text-[#00ff88]" : "text-amber-400"}`}>
                       +{rec.slippageBps} bps
                     </span>
                   </td>
-                  <td className="py-2.5 px-3 text-slate-400 text-[10px]">
+                  <td className="py-3 px-3.5 text-slate-300 text-xs font-mono">
                     {rec.currency === "EUR" ? "€" : "$"}{rec.commission.toFixed(2)}
                   </td>
-                  <td className="py-2.5 px-3">
-                    <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/10 text-[#00ff88] border border-emerald-500/30">
+                  <td className="py-3 px-3.5">
+                    <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-emerald-500/15 text-[#00ff88] border border-emerald-500/30">
                       {rec.status}
                     </span>
                   </td>

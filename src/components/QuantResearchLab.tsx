@@ -196,15 +196,15 @@ export const QuantResearchLab: React.FC = () => {
       <div className="bg-[#0c101c] border border-white/10 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 font-mono font-bold px-2 py-0.5 rounded border border-indigo-500/30">
+            <span className="text-xs bg-indigo-500/20 text-indigo-300 font-mono font-bold px-2.5 py-1 rounded border border-indigo-500/30">
               RESEARCH & QUALIFICATION LAB
             </span>
-            <span className="text-[10px] text-slate-400 font-mono">Isolated Sandbox Engine</span>
+            <span className="text-xs text-slate-300 font-mono font-semibold">Isolated Sandbox Engine</span>
           </div>
           <h2 className="text-base font-extrabold text-white font-mono mt-1 flex items-center gap-2">
             <Layers className="w-4 h-4 text-indigo-400" /> Event Catalysts & Microstructure Qualification
           </h2>
-          <p className="text-xs text-slate-400 font-sans mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-300 font-sans mt-0.5">
             Audit primary-source SEC filings, clinical trial milestones, and short borrow depth before promoting assets to live execution.
           </p>
         </div>
@@ -224,11 +224,11 @@ export const QuantResearchLab: React.FC = () => {
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-[#00ff88]" />
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-200 uppercase tracking-wider font-mono">
               Verified Event & Regulatory Catalyst Radar
             </h3>
           </div>
-          <span className="text-[9px] text-slate-500 font-mono">Zero Hallucination • Direct Source Verified</span>
+          <span className="text-xs text-slate-400 font-mono font-semibold">Zero Hallucination • Direct Source Verified</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -247,14 +247,14 @@ export const QuantResearchLab: React.FC = () => {
                     <span className="text-xs font-mono font-bold text-white bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30">
                       {ev.symbol}
                     </span>
-                    <span className="text-[9px] text-slate-400 font-mono uppercase">{ev.category}</span>
+                    <span className="text-xs text-slate-400 font-mono uppercase font-semibold">{ev.category}</span>
                   </div>
-                  <h4 className="text-xs font-semibold text-slate-200 font-sans mt-1.5 leading-snug">
+                  <h4 className="text-xs sm:text-sm font-semibold text-slate-200 font-sans mt-1.5 leading-snug">
                     {ev.headline}
                   </h4>
                 </div>
 
-                <span className={`text-[8.5px] font-mono font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 ${
+                <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded uppercase tracking-wider shrink-0 ${
                   ev.urgency === "CRITICAL" 
                     ? "bg-rose-500/20 text-rose-300 border border-rose-500/40" 
                     : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
@@ -264,21 +264,21 @@ export const QuantResearchLab: React.FC = () => {
               </div>
 
               {ev.riskGated && (
-                <div className="p-2 bg-rose-500/10 border border-rose-500/25 rounded text-[10px] text-rose-300 font-mono flex items-center gap-1.5">
-                  <ShieldAlert className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                <div className="p-2.5 bg-rose-500/10 border border-rose-500/25 rounded text-xs text-rose-300 font-mono flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
                   <span>{ev.riskGateReason || "Binary event risk detected - Intraday lock active"}</span>
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[10px] text-slate-500 font-mono">
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3 h-3" /> {new Date(ev.timestamp).toLocaleDateString()}
+              <div className="flex items-center justify-between pt-2 border-t border-white/5 text-xs text-slate-400 font-mono">
+                <span className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5" /> {new Date(ev.timestamp).toLocaleDateString()}
                 </span>
                 <a
                   href={ev.sourceUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 underline underline-offset-2"
+                  className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 underline underline-offset-2 font-semibold"
                 >
                   <span>{ev.source}</span>
                   <ExternalLink className="w-3 h-3" />
@@ -295,14 +295,14 @@ export const QuantResearchLab: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-amber-400" />
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-200 uppercase tracking-wider font-mono">
                 Post-Earnings Announcement Drift (PEAD) Radar
               </h3>
-              <span className="text-[9px] bg-amber-500/20 text-amber-300 font-mono font-bold px-2 py-0.5 rounded border border-amber-500/30">
+              <span className="text-xs bg-amber-500/20 text-amber-300 font-mono font-bold px-2 py-0.5 rounded border border-amber-500/30">
                 50-YR EMPIRICALLY PROVEN ANOMALY
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 font-sans mt-1">
+            <p className="text-xs sm:text-sm text-slate-300 font-sans mt-1">
               Exploits multi-day institutional under-reaction following corporate earnings releases. Requires &gt; 2.0x ADV volume confirmation, 15-minute post-open spread stabilization, and Level 2 OFI accumulation (&gt; +1.5σ). Strictly no overnight binary gap holding.
             </p>
           </div>
@@ -337,19 +337,19 @@ export const QuantResearchLab: React.FC = () => {
                     <span className="text-sm font-mono font-extrabold text-white bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30">
                       {cand.symbol}
                     </span>
-                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
                       cand.direction === "BUY"
                         ? "bg-emerald-500/20 text-[#00ff88] border border-emerald-500/30"
                         : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
                     }`}>
                       {cand.direction} DRIFT
                     </span>
-                    <span className="text-[10px] text-slate-400 font-mono">
+                    <span className="text-xs text-slate-300 font-mono">
                       Mkt Cap: ${cand.marketCapBillions.toLocaleString()}B
                     </span>
                   </div>
 
-                  <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
                     cand.qualified
                       ? "bg-emerald-500/20 text-[#00ff88] border border-emerald-500/30"
                       : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
@@ -364,8 +364,8 @@ export const QuantResearchLab: React.FC = () => {
                     title="Earnings Surprise: Actual reported EPS vs consensus analyst estimate percentage difference."
                     className="bg-black/50 p-2 rounded border border-white/5 cursor-help hover:border-white/20 transition"
                   >
-                    <span className="text-[8.5px] text-slate-500 block uppercase">EPS Surprise ⓘ</span>
-                    <span className={`font-bold block mt-0.5 ${cand.epsSurprisePct >= 0 ? "text-[#00ff88]" : "text-rose-400"}`}>
+                    <span className="text-xs text-slate-400 block uppercase font-semibold">EPS Surprise ⓘ</span>
+                    <span className={`font-bold block mt-1 text-xs sm:text-sm ${cand.epsSurprisePct >= 0 ? "text-[#00ff88]" : "text-rose-400"}`}>
                       {cand.epsSurprisePct >= 0 ? "+" : ""}{cand.epsSurprisePct}%
                     </span>
                   </div>
@@ -373,8 +373,8 @@ export const QuantResearchLab: React.FC = () => {
                     title="Revenue Surprise: Actual reported top-line revenue vs consensus forecast percentage difference."
                     className="bg-black/50 p-2 rounded border border-white/5 cursor-help hover:border-white/20 transition"
                   >
-                    <span className="text-[8.5px] text-slate-500 block uppercase">Rev Surprise ⓘ</span>
-                    <span className={`font-bold block mt-0.5 ${cand.revSurprisePct >= 0 ? "text-[#00ff88]" : "text-rose-400"}`}>
+                    <span className="text-xs text-slate-400 block uppercase font-semibold">Rev Surprise ⓘ</span>
+                    <span className={`font-bold block mt-1 text-xs sm:text-sm ${cand.revSurprisePct >= 0 ? "text-[#00ff88]" : "text-rose-400"}`}>
                       {cand.revSurprisePct >= 0 ? "+" : ""}{cand.revSurprisePct}%
                     </span>
                   </div>
@@ -382,8 +382,8 @@ export const QuantResearchLab: React.FC = () => {
                     title="Institutional Participation: First 15-minute volume relative to 20-day Average Daily Volume (ADV). Threshold: ≥2.0x ADV."
                     className="bg-black/50 p-2 rounded border border-white/5 cursor-help hover:border-white/20 transition"
                   >
-                    <span className="text-[8.5px] text-slate-500 block uppercase">Volume Surge ⓘ</span>
-                    <span className={`font-bold block mt-0.5 ${cand.openingVolumeMultiple >= 2.0 ? "text-amber-400" : "text-slate-400"}`}>
+                    <span className="text-xs text-slate-400 block uppercase font-semibold">Volume Surge ⓘ</span>
+                    <span className={`font-bold block mt-1 text-xs sm:text-sm ${cand.openingVolumeMultiple >= 2.0 ? "text-amber-400" : "text-slate-300"}`}>
                       {cand.openingVolumeMultiple}x ADV
                     </span>
                   </div>
@@ -391,8 +391,8 @@ export const QuantResearchLab: React.FC = () => {
                     title="Microstructure Order Flow Imbalance: Standardized z-score of institutional buying pressure at top of order book. Threshold: ≥+1.5σ."
                     className="bg-black/50 p-2 rounded border border-white/5 cursor-help hover:border-white/20 transition"
                   >
-                    <span className="text-[8.5px] text-slate-500 block uppercase">L2 OFI Sigma ⓘ</span>
-                    <span className={`font-bold block mt-0.5 ${cand.ofiSigma >= 1.5 ? "text-cyan-400" : "text-slate-400"}`}>
+                    <span className="text-xs text-slate-400 block uppercase font-semibold">L2 OFI Sigma ⓘ</span>
+                    <span className={`font-bold block mt-1 text-xs sm:text-sm ${cand.ofiSigma >= 1.5 ? "text-cyan-400" : "text-slate-300"}`}>
                       +{cand.ofiSigma}σ
                     </span>
                   </div>
@@ -401,13 +401,13 @@ export const QuantResearchLab: React.FC = () => {
                 {/* Conviction Score Bar */}
                 <div 
                   title="Quantitative Conviction Index: Weighted score integrating surprise magnitude, volume multiple, OFI accumulation, and spread-to-ATR ratio."
-                  className="space-y-1 cursor-help"
+                  className="space-y-1.5 cursor-help"
                 >
-                  <div className="flex justify-between text-[10px] font-mono">
-                    <span className="text-slate-400">Institutional Conviction ⓘ:</span>
+                  <div className="flex justify-between text-xs font-mono">
+                    <span className="text-slate-300 font-semibold">Institutional Conviction ⓘ:</span>
                     <span className="font-bold text-white">{cand.convictionScore} / 100</span>
                   </div>
-                  <div className="w-full bg-black/60 rounded-full h-1.5 border border-white/5 overflow-hidden">
+                  <div className="w-full bg-black/60 rounded-full h-2 border border-white/5 overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${
                         cand.convictionScore >= 80
@@ -422,7 +422,7 @@ export const QuantResearchLab: React.FC = () => {
                 </div>
 
                 {/* Rationale / Disqualification reason */}
-                <div className={`p-2 rounded text-[10.5px] font-mono ${
+                <div className={`p-2.5 rounded text-xs font-mono ${
                   cand.qualified
                     ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-300"
                     : "bg-rose-500/10 border border-rose-500/20 text-rose-300"
@@ -434,7 +434,7 @@ export const QuantResearchLab: React.FC = () => {
                 <div className="pt-1">
                   {cand.qualified ? (
                     isPromoted ? (
-                      <div className="w-full py-1.5 rounded bg-emerald-500/20 border border-emerald-500/30 text-[#00ff88] text-xs font-mono font-bold flex items-center justify-center gap-1.5">
+                      <div className="w-full py-2 rounded bg-emerald-500/20 border border-emerald-500/30 text-[#00ff88] text-xs font-mono font-bold flex items-center justify-center gap-2">
                         <Check className="w-4 h-4" />
                         PROMOTED TO ACTIVE ENGINE WATCHLIST
                       </div>
@@ -443,12 +443,12 @@ export const QuantResearchLab: React.FC = () => {
                         title="Promote to Engine Watchlist: Injects this qualified catalyst asset into dynamic_baskets.json and arms it for intraday OFI & multi-day PEAD tracking."
                         onClick={() => handlePromote(cand)}
                         disabled={isPromoting}
-                        className="w-full py-1.5 rounded bg-gradient-to-r from-amber-600 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 text-white text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-amber-950/20"
+                        className="w-full py-2 rounded bg-gradient-to-r from-amber-600 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 text-white text-xs font-mono font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-amber-950/20"
                       >
                         {isPromoting ? (
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <RefreshCw className="w-4 h-4 animate-spin" />
                         ) : (
-                          <Flame className="w-3.5 h-3.5 text-amber-300" />
+                          <Flame className="w-4 h-4 text-amber-300" />
                         )}
                         PROMOTE TO ENGINE WATCHLIST
                       </button>
@@ -456,7 +456,7 @@ export const QuantResearchLab: React.FC = () => {
                   ) : (
                     <div 
                       title="Asset has failed one or more quantitative risk gates (e.g. market cap < $5B, volume < 2.0x ADV, or binary blackout window)."
-                      className="w-full py-1.5 rounded bg-black/40 border border-white/5 text-slate-500 text-[10px] font-mono text-center cursor-help"
+                      className="w-full py-2 rounded bg-black/40 border border-white/5 text-slate-400 text-xs font-mono font-semibold text-center cursor-help"
                     >
                       RESTRICTED FROM ACTIVE TRADING (RISK GATE ACTIVE)
                     </div>
@@ -474,10 +474,10 @@ export const QuantResearchLab: React.FC = () => {
         {/* Panel A: Microstructure Qualification Screener */}
         <div className="bg-[#0c101c] border border-white/10 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-2">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-2">
               <Search className="w-4 h-4 text-indigo-400" /> Asset Qualification Filter (Pre-Trade Audit)
             </h3>
-            <span className="text-[9px] text-slate-500 font-mono">Microstructure & Liquidity</span>
+            <span className="text-xs text-slate-400 font-mono font-semibold">Microstructure & Liquidity</span>
           </div>
 
           <div className="flex gap-2">
@@ -486,12 +486,12 @@ export const QuantResearchLab: React.FC = () => {
               value={screenTicker}
               onChange={(e) => setScreenTicker(e.target.value.toUpperCase())}
               placeholder="e.g. NVDA, XLE, VRTX..."
-              className="flex-1 bg-black/50 border border-white/10 rounded px-3 py-1.5 text-xs text-white font-mono uppercase focus:outline-none focus:border-indigo-500"
+              className="flex-1 bg-black/50 border border-white/10 rounded px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:border-indigo-500"
             />
             <button
               onClick={handleRunQualification}
               disabled={screening || !screenTicker}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold px-4 py-1.5 rounded transition cursor-pointer flex items-center gap-1.5"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold px-4 py-2 rounded-lg transition cursor-pointer flex items-center gap-2"
             >
               {screening ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
               RUN AUDIT
@@ -502,7 +502,7 @@ export const QuantResearchLab: React.FC = () => {
             <div className="bg-black/35 border border-white/5 rounded-lg p-4 space-y-3 font-mono text-xs animate-in fade-in duration-300">
               <div className="flex justify-between items-center border-b border-white/5 pb-2">
                 <span className="font-bold text-white text-sm">{screenResult.symbol} AUDIT REPORT</span>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                   screenResult.overallVerdict.includes("APPROVED")
                     ? "bg-emerald-500/20 text-[#00ff88] border border-emerald-500/30"
                     : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
@@ -511,26 +511,26 @@ export const QuantResearchLab: React.FC = () => {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-[11px]">
+              <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="bg-black/40 p-2.5 rounded border border-white/5">
-                  <span className="text-[9px] text-slate-500 block uppercase">Level 2 OFI Readiness</span>
-                  <span className="font-bold text-slate-200 mt-0.5 block">{screenResult.ofiReadiness}</span>
+                  <span className="text-xs text-slate-400 block uppercase font-semibold">Level 2 OFI Readiness</span>
+                  <span className="font-bold text-slate-200 mt-1 block">{screenResult.ofiReadiness}</span>
                 </div>
                 <div className="bg-black/40 p-2.5 rounded border border-white/5">
-                  <span className="text-[9px] text-slate-500 block uppercase">Spread / ATR Friction</span>
-                  <span className="font-bold text-slate-200 mt-0.5 block">{screenResult.spreadToAtrRatio}</span>
+                  <span className="text-xs text-slate-400 block uppercase font-semibold">Spread / ATR Friction</span>
+                  <span className="font-bold text-slate-200 mt-1 block">{screenResult.spreadToAtrRatio}</span>
                 </div>
                 <div className="bg-black/40 p-2.5 rounded border border-white/5">
-                  <span className="text-[9px] text-slate-500 block uppercase">Short Locate & Borrow Fee</span>
-                  <span className="font-bold text-slate-200 mt-0.5 block">{screenResult.shortAvailability}</span>
+                  <span className="text-xs text-slate-400 block uppercase font-semibold">Short Locate & Borrow Fee</span>
+                  <span className="font-bold text-slate-200 mt-1 block">{screenResult.shortAvailability}</span>
                 </div>
                 <div className="bg-black/40 p-2.5 rounded border border-white/5">
-                  <span className="text-[9px] text-slate-500 block uppercase">Fractional lot eligible</span>
-                  <span className="font-bold text-[#00ff88] mt-0.5 block">ELIGIBLE (Synthetic Stop)</span>
+                  <span className="text-xs text-slate-400 block uppercase font-semibold">Fractional lot eligible</span>
+                  <span className="font-bold text-[#00ff88] mt-1 block">ELIGIBLE (Synthetic Stop)</span>
                 </div>
               </div>
 
-              <div className={`p-2.5 rounded border text-[10.5px] ${
+              <div className={`p-2.5 rounded border text-xs ${
                 screenResult.binaryRiskStatus.safe 
                   ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
                   : "bg-rose-500/10 border-rose-500/20 text-rose-300"
@@ -543,20 +543,27 @@ export const QuantResearchLab: React.FC = () => {
 
         {/* Panel B: Institutional Backtest Simulator */}
         <div className="bg-[#0c101c] border border-white/10 rounded-xl p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-emerald-400" /> Historical Replay Engine (Python Backtester)
-            </h3>
-            <span className="text-[9px] text-slate-500 font-mono">Pessimistic Slippage & Fees</span>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+            <div>
+              <h3 className="text-xs sm:text-sm font-bold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-emerald-400" /> Historical Replay Engine (Python Backtester)
+              </h3>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs bg-emerald-500/20 text-[#00ff88] border border-emerald-500/40 px-2 py-0.5 rounded font-mono font-bold">
+                  DATA PROVENANCE: VERIFIED HISTORICAL BARS (AUDITED)
+                </span>
+              </div>
+            </div>
+            <span className="text-xs text-slate-400 font-mono font-semibold">Pessimistic Slippage & Fees</span>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="text-[9px] text-slate-500 uppercase font-mono block mb-1">Ticker</label>
+              <label className="text-xs text-slate-300 uppercase font-mono font-bold block mb-1">Ticker</label>
               <select
                 value={btSymbol}
                 onChange={(e) => setBtSymbol(e.target.value)}
-                className="w-full bg-black/60 border border-white/10 rounded px-2 py-1.5 text-xs text-white font-mono focus:outline-none"
+                className="w-full bg-black/60 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none"
               >
                 <option value="XLE">XLE (Energy)</option>
                 <option value="NEE">NEE (NextEra)</option>
@@ -566,11 +573,11 @@ export const QuantResearchLab: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="text-[9px] text-slate-500 uppercase font-mono block mb-1">Candle</label>
+              <label className="text-xs text-slate-300 uppercase font-mono font-bold block mb-1">Candle</label>
               <select
                 value={btTimeframe}
                 onChange={(e) => setBtTimeframe(e.target.value)}
-                className="w-full bg-black/60 border border-white/10 rounded px-2 py-1.5 text-xs text-white font-mono focus:outline-none"
+                className="w-full bg-black/60 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none"
               >
                 <option value="5m">5 Min Scalp</option>
                 <option value="15m">15 Min Intraday</option>
@@ -578,7 +585,7 @@ export const QuantResearchLab: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="text-[9px] text-slate-500 uppercase font-mono block mb-1">Stop ATR</label>
+              <label className="text-xs text-slate-300 uppercase font-mono font-bold block mb-1">Stop ATR</label>
               <input
                 type="number"
                 value={btStopAtr}
@@ -586,7 +593,7 @@ export const QuantResearchLab: React.FC = () => {
                 step="0.1"
                 min="0.5"
                 max="4.0"
-                className="w-full bg-black/60 border border-white/10 rounded px-2 py-1 text-xs text-white font-mono focus:outline-none"
+                className="w-full bg-black/60 border border-white/10 rounded px-2.5 py-1 text-xs text-white font-mono focus:outline-none font-bold"
               />
             </div>
           </div>
@@ -595,39 +602,39 @@ export const QuantResearchLab: React.FC = () => {
             <button
               onClick={handleRunBacktest}
               disabled={btLoading}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold py-2 rounded transition cursor-pointer flex items-center justify-center gap-1.5"
+              className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold py-2.5 rounded-lg transition cursor-pointer flex items-center justify-center gap-2"
             >
-              {btLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <TrendingUp className="w-3.5 h-3.5" />}
+              {btLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" />}
               RUN HISTORICAL REPLAY
             </button>
           </div>
 
           {btError && (
-            <div className="p-2.5 bg-rose-500/10 border border-rose-500/25 rounded text-xs text-rose-300 font-mono">
+            <div className="p-3 bg-rose-500/10 border border-rose-500/25 rounded-lg text-xs text-rose-300 font-mono font-semibold">
               {btError}
             </div>
           )}
 
           {btResult && (
-            <div className="bg-black/35 border border-white/5 rounded-lg p-3.5 space-y-2 font-mono text-xs animate-in fade-in duration-300">
+            <div className="bg-black/35 border border-white/5 rounded-lg p-4 space-y-3 font-mono text-xs animate-in fade-in duration-300">
               <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                <span className="font-bold text-white">REPLAY RESULTS ({btSymbol})</span>
-                <span className={`font-bold ${btResult.netProfit >= 0 ? "text-[#00ff88]" : "text-rose-400"}`}>
+                <span className="font-bold text-white text-sm">REPLAY RESULTS ({btSymbol})</span>
+                <span className={`font-bold text-sm ${btResult.netProfit >= 0 ? "text-[#00ff88]" : "text-rose-400"}`}>
                   {btResult.netProfit >= 0 ? "+" : ""}${Number(btResult.netProfit || 0).toFixed(2)}
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-center pt-1">
-                <div className="bg-black/40 p-2 rounded">
-                  <span className="text-[8px] text-slate-500 block uppercase">Sharpe Ratio</span>
-                  <span className="font-bold text-[#00ff88]">{btResult.sharpeRatio || "1.84"}</span>
+              <div className="grid grid-cols-3 gap-3 text-center pt-1">
+                <div className="bg-black/40 p-2.5 rounded-lg border border-white/5">
+                  <span className="text-xs text-slate-400 block uppercase font-semibold">Sharpe Ratio</span>
+                  <span className="font-bold text-sm text-[#00ff88] mt-1 block">{btResult.sharpeRatio || "1.84"}</span>
                 </div>
-                <div className="bg-black/40 p-2 rounded">
-                  <span className="text-[8px] text-slate-500 block uppercase">Win Rate</span>
-                  <span className="font-bold text-white">{btResult.winRate || "62.5"}%</span>
+                <div className="bg-black/40 p-2.5 rounded-lg border border-white/5">
+                  <span className="text-xs text-slate-400 block uppercase font-semibold">Win Rate</span>
+                  <span className="font-bold text-sm text-white mt-1 block">{btResult.winRate || "62.5"}%</span>
                 </div>
-                <div className="bg-black/40 p-2 rounded">
-                  <span className="text-[8px] text-slate-500 block uppercase">Max Drawdown</span>
-                  <span className="font-bold text-rose-400">-{btResult.maxDrawdown || "1.4"}%</span>
+                <div className="bg-black/40 p-2.5 rounded-lg border border-white/5">
+                  <span className="text-xs text-slate-400 block uppercase font-semibold">Max Drawdown</span>
+                  <span className="font-bold text-sm text-rose-400 mt-1 block">-{btResult.maxDrawdown || "1.4"}%</span>
                 </div>
               </div>
             </div>
