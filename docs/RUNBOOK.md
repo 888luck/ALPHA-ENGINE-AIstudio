@@ -100,14 +100,14 @@ The engine operates on a zero-hallucination, zero-drift, 100% dynamic architectu
 |---|---|---|
 | **Edge Compute Node** | GCP Compute Engine `alpha-edge-node` | `europe-west3-a` (Frankfurt, Germany) |
 | **Machine Type** | `e2-medium` (2 vCPUs, 4 GB RAM) | Resized for low-latency European execution |
-| **External IP** | `34.159.125.115` | Public Frankfurt gateway IP |
+| **External IP** | `34.107.87.48` | Public Frankfurt gateway IP |
 | **Cloud Scopes** | `https://www.googleapis.com/auth/cloud-platform` | Native Firestore & Cloud Logging access |
 | **Control Plane** | Firebase Hosting + Cloud Run | `https://alpha-engine-ai-studio.web.app` |
 
 ### 2. Standalone IB Gateway 10.50 & Web VNC
 Interactive Brokers Gateway 10.50 runs headlessly inside a virtual X11 frame buffer on the Frankfurt VM:
 - **API Socket Port**: `127.0.0.1:4002` (Verified active and listening)
-- **Direct HTTPS Web VNC**: `https://34.159.125.115:8443/vnc.html`
+- **Direct HTTPS Web VNC**: `https://34.107.87.48:8443/vnc.html`
 - **Reverse Proxy Authentication**:
   - **Username**: `admin`
   - **Password**: `Alpha2026Engine!`
@@ -157,7 +157,7 @@ This immediately transmits a global order cancellation (`reqGlobalCancel()`), li
 
 ## 📋 Pre-Flight Checklist Before Live Trading Session
 
-- [ ] **IB Gateway Authenticated**: Access `https://34.159.125.115:8443/vnc.html` and verify the green "Connected" status with port `4002` open.
+- [ ] **IB Gateway Authenticated**: Access `https://34.107.87.48:8443/vnc.html` and verify the green "Connected" status with port `4002` open.
 - [ ] **API Vault Handshake**: Verify in the control center that Google Gemini, Groq, and Cloud Firestore endpoints return green latency badges (<300ms).
 - [ ] **Market Hours Synchronized**: Confirm the active session countdown displays correctly for Euronext (`XPAR`), Xetra (`XETR`), and NYSE (`XNYS`).
 - [ ] **Friction Filter Active**: Confirm maximum friction ratio ceiling is enforced at 15.0% of expected gross move.
