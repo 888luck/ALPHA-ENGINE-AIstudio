@@ -98,11 +98,11 @@ class RankedCandidate:
     direction: Literal["BUY", "SELL"]
     catalyst: str
     confidence: float
-    projectedWinRate: Optional[float] = None
-    profitFactor: Optional[float] = None
     expectedMovePct: float
     averageSpread: float
     estimatedFrictionPct: float
+    projectedWinRate: Optional[float] = None
+    profitFactor: Optional[float] = None
     conId: int = 0
     primaryExchange: str = "SMART"
     currency: str = "USD"
