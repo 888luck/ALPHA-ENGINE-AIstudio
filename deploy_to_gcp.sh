@@ -29,13 +29,18 @@ fi
 
 # Fallback prompts if blank
 if [ -z "$FIREBASE_PROJECT" ]; then
-    # Try to read the currently set active gcloud project
-    ACTIVE_PROJECT=$(gcloud config get-value project 2>/dev/null || true)
-    if [ -n "$ACTIVE_PROJECT" ]; then
-        echo "[GCLOUD] Auto-detected active GCP project from environment: $ACTIVE_PROJECT"
-        FIREBASE_PROJECT="$ACTIVE_PROJECT"
+    # Parse project ID from .firebaserc natively if it exists
+    if [ -f ".firebaserc" ]; then
+        FIREBASE_PROJECT=$(grep '"default"' .firebaserc | cut -d '"' -f 4)
+        echo "[SYNC] Extracted GCP project from .firebaserc: $FIREBASE_PROJECT"
     else
-        read -p "Enter Google Cloud Project ID: " FIREBASE_PROJECT
+        ACTIVE_PROJECT=$(gcloud config get-value project 2>/dev/null || true)
+        if [ -n "$ACTIVE_PROJECT" ]; then
+            echo "[GCLOUD] Auto-detected active GCP project from environment: $ACTIVE_PROJECT"
+            FIREBASE_PROJECT="$ACTIVE_PROJECT"
+        else
+            read -p "Enter Google Cloud Project ID: " FIREBASE_PROJECT
+        fi
     fi
 fi
 
@@ -61,7 +66,7 @@ else
     gcloud compute instances create "$VM_NAME" \
         --zone="$ZONE" \
         --machine-type="e2-medium" \
-        --image-family="debian-11" \
+        --image-family="debian-12" \
         --image-project="debian-cloud" \
         --metadata=startup-script="sudo apt-get update && sudo apt-get install -y python3 python3-pip git" \
         --scopes="https://www.googleapis.com/auth/cloud-platform" \
@@ -187,7 +192,7 @@ else
     gcloud compute instances create "$STANDBY_VM" \
         --zone="$STANDBY_ZONE" \
         --machine-type="e2-medium" \
-        --image-family="debian-11" \
+        --image-family="debian-12" \
         --image-project="debian-cloud" \
         --metadata=startup-script="sudo apt-get update && sudo apt-get install -y python3 python3-pip git" \
         --scopes="https://www.googleapis.com/auth/cloud-platform" \
@@ -196,7 +201,7 @@ else
 fi
 
 echo "[SSH] Deploying to Warm Standby..."
-gcloud compute scp /tmp/alpha-workspace-bundle.tar.gz "$STANDBY_VM":~/alpha-workspace-bundle.tar.gz --zone="$STANDBY_ZONE" --quiet
+gcloud compute scp ./alpha-workspace-bundle.tar.gz "$STANDBY_VM":~/alpha-workspace-bundle.tar.gz --zone="$STANDBY_ZONE" --quiet
 gcloud compute scp remote_vm_setup.sh "$STANDBY_VM":~/remote_vm_setup.sh --zone="$STANDBY_ZONE" --quiet
 gcloud compute ssh "$STANDBY_VM" --zone="$STANDBY_ZONE" --command="chmod +x ~/remote_vm_setup.sh && ~/remote_vm_setup.sh" --quiet
 
