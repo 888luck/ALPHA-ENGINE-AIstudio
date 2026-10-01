@@ -18,6 +18,8 @@ import {
   ArrowRight
 } from "lucide-react";
 
+import { GcpCompanion } from "./GcpCompanion";
+
 interface CatalystEvent {
   id: string;
   source: string;
@@ -192,6 +194,7 @@ export const QuantResearchLab: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <GcpCompanion />
       {/* HEADER BANNER */}
       <div className="bg-[#0c101c] border border-white/10 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
