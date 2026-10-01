@@ -64,17 +64,44 @@ class ConnectionManager(EWrapper, EClient):
         self._port = port
         self._client_id = client_id
         print(f"[CONNECTION] Connecting to IBKR Gateway at {host}:{port} (Mode: {self.trading_mode})...")
+        
+        self._handshake_time_received = False
         self.connect(host, port, client_id)
-        self.is_connected = True
-        self._reconnect_delay = 2.0
         
         # Start background API processing thread
         thread = threading.Thread(target=self.run, name="IBKR_API_Loop", daemon=True)
         thread.start()
         
-        # Launch dedicated pulse monitor
-        threading.Thread(target=self._heartbeat_pulse, daemon=True).start()
-        print("[CONNECTION] Connected successfully. Background listener thread and heartbeat active.")
+        print("[CONNECTION] Initiating 3-point handshake...")
+        # Request time to verify responsiveness
+        try:
+            self.reqCurrentTime()
+        except Exception:
+            pass
+            
+        # Wait up to 10s for the handshake criteria
+        success = False
+        for _ in range(100):
+            if hasattr(self, 'serverVersion') and self.serverVersion() >= 170 and len(self.accounts_list) > 0 and self.next_order_id > 0 and self._handshake_time_received:
+                success = True
+                break
+            time.sleep(0.1)
+            
+        if success:
+            self.is_connected = True
+            self._reconnect_delay = 2.0
+            # Launch dedicated pulse monitor
+            threading.Thread(target=self._heartbeat_pulse, daemon=True).start()
+            print("[CONNECTION] Handshake successful. Background listener thread and heartbeat active.")
+        else:
+            print("[CONNECTION] 3-point handshake timeout (10s) - Gate 1 locked. Connection not fully established.")
+            self.is_connected = False
+            try:
+                self.disconnect()
+            except Exception:
+                pass
+            if self.auto_reconnect_enabled and not self._is_reconnecting:
+                threading.Thread(target=self._reconnect_worker, name="IBKR_Reconnect_Thread", daemon=True).start()
 
     def _heartbeat_pulse(self):
         """Continuously screens socket connectivity and latency parameters."""
@@ -116,14 +143,33 @@ class ConnectionManager(EWrapper, EClient):
                     pass
                 
                 self.connect(self._host, self._port, self._client_id)
-                self.is_connected = True
-                self._is_reconnecting = False
-                self._reconnect_delay = 2.0 # Reset backoff
-                print(f"[AUTO-RECONNECT] Reconnection successful on attempt {attempt}! Restarting API loop.")
                 
+                # Handshake on reconnect
+                self._handshake_time_received = False
                 thread = threading.Thread(target=self.run, name="IBKR_API_Loop", daemon=True)
                 thread.start()
-                return
+                
+                try:
+                    self.reqCurrentTime()
+                except Exception:
+                    pass
+                    
+                success = False
+                for _ in range(100):
+                    if hasattr(self, 'serverVersion') and self.serverVersion() >= 170 and len(self.accounts_list) > 0 and self.next_order_id > 0 and self._handshake_time_received:
+                        success = True
+                        break
+                    time.sleep(0.1)
+                
+                if success:
+                    self.is_connected = True
+                    self._is_reconnecting = False
+                    self._reconnect_delay = 2.0 # Reset backoff
+                    print(f"[AUTO-RECONNECT] Reconnection & handshake successful on attempt {attempt}! Restarting API loop.")
+                    return
+                else:
+                    raise Exception("Handshake timeout during reconnect")
+                    
             except Exception as e:
                 attempt += 1
                 self._reconnect_delay = min(self._max_reconnect_delay, self._reconnect_delay * 2.0)
@@ -156,7 +202,7 @@ class ConnectionManager(EWrapper, EClient):
                 print(f"[WARNING] Mode is LIVE but detected Paper Account {acc}. Real capital is not deployed on DU accounts.")
 
     def currentTime(self, time_val: int):
-        pass
+        self._handshake_time_received = True
 
     def error(self, reqId: int, errorCode: int, errorString: str, advancedOrderRejectJson: str = ""):
         print(f"[GATEWAY ERROR] ReqID: {reqId} | Code: {errorCode} | Message: {errorString}")
