@@ -22,6 +22,8 @@ from universe_builder import UniverseBuilder
 from reasoning_auditor import ReasoningAuditor
 from local_edge_node import LocalEdgeNode
 from market_hours_resolver import MarketHoursResolver, MarketSessionPhase
+from tca_engine import TCAEngine
+from rts22_exporter import RTS22Exporter
 
 def get_current_ny_time():
     """Returns actual US Eastern Time intraday timestamp simulation."""
@@ -123,6 +125,22 @@ def main_loop():
     
     # Wire incoming broker bulletins to ingestor
     cm.on_news_bulletin_callback = news_ingestor.ingest_ibkr_bulletin
+    
+    # 4.6 Initialize TCA and RTS-22 Exporter
+    tca_engine = TCAEngine(firebase_tunnel=firebase_tunnel)
+    rts22_exporter = RTS22Exporter()
+    
+    def handle_execution(symbol, execution):
+        tca_engine.on_fill(symbol, execution)
+        rts22_exporter.record_transaction(
+            execution, 
+            config.get("MIFID2_DECISION_MAKER_ID", "ALGO_DEC_992"), 
+            config.get("MIFID2_EXECUTION_TRADER_ID", "ALGO_EXE_554")
+        )
+        # Flush RTS-22 immediately for safety, though normally done EOD
+        rts22_exporter.generate_daily_xml()
+        
+    cm.on_execution_callback = handle_execution
     
     # 5. Bind DRM Protection Module
     drm = DRMMiddleware(cm, config["IBKR_ACCOUNT_NUMBER"])
@@ -314,6 +332,7 @@ def main_loop():
                     # Simulation sandbox mode: evaluate candidate setup with dynamic ATR bands
                     # Zero Synthetic Policy: simulation trades route to active_trades_sandbox ONLY
                     sim_entry = 100.0 if cand.isEuropean else 52.40
+                    tca_engine.snapshot_arrival(sym, sim_entry)
                     atr = drm.calculate_atr14(cm.historical_data_buffer.get(sym, []), current_price=sim_entry)
                     brackets = drm.calculate_dynamic_brackets(sim_entry, direction, atr, k_stop=1.5, min_tick=spec.minTick)
                     sim_stop = brackets["stop_price"]

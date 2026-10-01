@@ -11,3 +11,5 @@ firebase-admin>=6.2.0
 feedparser>=6.0.10
 google-genai>=0.1.1
 pytest>=7.4.0
+
+xmlschema>=3.0.0
