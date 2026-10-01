@@ -48,10 +48,20 @@ def run_premarket_calibration(news_ingestor: NewsIngestor, ensemble: MultiModelE
     # 0. Dynamic Market Discovery via IBKR Multi-Exchange Scanner
     if edge_node:
         try:
+            print("[SCANNER DISCOVERY] Initiating multi-exchange scanners...")
+            edge_node.instantiate_and_rotate_scanners()
+            
+            # Wait for scanner streams to populate (reqScannerSubscription is async)
+            import time
+            time.sleep(5)
+            
             print("[SCANNER DISCOVERY] Polling multi-exchange scanner subscriptions for top volume assets...")
             discovered_symbols = edge_node.aggregate_top_symbols(target_limit=15)
             if discovered_symbols:
                 print(f"[SCANNER DISCOVERY] Ingested {len(discovered_symbols)} dynamic candidate symbols: {discovered_symbols[:8]}...")
+            
+            # Cleanup active scanners after ingestion
+            edge_node.cancel_active_scanners()
         except Exception as e:
             print(f"[SCANNER DISCOVERY WARN] Scanner aggregation bypassed: {e}")
 
