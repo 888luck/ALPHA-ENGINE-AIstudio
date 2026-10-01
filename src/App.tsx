@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import Dashboard from "./components/Dashboard";
-import Launchpad from "./components/Launchpad";
 import { LiveCockpit } from "./components/LiveCockpit";
 import { QuantResearchLab } from "./components/QuantResearchLab";
 import { Sun, Moon, Activity, Tag, Globe, HelpCircle, LayoutGrid, Home, ShieldAlert, Layers } from "lucide-react";
@@ -12,13 +11,13 @@ export default function App() {
     return (saved as "dark" | "light") || "dark";
   });
 
-  const [view, setView] = useState<"cockpit" | "lab" | "dashboard" | "launchpad">(() => {
+  const [view, setView] = useState<"cockpit" | "lab" | "dashboard">(() => {
     const saved = localStorage.getItem("alpha_dashboard_view");
     return (saved as any) || "cockpit";
   });
   const [navTarget, setNavTarget] = useState<string | null>(null);
 
-  const handleNavigate = (newView: "cockpit" | "lab" | "dashboard" | "launchpad", target?: string) => {
+  const handleNavigate = (newView: "cockpit" | "lab" | "dashboard", target?: string) => {
     setView(newView);
     localStorage.setItem("alpha_dashboard_view", newView);
     if (target) {
@@ -41,7 +40,7 @@ export default function App() {
 
   const toggleView = () => {
     setView((prev) => {
-      const next = prev === "launchpad" ? "dashboard" : "launchpad";
+      const next = prev === "dashboard" ? "cockpit" : "dashboard";
       localStorage.setItem("alpha_dashboard_view", next);
       return next;
     });
@@ -88,246 +87,6 @@ export default function App() {
     }
   }, [theme]);
 
-  // Dynamic DOM Watcher to overlay multi-exchange tags securely is run iteratively
-  useEffect(() => {
-    const enrichDomElements = () => {
-      // 1. Scan for active trade and log rows (usually in standard td layout panels)
-      const cells = document.querySelectorAll("td");
-      cells.forEach((cell) => {
-        // Prevent duplicate badge injects
-        if (cell.querySelector(".exchange-tag")) return;
-
-        const cellText = (cell.textContent || "").trim();
-        // Check if cell is the symbol cell (e.g., matches standard uppercase ticker with ID text or just letters)
-        // Active Trades Symbol columns usually have text pattern: "XLE TRD_1001" or "SGO", etc.
-        const symbolMatch = cellText.match(/^([A-Z]{3,5})\b/);
-        if (symbolMatch) {
-          const matchedSymbol = symbolMatch[1];
-          const hasInnerSpanText = cell.querySelector("span") !== null;
-          
-          // To ensure we only target the symbol header column inside execution portfolios
-          if (cell.classList.contains("font-bold") || hasInnerSpanText) {
-            let badgeText = "US EXCHANGE";
-            let badgeClass = "exchange-badge-us";
-
-            if (["RWE", "SAP"].includes(matchedSymbol)) {
-              badgeText = "XETRA";
-              badgeClass = "exchange-badge-xetra";
-            } else if (["SGO", "ENGI", "ORSTED"].includes(matchedSymbol)) {
-              badgeText = "EURONEXT";
-              badgeClass = "exchange-badge-euronext";
-            } else if (!["BUY", "SELL", "LONG", "SHORT", "UNITS", "ENTRY"].includes(matchedSymbol)) {
-              // Standard US symbols default
-              badgeText = "US Exchange";
-              badgeClass = "exchange-badge-us";
-            } else {
-              return; // Exclude non-symbol matches
-            }
-
-            const badgeSpan = document.createElement("span");
-            badgeSpan.className = `exchange-tag ${badgeClass} text-xs px-2 py-0.5 rounded border ml-2 font-mono font-bold tracking-wider inline-block select-none align-middle transition-colors duration-150`;
-            badgeSpan.innerText = badgeText;
-            
-            // Append securely to the parent cell representation
-            cell.appendChild(badgeSpan);
-          }
-        }
-      });
-    };
-
-    // Instantiate scanning poll
-    const interval = setInterval(enrichDomElements, 350);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Comprehensive light theme stylesheet template logic
-  const lightThemeCss = `
-    /* Premium Slate Light Theme Mode */
-    .theme-light body {
-      background-color: #f8fafc !important;
-      color: #0f172a !important;
-    }
-    
-    .theme-light #alpha-engine-application-wrapper {
-      background-color: #f8fafc !important;
-    }
-    
-    .theme-light #alpha-header-panel {
-      background-color: rgba(255, 255, 255, 0.9) !important;
-      border-color: rgba(15, 23, 42, 0.08) !important;
-    }
-    
-    .theme-light #alpha-header-panel h1 {
-      color: #0f172a !important;
-    }
-    
-    .theme-light #alpha-header-panel p {
-      color: #475569 !important;
-    }
-    
-    .theme-light #theme-mode-toggle {
-      background-color: rgba(15, 23, 42, 0.04) !important;
-      border-color: rgba(15, 23, 42, 0.08) !important;
-      color: #334155 !important;
-    }
-    
-    .theme-light #theme-mode-toggle:hover {
-      background-color: rgba(15, 23, 42, 0.08) !important;
-      color: #0f172a !important;
-    }
-    
-    /* Frosted Glass Override Rules under Light Theme */
-    .theme-light .frosted-glass {
-      background: rgba(255, 255, 255, 0.85) !important;
-      backdrop-filter: blur(20px) saturate(180%) !important;
-      border: 1px solid rgba(15, 23, 42, 0.08) !important;
-      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04) !important;
-      color: #0f172a !important;
-    }
-    
-    .theme-light .frosted-glass-hover:hover {
-      background: rgba(255, 255, 255, 0.98) !important;
-      border-color: rgba(15, 23, 42, 0.15) !important;
-      box-shadow: 0 12px 35px -5px rgba(15, 23, 42, 0.08) !important;
-    }
-    
-    /* Text overrides across custom nested layouts */
-    .theme-light .text-slate-100,
-    .theme-light .text-slate-200,
-    .theme-light .text-slate-300,
-    .theme-light .text-[#f1f5f9],
-    .theme-light .text-white,
-    .theme-light h1,
-    .theme-light h2,
-    .theme-light h3,
-    .theme-light h4,
-    .theme-light th,
-    .theme-light td,
-    .theme-light table,
-    .theme-light button:not(.btn-cyber-primary) {
-      color: #0f172a !important;
-    }
-    
-    .theme-light .text-slate-400 {
-      color: #475569 !important;
-    }
-    
-    .theme-light .text-slate-500 {
-      color: #64748b !important;
-    }
-    
-    /* Boundaries & Borders adjustments */
-    .theme-light .border-white/10 {
-      border-color: rgba(15, 23, 42, 0.08) !important;
-    }
-    
-    .theme-light .divide-white/5 > * + * {
-      border-color: rgba(15, 23, 42, 0.06) !important;
-    }
-    
-    /* Background colors inside visual panels */
-    .theme-light .bg-black/35,
-    .theme-light .bg-black/40,
-    .theme-light .bg-black/20,
-    .theme-light .bg-white/5,
-    .theme-light .bg-white/10,
-    .theme-light .bg-slate-900 {
-      background-color: rgba(15, 23, 42, 0.03) !important;
-    }
-    
-    .theme-light .bg-slate-950,
-    .theme-light .bg-[#0a0f1d] {
-      background-color: #f8fafc !important;
-    }
-    
-    /* Inputs, Selections & Dialog layout adjustments */
-    .theme-light input,
-    .theme-light select {
-      background-color: #ffffff !important;
-      color: #0f172a !important;
-      border: 1px solid rgba(15, 23, 42, 0.12) !important;
-    }
-    
-    .theme-light select option {
-      background-color: #ffffff !important;
-      color: #0f172a !important;
-    }
-    
-    .theme-light input::placeholder {
-      color: #94a3b8 !important;
-    }
-    
-    /* Custom Scrollbar override blocks */
-    .theme-light ::-webkit-scrollbar-track {
-      background: rgba(15, 23, 42, 0.01) !important;
-    }
-    .theme-light ::-webkit-scrollbar-thumb {
-      background: rgba(15, 23, 42, 0.08) !important;
-    }
-    .theme-light ::-webkit-scrollbar-thumb:hover {
-      background: rgba(15, 23, 42, 0.15) !important;
-    }
-    
-    /* Recharts responsive grid coordinates styling */
-    .theme-light .recharts-cartesian-grid line {
-      stroke: rgba(15, 23, 42, 0.06) !important;
-    }
-    
-    .theme-light .recharts-text {
-      fill: #475569 !important;
-      font-weight: 500 !important;
-    }
-    
-    .theme-light .recharts-tooltip-cursor {
-      fill: rgba(15, 23, 42, 0.02) !important;
-    }
-    
-    .theme-light .recharts-default-tooltip {
-      background-color: rgba(255, 255, 255, 0.98) !important;
-      border: 1px solid rgba(15, 23, 42, 0.08) !important;
-      color: #0f172a !important;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
-    }
-    
-    .theme-light .recharts-tooltip-label {
-      color: #0f172a !important;
-    }
-    
-    /* Specific styling for exchange badges */
-    .exchange-badge-us {
-      background-color: rgba(59, 130, 246, 0.12) !important;
-      color: #60a5fa !important;
-      border: 1px solid rgba(59, 130, 246, 0.25) !important;
-    }
-    .theme-light .exchange-badge-us {
-      background-color: rgba(59, 130, 246, 0.06) !important;
-      color: #1d4ed8 !important;
-      border: 1px solid rgba(59, 130, 246, 0.18) !important;
-    }
-    
-    .exchange-badge-xetra {
-      background-color: rgba(245, 158, 11, 0.12) !important;
-      color: #fbbf24 !important;
-      border: 1px solid rgba(245, 158, 11, 0.25) !important;
-    }
-    .theme-light .exchange-badge-xetra {
-      background-color: rgba(245, 158, 11, 0.06) !important;
-      color: #b45309 !important;
-      border: 1px solid rgba(245, 158, 11, 0.18) !important;
-    }
-    
-    .exchange-badge-euronext {
-      background-color: rgba(16, 185, 129, 0.12) !important;
-      color: #34d399 !important;
-      border: 1px solid rgba(16, 185, 129, 0.25) !important;
-    }
-    .theme-light .exchange-badge-euronext {
-      background-color: rgba(16, 185, 129, 0.06) !important;
-      color: #047857 !important;
-      border: 1px solid rgba(16, 185, 129, 0.18) !important;
-    }
-  `;
-
   return (
     <div 
       id="alpha-engine-application-wrapper" 
@@ -335,9 +94,6 @@ export default function App() {
         theme === "dark" ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900"
       }`}
     >
-      {/* Inject light mode stylesheet overrides */}
-      <style>{lightThemeCss}</style>
-
       {/* Institutional Truth-in-Labeling Environment Banner */}
       <div className={`w-full py-2 px-6 font-mono text-xs font-bold tracking-wider flex flex-col sm:flex-row items-center justify-between gap-2 border-b ${
         systemState?.settings?.tradingMode === "LIVE"
@@ -477,18 +233,6 @@ export default function App() {
               <span>SYSTEM</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => handleNavigate("launchpad")}
-              className={`px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer text-xs font-mono tracking-wider font-bold flex items-center gap-2 ${
-                view === "launchpad"
-                  ? "bg-slate-700 text-white"
-                  : "text-slate-300 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              <Home className="w-4 h-4" />
-              <span>HUB</span>
-            </button>
           </div>
 
           {/* Interactive Help & Runbook Guide Button */}
@@ -508,7 +252,6 @@ export default function App() {
         {view === "cockpit" && <LiveCockpit systemState={systemState} onRefresh={() => {}} />}
         {view === "lab" && <QuantResearchLab />}
         {view === "dashboard" && <Dashboard onNavigate={handleNavigate} navTarget={navTarget} />}
-        {view === "launchpad" && <Launchpad systemState={systemState} onNavigate={handleNavigate} />}
       </main>
 
       {/* Modern, Highly Graphic Onboarding Modal Overlay */}

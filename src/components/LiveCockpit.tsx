@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { ExchangeTag } from "./ExchangeTag";
 import { 
   ShieldAlert, 
   ShieldCheck, 
@@ -778,7 +779,7 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
                     {new Date(rec.timestamp).toLocaleTimeString()}
                   </td>
                   <td className="py-3 px-3.5 font-bold text-white flex items-center gap-2 text-xs">
-                    {rec.symbol}
+                    {rec.symbol} <ExchangeTag symbol={rec.symbol} />
                     <span className={`text-xs px-1.5 py-0.5 rounded font-mono font-bold ${
                       rec.currency === "EUR" ? "bg-emerald-500/20 text-emerald-300" : "bg-blue-500/20 text-blue-300"
                     }`}>

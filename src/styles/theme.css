@@ -1,0 +1,184 @@
+/* Premium Slate Light Theme Mode */
+.theme-light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.theme-light #alpha-engine-application-wrapper {
+  background-color: #f8fafc !important;
+}
+
+.theme-light #alpha-header-panel {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+.theme-light #alpha-header-panel h1 {
+  color: #0f172a !important;
+}
+
+.theme-light #alpha-header-panel p {
+  color: #475569 !important;
+}
+
+.theme-light #theme-mode-toggle {
+  background-color: rgba(15, 23, 42, 0.04) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+  color: #334155 !important;
+}
+
+.theme-light #theme-mode-toggle:hover {
+  background-color: rgba(15, 23, 42, 0.08) !important;
+  color: #0f172a !important;
+}
+
+/* Frosted Glass Override Rules under Light Theme */
+.theme-light .frosted-glass {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04) !important;
+  color: #0f172a !important;
+}
+
+.theme-light .frosted-glass-hover:hover {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+  box-shadow: 0 12px 35px -5px rgba(15, 23, 42, 0.08) !important;
+}
+
+/* Text overrides across custom nested layouts */
+.theme-light .text-slate-100,
+.theme-light .text-slate-200,
+.theme-light .text-slate-300,
+.theme-light .text-\[\#f1f5f9\],
+.theme-light .text-white,
+.theme-light h1,
+.theme-light h2,
+.theme-light h3,
+.theme-light h4,
+.theme-light th,
+.theme-light td,
+.theme-light table,
+.theme-light button:not(.btn-cyber-primary) {
+  color: #0f172a !important;
+}
+
+.theme-light .text-slate-400 {
+  color: #475569 !important;
+}
+
+.theme-light .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Boundaries & Borders adjustments */
+.theme-light .border-white\\/10 {
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+.theme-light .divide-white\\/5 > * + * {
+  border-color: rgba(15, 23, 42, 0.06) !important;
+}
+
+/* Background colors inside visual panels */
+.theme-light .bg-black\\/35,
+.theme-light .bg-black\\/40,
+.theme-light .bg-black\\/20,
+.theme-light .bg-white\\/5,
+.theme-light .bg-white\\/10,
+.theme-light .bg-slate-900 {
+  background-color: rgba(15, 23, 42, 0.03) !important;
+}
+
+.theme-light .bg-slate-950,
+.theme-light .bg-\[\#0a0f1d\] {
+  background-color: #f8fafc !important;
+}
+
+/* Inputs, Selections & Dialog layout adjustments */
+.theme-light input,
+.theme-light select {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(15, 23, 42, 0.12) !important;
+}
+
+.theme-light select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.theme-light input::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Custom Scrollbar override blocks */
+.theme-light ::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.01) !important;
+}
+.theme-light ::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.08) !important;
+}
+.theme-light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.15) !important;
+}
+
+/* Recharts responsive grid coordinates styling */
+.theme-light .recharts-cartesian-grid line {
+  stroke: rgba(15, 23, 42, 0.06) !important;
+}
+
+.theme-light .recharts-text {
+  fill: #475569 !important;
+  font-weight: 500 !important;
+}
+
+.theme-light .recharts-tooltip-cursor {
+  fill: rgba(15, 23, 42, 0.02) !important;
+}
+
+.theme-light .recharts-default-tooltip {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  color: #0f172a !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
+}
+
+.theme-light .recharts-tooltip-label {
+  color: #0f172a !important;
+}
+
+/* Specific styling for exchange badges */
+.exchange-badge-us {
+  background-color: rgba(59, 130, 246, 0.12) !important;
+  color: #60a5fa !important;
+  border: 1px solid rgba(59, 130, 246, 0.25) !important;
+}
+.theme-light .exchange-badge-us {
+  background-color: rgba(59, 130, 246, 0.06) !important;
+  color: #1d4ed8 !important;
+  border: 1px solid rgba(59, 130, 246, 0.18) !important;
+}
+
+.exchange-badge-xetra {
+  background-color: rgba(245, 158, 11, 0.12) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(245, 158, 11, 0.25) !important;
+}
+.theme-light .exchange-badge-xetra {
+  background-color: rgba(245, 158, 11, 0.06) !important;
+  color: #b45309 !important;
+  border: 1px solid rgba(245, 158, 11, 0.18) !important;
+}
+
+.exchange-badge-euronext {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  color: #34d399 !important;
+  border: 1px solid rgba(16, 185, 129, 0.25) !important;
+}
+.theme-light .exchange-badge-euronext {
+  background-color: rgba(16, 185, 129, 0.06) !important;
+  color: #047857 !important;
+  border: 1px solid rgba(16, 185, 129, 0.18) !important;
+}

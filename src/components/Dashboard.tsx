@@ -38,8 +38,8 @@ import {
   Tooltip,
   ReferenceLine
 } from "recharts";
-import GcpCompanion from "./GcpCompanion";
-import { ApiVaultModal } from "./ApiVaultModal";
+
+
 
 export interface SystemSettings {
   tradingMode?: "PAPER" | "LIVE";
@@ -112,7 +112,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
   const [historicalLogs, setHistoricalLogs] = useState<HistoricalLog[]>([]);
   const [marketBooks, setMarketBooks] = useState<Record<string, Level2Book>>({});
   const [selectedSymbol, setSelectedSymbol] = useState<string>("");
-  const [showApiVaultModal, setShowApiVaultModal] = useState<boolean>(false);
+  
   const [isSavingSetting, setIsSavingSetting] = useState<boolean>(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
@@ -322,7 +322,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
-            onClick={() => setShowApiVaultModal(true)}
+            
             className="px-3.5 py-2 rounded-lg border border-indigo-400/40 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 flex items-center gap-2 font-mono text-xs font-bold transition cursor-pointer"
           >
             <Zap className="w-4 h-4 text-indigo-400 animate-pulse" />
@@ -786,7 +786,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
             <p className="text-xs text-slate-400 font-sans mb-4">
               Access the secondary Cloud Run backtesting suite, dynamic universe discovery filters, and circuit breaker calculators.
             </p>
-            <GcpCompanion settings={settings} />
+            {/* GcpCompanion removed */}
           </div>
         </div>
       )}
@@ -807,7 +807,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
 
               <button
                 type="button"
-                onClick={() => setShowApiVaultModal(true)}
+                
                 className="px-3.5 py-1.5 rounded bg-indigo-600/30 border border-indigo-500/50 hover:bg-indigo-600/40 text-indigo-300 font-mono text-xs font-bold transition cursor-pointer"
               >
                 OPEN FULL CREDENTIALS VAULT
@@ -895,7 +895,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
       )}
 
       {/* 4. API VAULT MODAL (Dark themed, 4-pillar) */}
-      <ApiVaultModal isOpen={showApiVaultModal} onClose={() => setShowApiVaultModal(false)} />
+      {/* ApiVaultModal removed */}
 
     </div>
   );
