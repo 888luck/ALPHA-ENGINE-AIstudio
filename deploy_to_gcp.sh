@@ -63,7 +63,7 @@ else
         --machine-type="e2-medium" \
         --image-family="debian-11" \
         --image-project="debian-cloud" \
-        --metadata=startup-script="sudo apt-get update && sudo apt-get install -y python3 python3-pip git && pip3 install python-dotenv urllib3" \
+        --metadata=startup-script="sudo apt-get update && sudo apt-get install -y python3 python3-pip git" \
         --scopes="https://www.googleapis.com/auth/cloud-platform" \
         --tags="ib-gateway-target" \
         --description="Alpha Engine High Frequency Execution node in europe-west3 (Frankfurt)"
@@ -125,13 +125,13 @@ sudo systemctl enable docker
 sudo systemctl start docker
 sudo usermod -aG docker \$USER
 
-# Python dependencies setup
-echo "[VM] Syncing Python library packages..."
-pip3 install python-dotenv urllib3 --quiet || pip install python-dotenv urllib3 --quiet || true
-
 # Extract the local workspace installer bundle directly
 echo "[VM] Extracting workspace codebase elements to /opt/alpha-engine..."
 tar -xzf ~/alpha-workspace-bundle.tar.gz -C /opt/alpha-engine/
+
+# Python dependencies setup
+echo "[VM] Syncing Python library packages via requirements.txt..."
+cd /opt/alpha-engine && (pip3 install -r requirements.txt --quiet || pip install -r requirements.txt --quiet || true)
 
 # Pull secrets from GCP Secret Manager dynamically to avoid plaintext disk artifacts
 echo "[VM] Pulling production secrets from Secret Manager into memory-backed /dev/shm..."
@@ -152,6 +152,7 @@ WorkingDirectory=/opt/alpha-engine
 ExecStart=/usr/bin/python3 main.py
 Restart=always
 RestartSec=5
+WatchdogSec=30
 
 [Install]
 WantedBy=multi-user.target
@@ -188,7 +189,7 @@ else
         --machine-type="e2-medium" \
         --image-family="debian-11" \
         --image-project="debian-cloud" \
-        --metadata=startup-script="sudo apt-get update && sudo apt-get install -y python3 python3-pip git && pip3 install python-dotenv urllib3" \
+        --metadata=startup-script="sudo apt-get update && sudo apt-get install -y python3 python3-pip git" \
         --scopes="https://www.googleapis.com/auth/cloud-platform" \
         --tags="ib-gateway-standby" \
         --description="Alpha Engine Warm Standby node in europe-west1 (Belgium)"
