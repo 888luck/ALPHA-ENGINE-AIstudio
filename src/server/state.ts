@@ -92,22 +92,9 @@ export let historicalLogs: HistoricalLog[] = [];
 export let marketBooks: Record<string, Level2Book> = {};
 export let dynamicBaskets: any[] = [];
 
-export let executionBlotter: ExecutionRecord[] = [
-  {
-    id: "ORD-98214",
-    timestamp: new Date().toISOString(),
-    symbol: "XLE",
-    side: "BUY",
-    qty: 12.45,
-    orderType: "MKT (Synthetic Stop)",
-    status: "FILLED",
-    arrivalPrice: 89.42,
-    fillPrice: 89.44,
-    slippageBps: 2.2,
-    commission: 1.00,
-    currency: "USD"
-  }
-];
+// Zero Synthetic Policy: executionBlotter is populated exclusively from verified IBKR execDetails callbacks.
+// No mock, fixture, or test trades may be initialised here.
+export let executionBlotter: ExecutionRecord[] = [];
 
 export async function persistSettings() {
   if (!db_fs) return;
