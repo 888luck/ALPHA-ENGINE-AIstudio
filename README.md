@@ -15,6 +15,8 @@ The platform links an interactive React web dashboard with an asynchronous Pytho
                                     │  • SEC EDGAR Official Form 8-K Disclosures             │
                                     │  • OpenFDA & ClinicalTrials.gov Registry               │
                                     │  • Federal Reserve & Macro Event Schedules             │
+                                    │  • European Central Bank (ECB) & ESMA Announcements    │
+                                    │  • London Stock Exchange RNS & Euronext Market Feeds   │
                                     └───────────────────────────┬────────────────────────────┘
                                                                 │
                                                                 ▼

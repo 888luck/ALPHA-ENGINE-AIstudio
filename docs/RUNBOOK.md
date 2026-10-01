@@ -10,7 +10,7 @@ AlphaEngine is an institutional algorithmic trading platform architected for cro
 The engine operates on a zero-hallucination, zero-drift, 100% dynamic architecture. Every component—from multi-agent AI verification to exchange trading calendars, regulatory feeds, contract specifications, and risk bracket calculations—is dynamically queried, verified, and calibrated against authoritative primary sources.
 
 ```
-       [Primary Feeds: SEC EDGAR, ClinicalTrials, OpenFDA, Central Banks]
+       [Primary Feeds: SEC EDGAR, OpenFDA, ECB, LSE RNS, Euronext, Macro]
                                   │
                                   ▼
                     [Multi-Model Ensemble Layer]
