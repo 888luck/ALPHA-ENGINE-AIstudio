@@ -12,6 +12,7 @@ from connection import ConnectionManager
 from risk_engine import DRMMiddleware
 from alpha_strategy import AlphaStrategy, ProactiveSimulator
 from firebase_sync import FirebaseSyncTunnel
+from ha_manager import HighAvailabilityManager
 
 # Dynamic Multi-Agent Intelligence Modules
 from universe_models import NewsEvent, DynamicBasket
@@ -116,6 +117,17 @@ def main_loop():
     # 5. Bind DRM Protection Module
     drm = DRMMiddleware(cm, config["IBKR_ACCOUNT_NUMBER"])
     
+    # Initialize HA Leader Election (Phase 3.2)
+    def on_failover():
+        print("[HA-MGR] ALERT: Secondary node adopting Primary Role! Initiating failover procedures...")
+        drm.emergency_flush()
+        firebase_tunnel.push_historical_log(f"HA_FAILOVER_{int(time.time())}", {
+            "event": "LEADER_FAILOVER",
+            "message": "Primary edge node timeout. Warm standby has taken over execution and flushed state."
+        })
+    ha_manager = HighAvailabilityManager(firebase_tunnel, failover_callback=on_failover)
+    ha_manager.start()
+    
     # 6. Execute Pre-Market Calibration Pipeline
     active_basket = run_premarket_calibration(news_ingestor, ensemble, universe_builder, edge_node=edge_node, basket_size=basket_size)
     
@@ -176,6 +188,13 @@ def main_loop():
         current_cet_time = get_current_cet_time()
         print(f"[SESSION PULSE] NY: {current_ny_time} | CET: {current_cet_time} | Status: RUNNING | Iteration: {iteration}")
         
+        # Phase 3.2: HA Leader Election Enforcement
+        if not ha_manager.is_leader:
+            print(f"[HA-MGR] Node is in Warm Standby mode. Pausing execution loop.")
+            time.sleep(5)
+            iteration += 1
+            continue
+            
         # Pull latest risk state overrides from Firestore
         if iteration % 2 == 0:
             remote_state = firebase_tunnel.get_system_risk_state()
@@ -365,5 +384,12 @@ def main_loop():
         time.sleep(12)
         iteration += 1
 
+    # Cleanup HA Manager on exit
+    ha_manager.stop()
+
 if __name__ == "__main__":
-    main_loop()
+    try:
+        main_loop()
+    except KeyboardInterrupt:
+        print("[SHUTDOWN] Terminating Edge Node...")
+        sys.exit(0)

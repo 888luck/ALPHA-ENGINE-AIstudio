@@ -243,3 +243,28 @@ class FirebaseSyncTunnel:
             print(f"[FIREBASE TUNNEL] Pulled risk state overrides: RouterLocked={parsed.get('routerLocked', 'N/A')}")
             return parsed
         return {}
+
+    def push_leader_heartbeat(self, node_id: str, timestamp_iso: str):
+        """Updates the system_nodes/leader document with the current timestamp."""
+        if not self.enabled:
+            return
+        
+        path = "system_nodes/leader"
+        payload = {
+            "fields": self._dict_to_firestore_fields({
+                "node_id": node_id,
+                "last_heartbeat": timestamp_iso
+            })
+        }
+        self._request("PATCH", path, body=payload)
+
+    def get_leader_heartbeat(self) -> Dict[str, Any]:
+        """Gets the system_nodes/leader document to check for active primary node."""
+        if not self.enabled:
+            return {}
+        
+        path = "system_nodes/leader"
+        res = self._request("GET", path)
+        if res and "fields" in res:
+            return self._firestore_fields_to_dict(res["fields"])
+        return {}
