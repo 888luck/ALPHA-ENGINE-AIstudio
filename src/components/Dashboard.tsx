@@ -101,7 +101,7 @@ export interface Level2Book {
 }
 
 export interface DashboardProps {
-  onNavigate?: (view: "launchpad" | "dashboard" | "cockpit" | "lab", target?: string) => void;
+  onNavigate?: (view: "mission-control" | "blotter" | "risk" | "lab" | "config", target?: string) => void;
   navTarget?: string | null;
   activeTabOverride?: "infrastructure" | "holdings" | "orderbook" | "companion" | "credentials";
 }
