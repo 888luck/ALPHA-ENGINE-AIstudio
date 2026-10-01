@@ -197,6 +197,9 @@ def main_loop():
         if is_conn_enabled:
             print(f"[GATEWAY CONNECT] Initializing Connection: Port={config['IBKR_PORT']} ClientID={config['IBKR_CLIENT_ID']}")
             cm.connect_gateway(config["IBKR_HOST"], config["IBKR_PORT"], config["IBKR_CLIENT_ID"])
+            import time
+            time.sleep(2) # Give connection time to establish
+            cm.reqAccountSummary(9001, "All", "AvailableFunds,ExcessLiquidity,InitMarginReq,MaintMarginReq")
         else:
             print("[GATEWAY BYPASS] Operating in offline simulation sandbox mode.")
             cm.is_connected = False
@@ -206,6 +209,8 @@ def main_loop():
         cm.is_connected = False
         
     print("\n[SCHEDULER] Master loop started. Waiting for tactical session windows...")
+    from historical_var import HistoricalVAR
+    var_engine = HistoricalVAR(confidence_interval=0.99, lookback_days=250)
     
     # Core loop coordinating the intraday trading session lifecycle
     active_session = True
@@ -280,6 +285,18 @@ def main_loop():
                     cand.challengeStatus = "VALIDATED"
                     print(f"[REALITY VERIFIER CONFIRMED] {cand.symbol} thesis validated by opening auction.")
 
+        # Enforce Real-Time Margin & Historical VaR Constraints
+        if cm.is_connected:
+            excess_liq = cm.account_summary.get("ExcessLiquidity", 0.0)
+            avail_funds = cm.account_summary.get("AvailableFunds", 0.0)
+            print(f"[MARGIN MONITOR] Excess Liquidity: ${excess_liq:,.2f} | Available Funds: ${avail_funds:,.2f}")
+            
+            daily_ceiling = drm.daily_loss_limit
+            current_var = var_engine.calculate_var(cm.active_positions, cm.historical_data_buffer)
+            if current_var > (daily_ceiling * 0.5):
+                print(f"[VAR ALERT] 99% VaR (${current_var:.2f}) exceeds 50% of daily ceiling (${daily_ceiling:.2f}). Locking router.")
+                drm.router_locked = True
+                
         # Enforce daily cumulative drawdown circuit breaker
         if not drm.check_daily_drawdown(cm.pnl_updates):
             print("[RISK ALERT] Daily drawdown circuit breaker active. Blocking new entries.")
