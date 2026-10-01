@@ -48,15 +48,23 @@ riskRouter.get("/api/risk/status", (req, res) => {
 });
 
 riskRouter.post("/api/risk/settings", authMiddleware, (req, res) => {
-  const { dailyCapitalCeiling, dailyMaxLossCutoff, fractionalTradingEnabled, intradayFlatteningEnabled, tradingMode, marketScope } = req.body;
+  const { dailyCapitalCeiling, dailyMaxLossCutoff, fractionalTradingEnabled, intradayFlatteningEnabled, tradingMode, marketScope, liveConfirmationToken } = req.body;
   
   if (dailyCapitalCeiling !== undefined) systemSettings.dailyCapitalCeiling = Number(dailyCapitalCeiling);
   if (dailyMaxLossCutoff !== undefined) systemSettings.dailyMaxLossCutoff = Number(dailyMaxLossCutoff);
   if (fractionalTradingEnabled !== undefined) systemSettings.fractionalTradingEnabled = Boolean(fractionalTradingEnabled);
   if (intradayFlatteningEnabled !== undefined) systemSettings.intradayFlatteningEnabled = Boolean(intradayFlatteningEnabled);
+  
   if (tradingMode !== undefined && (tradingMode === "PAPER" || tradingMode === "LIVE")) {
+    if (tradingMode === "LIVE" && systemSettings.tradingMode !== "LIVE") {
+      const requiredToken = process.env.ADMIN_LIVE_CONFIRMATION_TOKEN || "ALPHA_LIVE_CONFIRMED_2026";
+      if (liveConfirmationToken !== requiredToken) {
+        return res.status(403).json({ success: false, error: "Invalid or missing ADMIN_LIVE_CONFIRMATION_TOKEN. Cannot switch to LIVE routing." });
+      }
+    }
     systemSettings.tradingMode = tradingMode;
   }
+  
   if (marketScope !== undefined && ["ALL", "US", "EUROPE"].includes(marketScope)) {
     systemSettings.marketScope = marketScope;
   }

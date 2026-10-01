@@ -72,6 +72,7 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
   const [fractionalToggle, setFractionalToggle] = useState<boolean>(true);
   const [intradayFlattenToggle, setIntradayFlattenToggle] = useState<boolean>(true);
   const [modeToggle, setModeToggle] = useState<"PAPER" | "LIVE">("PAPER");
+  const [liveTokenInput, setLiveTokenInput] = useState<string>("");
   const [marketScopeToggle, setMarketScopeToggle] = useState<"ALL" | "US" | "EUROPE">("ALL");
   const [blotterMarketFilter, setBlotterMarketFilter] = useState<"ALL" | "US" | "EUROPE">("ALL");
   
@@ -601,6 +602,18 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
                   <option value="LIVE">LIVE (Port 4001 / U...)</option>
                 </select>
               </div>
+              {modeToggle === "LIVE" && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-rose-400 uppercase font-mono font-bold">Live Token:</span>
+                  <input
+                    type="password"
+                    value={liveTokenInput}
+                    onChange={(e) => setLiveTokenInput(e.target.value)}
+                    className="bg-black/60 border border-rose-500/50 rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-rose-400 w-48"
+                    placeholder="ALPHA_LIVE_CONFIRMED_2026"
+                  />
+                </div>
+              )}
 
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-300 uppercase font-mono font-bold" title="Pre-Trade Gate 0 Market Isolation: Restrict trading to US only, Europe only, or all markets">
