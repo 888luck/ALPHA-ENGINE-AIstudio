@@ -283,15 +283,16 @@ def main_loop():
                         firebase_tunnel.push_active_trade(trade_id, live_trade)
                 else:
                     # Simulation sandbox mode: evaluate candidate setup with dynamic ATR bands
+                    # Zero Synthetic Policy: simulation trades route to active_trades_sandbox ONLY
                     sim_entry = 100.0 if cand.isEuropean else 52.40
                     atr = drm.calculate_atr14(cm.historical_data_buffer.get(sym, []), current_price=sim_entry)
                     brackets = drm.calculate_dynamic_brackets(sim_entry, direction, atr, k_stop=1.5, min_tick=spec.minTick)
                     sim_stop = brackets["stop_price"]
                     pos_qty = drm.calculate_position_size(sim_entry, sim_stop, currency=spec.currency)
-                    
+
                     trade_id = f"TRD_{sym}_EDGE"
                     unrealized_pnl = float(0.35 * (pos_qty or 50)) if direction == "BUY" else float(-0.20 * (pos_qty or 50))
-                    
+
                     sim_trade = {
                         "id": trade_id,
                         "symbol": sym,
@@ -306,10 +307,13 @@ def main_loop():
                         "catalyst": cand.catalyst,
                         "mifidDecisionMaker": config["MIFID2_DECISION_MAKER_ID"],
                         "mifidExecutionTrader": config["MIFID2_EXECUTION_TRADER_ID"],
+                        "environment": "SANDBOX",
                         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
                     }
-                    firebase_tunnel.push_active_trade(trade_id, sim_trade)
+                    # SANDBOX ONLY — never writes to production active_trades collection
+                    firebase_tunnel.push_sandbox_trade(trade_id, sim_trade)
                     cm.active_positions[sym] = {"qty": (pos_qty or 50) if direction == "BUY" else -(pos_qty or 50), "avgCost": sim_entry}
+
 
         # Scenario C: Dynamic Exchange Session Flattening Window
         is_eod_flatten_phase = any(cand.sessionPhase == MarketSessionPhase.CLOSING_FLATTEN for cand in active_basket.candidates)

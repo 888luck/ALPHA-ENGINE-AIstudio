@@ -178,6 +178,18 @@ class FirebaseSyncTunnel:
         self._request("PATCH", path, body)
         print(f"[FIREBASE TUNNEL] Synchronized active trade {trade_id} ({trade_data['symbol']}) to cloud.")
 
+    def push_sandbox_trade(self, trade_id: str, trade_data: Dict[str, Any]):
+        """
+        Pushes a SIMULATION-ONLY trade to Firestore (/active_trades_sandbox/{tradeId}).
+        Zero Synthetic Policy: sandbox data MUST NEVER write to active_trades (production).
+        """
+        if not self.enabled:
+            return
+        body = self._dict_to_firestore_fields(trade_data)
+        path = f"active_trades_sandbox/{trade_id}"
+        self._request("PATCH", path, body)
+        print(f"[FIREBASE TUNNEL] [SANDBOX] Simulation trade {trade_id} ({trade_data['symbol']}) written to active_trades_sandbox only.")
+
     def delete_active_trade(self, trade_id: str):
         """Removes an active session holding from Firestore."""
         if not self.enabled:
