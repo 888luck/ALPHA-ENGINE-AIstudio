@@ -103,10 +103,11 @@ export interface Level2Book {
 export interface DashboardProps {
   onNavigate?: (view: "launchpad" | "dashboard" | "cockpit" | "lab", target?: string) => void;
   navTarget?: string | null;
+  activeTabOverride?: "infrastructure" | "holdings" | "orderbook" | "companion" | "credentials";
 }
 
-export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<"infrastructure" | "holdings" | "orderbook" | "companion" | "credentials">("infrastructure");
+export default function Dashboard({ onNavigate, navTarget, activeTabOverride }: DashboardProps) {
+  const [activeTab, setActiveTab] = useState<"infrastructure" | "holdings" | "orderbook" | "companion" | "credentials">(activeTabOverride || "credentials");
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [activeTrades, setActiveTrades] = useState<ActiveTrade[]>([]);
   const [historicalLogs, setHistoricalLogs] = useState<HistoricalLog[]>([]);
@@ -300,8 +301,10 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
   return (
     <div className="space-y-6 text-slate-100 font-sans">
       
-      {/* 1. TOP SYSTEM BANNER (Institutional Dark Mode, No Duplicate Header) */}
-      <div className="bg-[#0c101c] border border-white/10 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      {!activeTabOverride && (
+      <>
+        {/* 1. TOP SYSTEM BANNER (Institutional Dark Mode, No Duplicate Header) */}
+        <div className="bg-[#0c101c] border border-white/10 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xs bg-emerald-500/20 text-[#00ff88] border border-emerald-500/40 px-2.5 py-1 rounded font-mono font-bold">
@@ -336,8 +339,11 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* 2. SUB-NAVIGATION TABS */}
+      {!activeTabOverride && (
       <div className="flex flex-wrap items-center gap-2 border-b border-white/10 pb-3">
         <button
           type="button"
@@ -404,6 +410,7 @@ export default function Dashboard({ onNavigate, navTarget }: DashboardProps) {
           <span>GATEWAY CONFIG & MIFID II</span>
         </button>
       </div>
+      )}
 
       {/* 3. TAB CONTENT */}
 

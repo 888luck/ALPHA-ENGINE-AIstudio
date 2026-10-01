@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import Dashboard from "./components/Dashboard";
 import { LiveCockpit } from "./components/LiveCockpit";
 import { QuantResearchLab } from "./components/QuantResearchLab";
-import { Sun, Moon, Activity, Tag, Globe, HelpCircle, LayoutGrid, Home, ShieldAlert, Layers } from "lucide-react";
+import { Sun, Moon, Activity, Tag, Globe, HelpCircle, LayoutGrid, Home, ShieldAlert, Layers, Sliders } from "lucide-react";
 
 export default function App() {
   // Safe default persistent theme
@@ -11,13 +11,13 @@ export default function App() {
     return (saved as "dark" | "light") || "dark";
   });
 
-  const [view, setView] = useState<"cockpit" | "lab" | "dashboard">(() => {
+  const [view, setView] = useState<"mission-control" | "blotter" | "risk" | "lab" | "config">(() => {
     const saved = localStorage.getItem("alpha_dashboard_view");
-    return (saved as any) || "cockpit";
+    return (saved as any) || "mission-control";
   });
   const [navTarget, setNavTarget] = useState<string | null>(null);
 
-  const handleNavigate = (newView: "cockpit" | "lab" | "dashboard", target?: string) => {
+  const handleNavigate = (newView: "mission-control" | "blotter" | "risk" | "lab" | "config", target?: string) => {
     setView(newView);
     localStorage.setItem("alpha_dashboard_view", newView);
     if (target) {
@@ -193,18 +193,44 @@ export default function App() {
           </button>
 
           {/* Institutional Mode Switchers */}
-          <div className="flex items-center gap-2 bg-black/50 p-1.5 rounded-xl border border-white/10">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 bg-black/50 p-1.5 rounded-xl border border-white/10">
             <button
               type="button"
-              onClick={() => handleNavigate("cockpit")}
+              onClick={() => handleNavigate("mission-control")}
               className={`px-3.5 py-2 rounded-lg transition-all duration-200 cursor-pointer text-xs font-mono tracking-wider font-bold flex items-center gap-2 ${
-                view === "cockpit"
+                view === "mission-control"
                   ? "bg-rose-600 text-white shadow-md shadow-rose-950/50"
                   : "text-slate-300 hover:text-white hover:bg-white/5"
               }`}
             >
+              <Activity className="w-4 h-4" />
+              <span>MISSION CONTROL</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleNavigate("blotter")}
+              className={`px-3.5 py-2 rounded-lg transition-all duration-200 cursor-pointer text-xs font-mono tracking-wider font-bold flex items-center gap-2 ${
+                view === "blotter"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-950/50"
+                  : "text-slate-300 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+              <span>BLOTTER</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleNavigate("risk")}
+              className={`px-3.5 py-2 rounded-lg transition-all duration-200 cursor-pointer text-xs font-mono tracking-wider font-bold flex items-center gap-2 ${
+                view === "risk"
+                  ? "bg-amber-600 text-black shadow-md shadow-amber-950/50"
+                  : "text-slate-300 hover:text-white hover:bg-white/5"
+              }`}
+            >
               <ShieldAlert className="w-4 h-4" />
-              <span>LIVE COCKPIT</span>
+              <span>RISK & DRM</span>
             </button>
 
             <button
@@ -212,7 +238,7 @@ export default function App() {
               onClick={() => handleNavigate("lab")}
               className={`px-3.5 py-2 rounded-lg transition-all duration-200 cursor-pointer text-xs font-mono tracking-wider font-bold flex items-center gap-2 ${
                 view === "lab"
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-950/50"
+                  ? "bg-purple-600 text-white shadow-md shadow-purple-950/50"
                   : "text-slate-300 hover:text-white hover:bg-white/5"
               }`}
             >
@@ -222,17 +248,16 @@ export default function App() {
 
             <button
               type="button"
-              onClick={() => handleNavigate("dashboard")}
+              onClick={() => handleNavigate("config")}
               className={`px-3.5 py-2 rounded-lg transition-all duration-200 cursor-pointer text-xs font-mono tracking-wider font-bold flex items-center gap-2 ${
-                view === "dashboard"
-                  ? "bg-emerald-600 text-white"
+                view === "config"
+                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-950/50"
                   : "text-slate-300 hover:text-white hover:bg-white/5"
               }`}
             >
-              <LayoutGrid className="w-4 h-4" />
-              <span>SYSTEM</span>
+              <Globe className="w-4 h-4" />
+              <span>CONFIG</span>
             </button>
-
           </div>
 
           {/* Interactive Help & Runbook Guide Button */}
@@ -249,9 +274,11 @@ export default function App() {
 
       {/* Render the full Slate & Cyber-Green interactive dashboard element */}
       <main className="max-w-7xl mx-auto p-4 sm:p-6 transition-all duration-200">
-        {view === "cockpit" && <LiveCockpit systemState={systemState} onRefresh={() => {}} />}
+        {view === "mission-control" && <LiveCockpit systemState={systemState} onRefresh={() => {}} activeView="mission-control" />}
+        {view === "blotter" && <LiveCockpit systemState={systemState} onRefresh={() => {}} activeView="blotter" />}
+        {view === "risk" && <LiveCockpit systemState={systemState} onRefresh={() => {}} activeView="risk" />}
         {view === "lab" && <QuantResearchLab />}
-        {view === "dashboard" && <Dashboard onNavigate={handleNavigate} navTarget={navTarget} />}
+        {view === "config" && <Dashboard onNavigate={handleNavigate} navTarget={navTarget} activeTabOverride="credentials" />}
       </main>
 
       {/* Modern, Highly Graphic Onboarding Modal Overlay */}

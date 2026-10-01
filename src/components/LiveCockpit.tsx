@@ -57,9 +57,10 @@ interface ExecutionRecord {
 interface LiveCockpitProps {
   systemState?: any;
   onRefresh?: () => void;
+  activeView?: "mission-control" | "blotter" | "risk" | "all";
 }
 
-export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh }) => {
+export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh, activeView = "all" }) => {
   const [riskStatus, setRiskStatus] = useState<RiskStatus | null>(null);
   const [blotter, setBlotter] = useState<ExecutionRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -264,8 +265,10 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
 
   return (
     <div className="space-y-6">
-      {/* 1. TOP STATUS BAR & SAFETY AIRBAG */}
-      <div className={`p-4 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all duration-300 ${
+      {(activeView === "all" || activeView === "mission-control") && (
+        <>
+        {/* 1. TOP STATUS BAR & SAFETY AIRBAG */}
+        <div className={`p-4 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all duration-300 ${
         isLocked
           ? "bg-rose-950/40 border-rose-500/60 shadow-lg shadow-rose-950/50"
           : isLive 
@@ -351,7 +354,10 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
           </div>
         </div>
       </div>
+      </>
+      )}
 
+      {(activeView === "all" || activeView === "risk") && (<>
       {/* 2. OPERATIONAL GRID: RISK CONTROLS & KILL SWITCH */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
@@ -695,7 +701,10 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
           </div>
         </div>
       </div>
+      </>
+      )}
 
+      {(activeView === "all" || activeView === "blotter") && (<>
       {/* 3. LIVE TRANSACTION EXECUTION BLOTTER & TCA (Transaction Cost Analysis) */}
       <div className="bg-[#0c101c] border border-white/10 rounded-xl p-5 space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
@@ -836,6 +845,8 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
           </table>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };
