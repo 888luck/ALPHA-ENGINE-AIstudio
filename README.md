@@ -182,3 +182,10 @@ The Alpha Engine interface is designed so that **any operator, trader, or newcom
 - **Operational Runbook**: See [`docs/RUNBOOK.md`](docs/RUNBOOK.md) for full architecture specifications, VNC instructions, and emergency recovery procedures.
 - **Institutional Walkthrough**: See [`walkthrough.md`](walkthrough.md) for mathematical proofs, test output logs, and regulatory compliance details.
 
+
+## ✨ Latest Features: Phase 4 Additions
+- **Tier A Event-Study Backtester (vent_backtester.py)**: A native execution simulator that loops historical NewsEvent datasets against our MultiModelEnsemble, calculating Directional Hit Rates, Brier Scores for confidence calibration, and Maximum Favorable/Adverse Excursion (MFE/MAE) benchmarks.
+- **AI Intelligence Tab & Universe Manager**: A live React dashboard (GcpCompanion.tsx) module streaming real-time LLM Critic-Verifier consensus decisions and managing basket execution sizes directly via a frontend slider.
+- **Two-Step Live Gate (Security)**: A hardcoded ADMIN_LIVE_CONFIRMATION_TOKEN pre-flight check in the Risk API. The router strictly rejects 'PAPER' -> 'LIVE' mode mutations without explicit password validation to prevent accidental live execution.
+- **Real-Time Portfolio Margin & VaR (historical_var.py)**: Advanced risk bounds utilizing 1-Day 99% Value-at-Risk modeling and SPY Beta hedging to ensure position limits respect dynamically allocated capital caps.
+
