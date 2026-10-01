@@ -11,30 +11,38 @@ The platform links an interactive React web dashboard with an asynchronous Pytho
 ```
                                     ┌────────────────────────────────────────────────────────┐
                                     │               PRIMARY SOURCE CATALYSTS                 │
+                                    │  • Verified Broker Bulletins & Institutional RSS       │
                                     │  • SEC EDGAR Official Form 8-K Disclosures             │
-                                    │  • ClinicalTrials.gov Protocol Registry v2             │
-                                    │  • OpenFDA Drug Clearances & PDUFA Calendars           │
+                                    │  • OpenFDA & ClinicalTrials.gov Registry               │
                                     │  • Federal Reserve & Macro Event Schedules             │
+                                    └───────────────────────────┬────────────────────────────┘
+                                                                │
+                                                                ▼
+                                    ┌────────────────────────────────────────────────────────┐
+                                    │        MULTI-MODEL LLM ENSEMBLE (CRITIC-VERIFIER)      │
+                                    │  • Directional Confidence Scoring (BULLISH/BEARISH)    │
+                                    │  • Zero-Synthetic Policy (Strict Extractive Logic)     │
+                                    │  • Brier Score Calibration & Sector Impact Analysis    │
                                     └───────────────────────────┬────────────────────────────┘
                                                                 │
                                                                 ▼
 ┌─────────────────────────────────┐                 ┌────────────────────────────────────────┐
 │     INTERACTIVE WEB DASHBOARD   │                 │      STRATEGY ENGINES & QUANT LAB      │
-│  • LIVE COCKPIT (Risk & Blotter)│                 │  • PEAD Momentum Radar (Large/Mega >$5B│
-│  • QUANT LAB (PEAD & Catalysts) │◄───────────────►│  • L2 Order Flow Imbalance (OFI) Engine│
-│  • Auto-Flatten Toggle (15:45)  │    Firestore    │  • Gate 5 Binary Event Blackout        │
-│  • Emergency Kill Switch        │    Realtime     │  • Watchlist Promotion API             │
-└─────────────────────────────────┘      Tunnel     └───────────────────┬────────────────────┘
+│  • AI Intelligence Tab (LLMs)   │                 │  • PEAD Momentum Radar & Watchlist API │
+│  • Universe Manager (Size Slider│◄───────────────►│  • Tier A Event-Study Backtester (MFE) │
+│  • LIVE COCKPIT (Risk & Blotter)│    Firestore    │  • L2 Order Flow Imbalance (OFI) Engine│
+│  • Two-Step Live Routing Gate   │    Realtime     │  • Real-Time Portfolio Margin & VaR    │
+│  • Emergency Kill Switch        │    Tunnel       │  • Gate 5 Binary Event Blackout        │
+└─────────────────────────────────┘                 └───────────────────┬────────────────────┘
                                                                         │
                                                                         ▼
                                                     ┌────────────────────────────────────────┐
                                                     │       PRE-TRADE RISK & LIFECYCLE       │
                                                     │  • Daily Capital Ceiling ($10,000)     │
                                                     │  • Hard Loss Circuit Breaker ($250)    │
-                                                    │  • ADV Participation Cap (1.5% 5m ADV) │
+                                                    │  • 1-Day 99% VaR & SPY Beta Hedging    │
                                                     │  • Synthetic Fractional Stop Manager   │
-                                                    │  • Breakeven Latch (+1.0x ATR)         │
-                                                    │  • Tiered Scale-Out (+2.0x ATR, 50%)   │
+                                                    │  • Breakeven Latch & Tiered Scale-Out  │
                                                     │  • Intraday MOC Controller (15:45 EST) │
                                                     └───────────────────┬────────────────────┘
                                                                         │
