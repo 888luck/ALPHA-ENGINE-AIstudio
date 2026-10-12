@@ -58,13 +58,16 @@ systemRouter.get("/api/state", (req, res) => {
 systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
   const { 
     ibkrAccountNumber, 
+    ibkrHost,
+    ibkrPort, 
+    ibkrClientId, 
+    ibkrPaperUsername,
+    ibkrPaperPassword,
     mifid2DecisionMaker, 
     mifid2ExecutionTrader, 
     referenceEquity, 
     virtualCapitalCeiling, 
     tradingMode, 
-    ibkrPort, 
-    ibkrClientId, 
     gatewayConnectionActive,
     stopAtrMultiplier,
     partialProfit,
@@ -90,13 +93,13 @@ systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
   } = req.body;
 
   if (ibkrAccountNumber !== undefined) systemSettings.ibkrAccountNumber = ibkrAccountNumber;
-  if (mifid2DecisionMaker !== undefined) systemSettings.mifid2DecisionMaker = mifid2DecisionMaker;
-  if (mifid2ExecutionTrader !== undefined) systemSettings.mifid2ExecutionTrader = mifid2ExecutionTrader;
-  if (referenceEquity !== undefined) systemSettings.referenceEquity = Number(referenceEquity);
-  if (virtualCapitalCeiling !== undefined) systemSettings.virtualCapitalCeiling = Number(virtualCapitalCeiling);
-  if (tradingMode !== undefined) systemSettings.tradingMode = tradingMode;
+  if (ibkrHost !== undefined) systemSettings.ibkrHost = ibkrHost;
   if (ibkrPort !== undefined) systemSettings.ibkrPort = Number(ibkrPort);
   if (ibkrClientId !== undefined) systemSettings.ibkrClientId = Number(ibkrClientId);
+  if (ibkrPaperUsername !== undefined) systemSettings.ibkrPaperUsername = ibkrPaperUsername;
+  if (ibkrPaperPassword !== undefined) systemSettings.ibkrPaperPassword = ibkrPaperPassword;
+  if (mifid2DecisionMaker !== undefined) systemSettings.mifid2DecisionMaker = mifid2DecisionMaker;
+  if (mifid2ExecutionTrader !== undefined) systemSettings.mifid2ExecutionTrader = mifid2ExecutionTrader;
   if (gatewayConnectionActive !== undefined) systemSettings.gatewayConnectionActive = Boolean(gatewayConnectionActive);
   if (stopAtrMultiplier !== undefined) systemSettings.stopAtrMultiplier = Number(stopAtrMultiplier);
   if (partialProfit !== undefined) systemSettings.partialProfit = Boolean(partialProfit);
@@ -147,13 +150,16 @@ systemRouter.post("/api/sync-from-cloud", (req, res) => {
 });
 
 systemRouter.post("/api/test-broker-connection", (req, res) => {
-  const host = req.body.host || "127.0.0.1";
+  // If running on Cloud Run and no host is explicitly provided, default to EDGE_NODE_IP or loopback
+  const defaultHost = process.env.EDGE_NODE_IP || (process.env.K_SERVICE ? "34.141.105.241" : "127.0.0.1");
+  const host = req.body.host || defaultHost;
   const port = Number(req.body.port) || systemSettings.ibkrPort || 4002;
   const startTime = Date.now();
+  const isCloudRun = !!process.env.K_SERVICE;
   
   const socket = new net.Socket();
   let finished = false;
-  socket.setTimeout(2500);
+  socket.setTimeout(3500);
 
   socket.on("connect", () => {
     if (finished) return;
@@ -179,7 +185,9 @@ systemRouter.post("/api/test-broker-connection", (req, res) => {
       host,
       port,
       status: "TIMEOUT",
-      message: `TCP socket timeout after 2500ms attempting to reach IB Gateway (${host}:${port}).`
+      message: isCloudRun && host === "127.0.0.1"
+        ? `Cloud Run container isolation: IB Gateway runs on the Frankfurt Edge Node VM (34.141.105.241:4002), not inside this stateless Cloud Run container.`
+        : `TCP socket timeout after 3500ms attempting to reach IB Gateway (${host}:${port}).`
     });
   });
 
@@ -192,7 +200,9 @@ systemRouter.post("/api/test-broker-connection", (req, res) => {
       host,
       port,
       status: "REFUSED",
-      message: `TCP connection to ${host}:${port} failed: ${err.message}`
+      message: isCloudRun && host === "127.0.0.1"
+        ? `Cloud Run container isolation: IB Gateway runs on the Frankfurt Edge Node VM (34.141.105.241:4002), not inside this stateless Cloud Run container (127.0.0.1:4002 returned ECONNREFUSED).`
+        : `TCP connection to ${host}:${port} failed: ${err.message}`
     });
   });
 

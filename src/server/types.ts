@@ -37,8 +37,11 @@ export interface HistoricalLog {
 
 export interface SystemSettings {
   ibkrAccountNumber: string;
+  ibkrHost?: string;
   ibkrPort: number;
   ibkrClientId: number;
+  ibkrPaperUsername?: string;
+  ibkrPaperPassword?: string;
   mifid2DecisionMaker: string;
   mifid2ExecutionTrader: string;
   referenceEquity: number;

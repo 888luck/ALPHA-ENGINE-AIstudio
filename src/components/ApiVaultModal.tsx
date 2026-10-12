@@ -53,10 +53,13 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
 
   // Form State for Broker
   const [accountNumber, setAccountNumber] = useState(settings?.ibkrAccountNumber || "DU1234567");
+  const [ibkrHost, setIbkrHost] = useState(settings?.ibkrHost || (typeof window !== "undefined" && window.location.hostname.includes("run.app") ? "34.141.105.241" : "127.0.0.1"));
   const [ibkrPort, setIbkrPort] = useState(settings?.ibkrPort || 4002);
   const [ibkrClientId, setIbkrClientId] = useState(settings?.ibkrClientId || 1);
   const [mifidMaker, setMifidMaker] = useState(settings?.mifid2DecisionMaker || "ALGO_DEC_992");
   const [mifidTrader, setMifidTrader] = useState(settings?.mifid2ExecutionTrader || "ALGO_EXE_554");
+  const [ibkrUsername, setIbkrUsername] = useState(settings?.ibkrPaperUsername || "");
+  const [ibkrPassword, setIbkrPassword] = useState(settings?.ibkrPaperPassword || "");
 
   // Form State for Cloud
   const [projectId, setProjectId] = useState("alpha-engine-ai-studio");
@@ -142,10 +145,13 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
   // Save Handlers
   const handleSaveBroker = async () => {
     await onSaveSetting("ibkrAccountNumber", accountNumber);
+    await onSaveSetting("ibkrHost", ibkrHost);
     await onSaveSetting("ibkrPort", Number(ibkrPort));
     await onSaveSetting("ibkrClientId", Number(ibkrClientId));
     await onSaveSetting("mifid2DecisionMaker", mifidMaker);
     await onSaveSetting("mifid2ExecutionTrader", mifidTrader);
+    if (ibkrUsername) await onSaveSetting("ibkrPaperUsername", ibkrUsername);
+    if (ibkrPassword) await onSaveSetting("ibkrPaperPassword", ibkrPassword);
   };
 
   const handleSaveAiKeys = async () => {
@@ -220,7 +226,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
             }`}
           >
             <Database className="w-4 h-4 text-blue-500" />
-            <span>2. Cloud & Firebase</span>
+            <span>2. Google Cloud (GCP)</span>
           </button>
 
           <button
@@ -272,7 +278,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
               </div>
 
               {/* Form Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-mono font-bold text-slate-600 uppercase">Account Number:</label>
                   <input
@@ -283,6 +289,18 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
                   <span className="text-[9px] text-slate-400 font-mono block">DU... for Paper, U... for Live</span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-mono font-bold text-slate-600 uppercase">Target Host IP:</label>
+                  <input
+                    type="text"
+                    value={ibkrHost}
+                    onChange={(e) => setIbkrHost(e.target.value)}
+                    placeholder="127.0.0.1 or 34.141.105.241"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  />
+                  <span className="text-[9px] text-slate-400 font-mono block">127.0.0.1 (Local) / 34.141.105.241 (Edge Node)</span>
                 </div>
 
                 <div className="space-y-1.5">
@@ -297,7 +315,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     <option value={7497}>7497 (TWS Paper)</option>
                     <option value={7496}>7496 (TWS Live)</option>
                   </select>
-                  <span className="text-[9px] text-slate-400 font-mono block">Select port configured in IB Gateway/TWS</span>
+                  <span className="text-[9px] text-slate-400 font-mono block">IB Gateway/TWS Listening Port</span>
                 </div>
 
                 <div className="space-y-1.5">
@@ -308,7 +326,51 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     onChange={(e) => setIbkrClientId(Number(e.target.value))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
-                  <span className="text-[9px] text-slate-400 font-mono block">Must be unique per connecting client (default: 1)</span>
+                  <span className="text-[9px] text-slate-400 font-mono block">Unique ID (default: 1)</span>
+                </div>
+              </div>
+
+              {/* Headless Edge Node Gateway Credentials */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                    <Server className="w-4 h-4 text-amber-600" />
+                    <span>Frankfurt Edge Node Headless Autologin (Optional / Encrypted)</span>
+                  </div>
+                  <span className="text-[9px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-mono font-bold uppercase">
+                    Stored in Secret Manager
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-mono text-slate-500 block uppercase">IBKR Paper Username:</label>
+                    <input
+                      type="text"
+                      value={ibkrUsername}
+                      onChange={(e) => setIbkrUsername(e.target.value)}
+                      placeholder="e.g. edg94921"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-900"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-mono text-slate-500 block uppercase">IBKR Paper Password:</label>
+                    <div className="relative">
+                      <input
+                        type={showKeys["ibkrPassword"] ? "text" : "password"}
+                        value={ibkrPassword}
+                        onChange={(e) => setIbkrPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 pr-10 text-xs font-mono text-slate-900"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleShowKey("ibkrPassword")}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                      >
+                        {showKeys["ibkrPassword"] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -374,7 +436,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
               <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200">
                 <button
                   type="button"
-                  onClick={() => runTestProbe("ibkr", "/api/test-broker-connection", { port: ibkrPort })}
+                  onClick={() => runTestProbe("ibkr", "/api/test-broker-connection", { host: ibkrHost, port: ibkrPort })}
                   disabled={testResults["ibkr"]?.loading}
                   className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition shadow-xs"
                 >
@@ -414,7 +476,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
           )}
 
           {/* ============================================================== */}
-          {/* TAB 2: CLOUD & DATABASE (GOOGLE CLOUD & FIREBASE)              */}
+          {/* TAB 2: GOOGLE CLOUD PLATFORM (GCP & FIRESTORE)                 */}
           {/* ============================================================== */}
           {activeTab === "cloud" && (
             <div className="space-y-6">
@@ -422,13 +484,13 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-blue-900 font-bold text-sm">
                     <Database className="w-4 h-4 text-blue-600" />
-                    <span>Google Cloud Platform & Firestore Real-Time Database</span>
+                    <span>Google Cloud Platform (Cloud Run & Firestore)</span>
                     <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-mono font-black uppercase">
                       State & Risk Persistence
                     </span>
                   </div>
                   <p className="text-xs text-blue-800 leading-relaxed font-mono">
-                    Persists system risk parameters, active open trades, and execution ledger logs across browser tabs and cloud nodes.
+                    AlphaEngine runs on Google Cloud Run (<code className="bg-blue-100 px-1 rounded">europe-west3</code>) with Frankfurt Edge Node VM execution (<code className="bg-blue-100 px-1 rounded">34.141.105.241</code>). Google Cloud Firestore serves as the distributed real-time ledger synchronizing trades, blotters, and risk state across browser tabs and cloud nodes.
                   </p>
                 </div>
                 <button
@@ -442,7 +504,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-mono font-bold text-slate-600 uppercase">Firebase Project ID:</label>
+                  <label className="text-[10px] font-mono font-bold text-slate-600 uppercase">GCP Project ID:</label>
                   <input
                     type="text"
                     value={projectId}
@@ -462,7 +524,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                 </div>
 
                 <div className="md:col-span-2 space-y-1.5">
-                  <label className="text-[10px] font-mono font-bold text-slate-600 uppercase">Firebase Web API Key:</label>
+                  <label className="text-[10px] font-mono font-bold text-slate-600 uppercase">GCP Web Client API Key (Optional):</label>
                   <div className="relative">
                     <input
                       type={showKeys["webApiKey"] ? "text" : "password"}
@@ -481,21 +543,21 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                 </div>
               </div>
 
-              {/* Direct Link to Firebase Console */}
+              {/* Direct Link to GCP / Firebase Console */}
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <p className="text-xs font-bold text-slate-900">Google Cloud & Firebase Developer Console</p>
+                  <p className="text-xs font-bold text-slate-900">Google Cloud Platform Management Console</p>
                   <p className="text-[11px] text-slate-500 font-mono">
-                    Inspect security rules, view live database documents, or generate new web credentials.
+                    Inspect Cloud Run revisions, Secret Manager credentials, or real-time Firestore database records.
                   </p>
                 </div>
                 <a
-                  href="https://console.firebase.google.com/project/alpha-engine-ai-studio/settings/general"
+                  href="https://console.cloud.google.com/run/detail/europe-west3/alpha-engine-aistudio?project=alpha-engine-ai-studio"
                   target="_blank"
                   rel="noreferrer"
                   className="px-3.5 py-2 bg-white border border-slate-300 hover:border-slate-400 text-slate-700 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition shadow-xs"
                 >
-                  <span>Open Console</span>
+                  <span>Open Cloud Run Console</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </div>
@@ -509,7 +571,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                   className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition shadow-xs"
                 >
                   {testResults["cloud"]?.loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />}
-                  Verify Firestore Tunnel Ping
+                  Verify Firestore State Ping
                 </button>
               </div>
 
@@ -522,7 +584,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                 }`}>
                   <div className="flex items-center gap-2 font-bold mb-1">
                     {testResults["cloud"].success ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertTriangle className="w-4 h-4 text-amber-600" />}
-                    <span>{testResults["cloud"].success ? "Firestore Tunnel Active" : "In-Memory Fallback Active"}</span>
+                    <span>{testResults["cloud"].success ? "Firestore Realtime Sync Verified" : "Local In-Memory Mode Active"}</span>
                     {testResults["cloud"].latencyMs !== undefined && (
                       <span className="text-[10px] bg-white/60 px-1.5 py-0.5 rounded border border-current">
                         {testResults["cloud"].latencyMs}ms
