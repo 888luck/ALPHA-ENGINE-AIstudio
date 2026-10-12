@@ -38,6 +38,7 @@ import {
   Tooltip,
   ReferenceLine
 } from "recharts";
+import { ApiVaultModal } from "./ApiVaultModal";
 
 
 
@@ -116,6 +117,7 @@ export default function Dashboard({ onNavigate, navTarget, activeTabOverride }: 
   
   const [isSavingSetting, setIsSavingSetting] = useState<boolean>(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [isVaultOpen, setIsVaultOpen] = useState<boolean>(false);
 
   // Form states for Settings tab
   const [editAccount, setEditAccount] = useState("U8129384");
@@ -126,6 +128,18 @@ export default function Dashboard({ onNavigate, navTarget, activeTabOverride }: 
   const [newTickerInput, setNewTickerInput] = useState("");
   const [newTickerExchange, setNewTickerExchange] = useState("NYSE");
   const [isIngestingTicker, setIsIngestingTicker] = useState(false);
+
+  const handleSaveSingleSetting = async (key: string, value: any) => {
+    try {
+      await fetch("/api/set-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: value })
+      });
+    } catch (e) {
+      console.error(`Failed to save ${key}:`, e);
+    }
+  };
 
   // 1. Subscribe to Firestore Real-Time Tunnels
   useEffect(() => {
@@ -814,7 +828,7 @@ export default function Dashboard({ onNavigate, navTarget, activeTabOverride }: 
 
               <button
                 type="button"
-                
+                onClick={() => setIsVaultOpen(true)}
                 className="px-3.5 py-1.5 rounded bg-indigo-600/30 border border-indigo-500/50 hover:bg-indigo-600/40 text-indigo-300 font-mono text-xs font-bold transition cursor-pointer"
               >
                 OPEN FULL CREDENTIALS VAULT
@@ -902,8 +916,15 @@ export default function Dashboard({ onNavigate, navTarget, activeTabOverride }: 
       )}
 
       {/* 4. API VAULT MODAL (Dark themed, 4-pillar) */}
-      {/* ApiVaultModal removed */}
-
+      <ApiVaultModal
+        isOpen={isVaultOpen}
+        onClose={() => setIsVaultOpen(false)}
+        settings={settings || {}}
+        onSaveSetting={handleSaveSingleSetting}
+        customGeminiApiKey=""
+        onSaveGeminiKey={() => {}}
+        firebaseStatus="configured"
+      />
     </div>
   );
 }
