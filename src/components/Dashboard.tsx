@@ -131,11 +131,18 @@ export default function Dashboard({ onNavigate, navTarget, activeTabOverride }: 
 
   const handleSaveSingleSetting = async (key: string, value: any) => {
     try {
-      await fetch("/api/set-settings", {
+      const res = await fetch("/api/set-settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-admin-key": "ALPHA_ADMIN_REVERT_992"
+        },
         body: JSON.stringify({ [key]: value })
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error(`Failed to save ${key}:`, err);
+      }
     } catch (e) {
       console.error(`Failed to save ${key}:`, e);
     }
@@ -292,7 +299,10 @@ export default function Dashboard({ onNavigate, navTarget, activeTabOverride }: 
     try {
       const res = await fetch("/api/set-settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-admin-key": "ALPHA_ADMIN_REVERT_992"
+        },
         body: JSON.stringify({
           ibkrAccountNumber: editAccount,
           ibkrPort: Number(editPort),

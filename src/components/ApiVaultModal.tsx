@@ -142,16 +142,40 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
     setWebApiKey("AIzaSyCq4or4zJ70JUEe2CxukxwafGW_CVHSU_Q");
   };
 
+  // Broker saving state
+  const [isSavingBroker, setIsSavingBroker] = useState(false);
+  const [brokerSavedMsg, setBrokerSavedMsg] = useState<string | null>(null);
+
   // Save Handlers
   const handleSaveBroker = async () => {
-    await onSaveSetting("ibkrAccountNumber", accountNumber);
-    await onSaveSetting("ibkrHost", ibkrHost);
-    await onSaveSetting("ibkrPort", Number(ibkrPort));
-    await onSaveSetting("ibkrClientId", Number(ibkrClientId));
-    await onSaveSetting("mifid2DecisionMaker", mifidMaker);
-    await onSaveSetting("mifid2ExecutionTrader", mifidTrader);
-    if (ibkrUsername) await onSaveSetting("ibkrPaperUsername", ibkrUsername);
-    if (ibkrPassword) await onSaveSetting("ibkrPaperPassword", ibkrPassword);
+    setIsSavingBroker(true);
+    setBrokerSavedMsg(null);
+    try {
+      const updates: Record<string, any> = {
+        ibkrAccountNumber: accountNumber,
+        ibkrHost: ibkrHost,
+        ibkrPort: Number(ibkrPort),
+        ibkrClientId: Number(ibkrClientId),
+        mifid2DecisionMaker: mifidMaker,
+        mifid2ExecutionTrader: mifidTrader,
+      };
+      if (ibkrUsername) updates.ibkrPaperUsername = ibkrUsername;
+      if (ibkrPassword) updates.ibkrPaperPassword = ibkrPassword;
+
+      if (onSaveMultipleSettings) {
+        await onSaveMultipleSettings(updates);
+      } else {
+        for (const [k, v] of Object.entries(updates)) {
+          await onSaveSetting(k, v);
+        }
+      }
+      setBrokerSavedMsg("Broker settings synchronized successfully.");
+      setTimeout(() => setBrokerSavedMsg(null), 3500);
+    } catch (e: any) {
+      setBrokerSavedMsg(`Error saving broker settings: ${e.message}`);
+    } finally {
+      setIsSavingBroker(false);
+    }
   };
 
   const handleSaveAiKeys = async () => {
@@ -444,13 +468,22 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                   Test Socket Handshake
                 </button>
 
-                <button
-                  type="button"
-                  onClick={handleSaveBroker}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-mono font-bold cursor-pointer transition shadow-xs"
-                >
-                  Save Broker Configuration
-                </button>
+                <div className="flex items-center gap-3">
+                  {brokerSavedMsg && (
+                    <span className="text-xs text-emerald-600 font-mono font-bold flex items-center gap-1.5 animate-fade-in">
+                      <CheckCircle2 className="w-4 h-4" /> {brokerSavedMsg}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleSaveBroker}
+                    disabled={isSavingBroker}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-mono font-bold cursor-pointer transition shadow-xs flex items-center gap-2"
+                  >
+                    {isSavingBroker ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                    Save Broker Configuration
+                  </button>
+                </div>
               </div>
 
               {/* Live Probe Result */}
