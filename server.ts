@@ -9,6 +9,7 @@ import { eventsRouter } from "./src/server/routes/events";
 import { backtestRouter } from "./src/server/routes/backtest";
 import { systemRouter } from "./src/server/routes/system";
 import { aiRouter } from "./src/server/routes/ai";
+import { researchRouter } from "./src/server/routes/research";
 import { loadPersistentSettings, systemSettings, db_fs } from "./src/server/state";
 import { authMiddleware, getMaskedSettings } from "./src/server/middleware/auth";
 import { ActiveTrade, HistoricalLog } from "./src/server/types";
@@ -36,6 +37,7 @@ app.use(eventsRouter);
 app.use(backtestRouter);
 app.use(systemRouter);
 app.use(aiRouter);
+app.use(researchRouter);
 
 // Global Error Handlers
 process.on("unhandledRejection", (reason, promise) => {

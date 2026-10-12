@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { GcpCompanion } from "./GcpCompanion";
+import { ResearchCopilotTerminal } from "./ResearchCopilotTerminal";
 
 interface CatalystEvent {
   id: string;
@@ -195,6 +196,8 @@ export const QuantResearchLab: React.FC = () => {
   return (
     <div className="space-y-6">
       <GcpCompanion />
+      {/* 0. AGENTIC RESEARCH COPILOT & STRATEGY TERMINAL */}
+      <ResearchCopilotTerminal />
       {/* HEADER BANNER */}
       <div className="bg-[#0c101c] border border-white/10 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
