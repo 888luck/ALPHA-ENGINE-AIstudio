@@ -53,7 +53,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
 
   // Form State for Broker
   const [accountNumber, setAccountNumber] = useState(settings?.ibkrAccountNumber || "DU1234567");
-  const [ibkrHost, setIbkrHost] = useState(settings?.ibkrHost || (typeof window !== "undefined" && window.location.hostname.includes("run.app") ? "34.141.105.241" : "127.0.0.1"));
+  const [ibkrHost, setIbkrHost] = useState(settings?.ibkrHost || (typeof window !== "undefined" && window.location.hostname.includes("run.app") ? "10.156.0.2" : "10.156.0.2"));
   const [ibkrPort, setIbkrPort] = useState(settings?.ibkrPort || 4002);
   const [ibkrClientId, setIbkrClientId] = useState(settings?.ibkrClientId || 1);
   const [mifidMaker, setMifidMaker] = useState(settings?.mifid2DecisionMaker || "ALGO_DEC_992");
@@ -321,10 +321,10 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     type="text"
                     value={ibkrHost}
                     onChange={(e) => setIbkrHost(e.target.value)}
-                    placeholder="127.0.0.1 or 34.141.105.241"
+                    placeholder="10.156.0.2 or 127.0.0.1"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
-                  <span className="text-[9px] text-slate-400 font-mono block">127.0.0.1 (Local) / 34.141.105.241 (Edge Node)</span>
+                  <span className="text-[9px] text-slate-400 font-mono block">10.156.0.2 (Frankfurt Edge Node) / 127.0.0.1 (Local)</span>
                 </div>
 
                 <div className="space-y-1.5">
@@ -523,7 +523,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     </span>
                   </div>
                   <p className="text-xs text-blue-800 leading-relaxed font-mono">
-                    AlphaEngine runs on Google Cloud Run (<code className="bg-blue-100 px-1 rounded">europe-west3</code>) with Frankfurt Edge Node VM execution (<code className="bg-blue-100 px-1 rounded">34.141.105.241</code>). Google Cloud Firestore serves as the distributed real-time ledger synchronizing trades, blotters, and risk state across browser tabs and cloud nodes.
+                    AlphaEngine runs on Google Cloud Run (<code className="bg-blue-100 px-1 rounded">europe-west3</code>) with Frankfurt Edge Node VM execution (<code className="bg-blue-100 px-1 rounded">10.156.0.2:4002</code> via VPC Connector <code className="bg-blue-100 px-1 rounded">alpha-edge-connector</code>). Google Cloud Firestore serves as the distributed real-time ledger synchronizing trades, blotters, and risk state across browser tabs and cloud nodes.
                   </p>
                 </div>
                 <button

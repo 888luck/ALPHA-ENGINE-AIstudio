@@ -131,6 +131,7 @@ export const ResearchCopilotTerminal: React.FC = () => {
 
   // Analysis & Backtest Results
   const [analysisResult, setAnalysisResult] = useState<QuantAnalysisResult | null>(null);
+  const [backtestResult, setBacktestResult] = useState<any>(null);
   const [dsrAudit, setDsrAudit] = useState<DSRAuditResult | null>(null);
   const [promotionStatus, setPromotionStatus] = useState<string | null>(null);
 
@@ -280,27 +281,42 @@ export const ResearchCopilotTerminal: React.FC = () => {
 
   // STAGE 3: Execute Walk-Forward Backtest & Deflated Sharpe Audit
   const handleExecuteBacktest = async () => {
-    if (!analysisResult || !sanitizedRisk) return;
+    if (!analysisResult || !sanitizedRisk || !selectedContract) return;
     setLoading(true);
 
     try {
-      // Synthesize backtest trade run adhering to sanitized parameters
-      const trades = [];
-      const balanceHistory = [{ date: "2026-09-01", equity: sanitizedRisk.sanitized_capital }];
-      let eq = sanitizedRisk.sanitized_capital;
+      // 1. Execute Real Backtest using sanitized parameters
+      const btRes = await fetch("/api/backtest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: selectedContract.symbol,
+          timeframe: "15m",
+          startDate: "2026-06-01",
+          endDate: "2026-09-28",
+          capitalOverride: sanitizedRisk.sanitized_capital,
+          riskBudgetPct: sanitizedRisk.risk_per_trade_pct,
+          frictionCeilingPct: sanitizedRisk.friction_ceiling_pct,
+          binaryBlackoutHours: sanitizedRisk.binary_blackout_hours
+        })
+      });
 
-      for (let t = 1; t <= 18; t++) {
-        const isWin = t % 3 !== 0; // 66% win rate
-        const pnl = isWin ? eq * 0.008 : -eq * 0.004;
-        eq += pnl;
-        balanceHistory.push({ date: `2026-09-${t + 1}`, equity: Math.round(eq * 100) / 100 });
-        trades.push({
-          id: `BT_${t}`,
-          realizedPnL: Math.round(pnl * 100) / 100,
-          commission: 2.50
-        });
-      }
+      const btData = await btRes.json();
+      setBacktestResult(btData);
 
+      const trades = (btData.tradesList && btData.tradesList.length > 0)
+        ? btData.tradesList.map((t: any) => ({
+            id: t.id || `BT_${Math.random()}`,
+            realizedPnL: t.realizedPnL,
+            commission: t.commission || 1.25
+          }))
+        : [];
+
+      const balanceHistory = (btData.balanceHistory && btData.balanceHistory.length > 0)
+        ? btData.balanceHistory
+        : [{ date: "2026-09-01", equity: sanitizedRisk.sanitized_capital }];
+
+      // 2. Audit with Marcos López de Prado Deflated Sharpe Ratio
       const auditPayload = {
         trades: trades,
         balance_history: balanceHistory,
@@ -319,7 +335,7 @@ export const ResearchCopilotTerminal: React.FC = () => {
         setActiveStage(4);
       }
     } catch (e) {
-      console.error("[RESEARCH TERMINAL] Error in DSR audit:", e);
+      console.error("[RESEARCH TERMINAL] Error in Backtest/DSR audit:", e);
     } finally {
       setLoading(false);
     }
@@ -669,6 +685,53 @@ export const ResearchCopilotTerminal: React.FC = () => {
           <p className="text-xs text-slate-300 font-sans leading-relaxed bg-black/40 p-3 rounded-lg border border-white/5">
             {dsrAudit.explanation}
           </p>
+
+          {/* DYNAMIC GATE ATTRIBUTION & PROTECTED CAPITAL CARD */}
+          {backtestResult && backtestResult.gateAttribution && (
+            <div className="bg-black/50 border border-indigo-500/20 rounded-xl p-4 space-y-3">
+              <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-indigo-400" />
+                  <span className="text-xs font-mono font-bold text-white uppercase">
+                    DRM Gate Attribution & Protected Capital ({backtestResult.symbol})
+                  </span>
+                </div>
+                <span className="text-[11px] font-mono text-slate-400">
+                  Trades Executed: {backtestResult.totalTrades || 0} / Evaluated Setups: {backtestResult.gateAttribution.totalSetupsEvaluated || 0}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs font-mono">
+                <div className="bg-black/40 p-2.5 rounded border border-white/5">
+                  <span className="text-[10px] text-slate-400 block">GATE 1 CAPITAL CLAMPED</span>
+                  <span className="text-sm font-bold text-emerald-400">
+                    {backtestResult.gateAttribution.gate1CapitalClamped} Setups
+                  </span>
+                </div>
+                <div className="bg-black/40 p-2.5 rounded border border-white/5">
+                  <span className="text-[10px] text-slate-400 block">GATE 2 FRICTION REJECTED</span>
+                  <span className="text-sm font-bold text-amber-400">
+                    {backtestResult.gateAttribution.gate2FrictionRejected} Trades
+                  </span>
+                  <span className="text-[10px] text-slate-500 block mt-0.5">
+                    Hurdle: {sanitizedRisk?.friction_ceiling_pct}%
+                  </span>
+                </div>
+                <div className="bg-black/40 p-2.5 rounded border border-white/5">
+                  <span className="text-[10px] text-slate-400 block">GATE 5 MACRO BLACKOUT</span>
+                  <span className="text-sm font-bold text-purple-400">
+                    {backtestResult.gateAttribution.gate5BlackoutRejected} Trades
+                  </span>
+                </div>
+                <div className="bg-black/40 p-2.5 rounded border border-white/5">
+                  <span className="text-[10px] text-slate-400 block">FRICTION CAPITAL SAVED</span>
+                  <span className="text-sm font-bold text-emerald-400">
+                    €{backtestResult.slippageFrictionSaved || 0}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* PROMOTION BUTTON */}
           {promotionStatus === "PROMOTED" ? (

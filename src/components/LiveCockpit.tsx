@@ -26,6 +26,13 @@ interface RiskStatus {
   intradayFlatteningEnabled?: boolean;
   intradayFlattenTimeEST?: string;
   intradayFlattenTimeCET?: string;
+  usMocFlattenCutoff?: string;
+  euMocFlattenCutoff?: string;
+  isEarlyClose?: boolean;
+  dstDesynced?: boolean;
+  scheduleSource?: string;
+  usCountdown?: string | null;
+  euCountdown?: string | null;
   nyTimeEST?: string;
   cetTimeCET?: string;
   usMarketOpen?: boolean;
@@ -526,20 +533,32 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
               </p>
             </div>
 
-            {/* Intraday Auto-Flatten Controller (15:45 EST MOC) */}
+            {/* Intraday Auto-Flatten Controller (Dynamic MOC) */}
             <div 
-              title="Market-on-Close (MOC) Rule: Automatically flattens open intraday positions at 15:45 EST (US) and 17:15 CET (Europe) to eliminate overnight gap risk. Multi-day PEAD swings remain protected."
+              title={`Market-on-Close (MOC) Rule: Automatically flattens open intraday positions before market close (US: ${riskStatus?.usMocFlattenCutoff || "15:45"} EST | EU: ${riskStatus?.euMocFlattenCutoff || "17:15"} CET) to eliminate overnight gap risk. Multi-day PEAD swings remain protected.`}
               className="bg-black/40 border border-white/5 rounded-lg p-3.5 space-y-2 hover:border-white/10 transition"
             >
               <div className="flex justify-between items-center">
                 <label className="text-xs text-slate-300 uppercase font-mono font-bold flex items-center gap-1 cursor-help">
                   Auto-Flatten Intraday <span className="text-xs text-amber-400">ⓘ</span>
                 </label>
-                <span className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${
-                  intradayFlattenToggle ? "bg-emerald-500/20 text-[#00ff88]" : "bg-amber-500/20 text-amber-400"
-                }`}>
-                  {intradayFlattenToggle ? "15:45 EST MOC" : "SWING ALLOWED"}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {riskStatus?.isEarlyClose && (
+                    <span className="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 px-1.5 py-0.5 rounded font-mono font-bold animate-pulse">
+                      EARLY CLOSE
+                    </span>
+                  )}
+                  {riskStatus?.dstDesynced && (
+                    <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded font-mono font-bold" title="DST Desync Active">
+                      DST ±1H
+                    </span>
+                  )}
+                  <span className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${
+                    intradayFlattenToggle ? "bg-emerald-500/20 text-[#00ff88]" : "bg-amber-500/20 text-amber-400"
+                  }`}>
+                    {intradayFlattenToggle ? `${riskStatus?.usMocFlattenCutoff || "15:45"} EST MOC` : "SWING ALLOWED"}
+                  </span>
+                </div>
               </div>
               <div className="flex items-center justify-between pt-1">
                 <span className="text-xs sm:text-sm text-slate-200 font-sans font-medium">0 Overnight Exposure</span>
@@ -556,8 +575,8 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
                 </button>
               </div>
               <div className="flex justify-between items-center text-xs font-mono text-slate-300">
-                <span>EST: <strong className="text-white font-bold">{riskStatus?.nyTimeEST || "--:--"}</strong></span>
-                <span>CET: <strong className="text-white font-bold">{riskStatus?.cetTimeCET || "--:--"}</strong></span>
+                <span>EST: <strong className="text-white font-bold">{riskStatus?.nyTimeEST || "--:--"}</strong> <span className="text-[10px] text-slate-400">(MOC {riskStatus?.usMocFlattenCutoff || "15:45"})</span></span>
+                <span>CET: <strong className="text-white font-bold">{riskStatus?.cetTimeCET || "--:--"}</strong> <span className="text-[10px] text-slate-400">(MOC {riskStatus?.euMocFlattenCutoff || "17:15"})</span></span>
               </div>
               <button
                 type="button"

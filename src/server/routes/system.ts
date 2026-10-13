@@ -151,7 +151,7 @@ systemRouter.post("/api/sync-from-cloud", (req, res) => {
 
 systemRouter.post("/api/test-broker-connection", (req, res) => {
   // If running on Cloud Run and no host is explicitly provided, default to EDGE_NODE_IP or loopback
-  const defaultHost = process.env.EDGE_NODE_IP || (process.env.K_SERVICE ? "34.141.105.241" : "127.0.0.1");
+  const defaultHost = process.env.EDGE_NODE_IP || (process.env.K_SERVICE ? "10.156.0.2" : "10.156.0.2");
   const host = req.body.host || defaultHost;
   const port = Number(req.body.port) || systemSettings.ibkrPort || 4002;
   const startTime = Date.now();
@@ -186,7 +186,7 @@ systemRouter.post("/api/test-broker-connection", (req, res) => {
       port,
       status: "TIMEOUT",
       message: isCloudRun && host === "127.0.0.1"
-        ? `Cloud Run container isolation: IB Gateway runs on the Frankfurt Edge Node VM (34.141.105.241:4002), not inside this stateless Cloud Run container.`
+        ? `Cloud Run container isolation: IB Gateway runs on the Frankfurt Edge Node VM (10.156.0.2:4002 via VPC connector), not inside this stateless Cloud Run container.`
         : `TCP socket timeout after 3500ms attempting to reach IB Gateway (${host}:${port}).`
     });
   });
@@ -201,7 +201,7 @@ systemRouter.post("/api/test-broker-connection", (req, res) => {
       port,
       status: "REFUSED",
       message: isCloudRun && host === "127.0.0.1"
-        ? `Cloud Run container isolation: IB Gateway runs on the Frankfurt Edge Node VM (34.141.105.241:4002), not inside this stateless Cloud Run container (127.0.0.1:4002 returned ECONNREFUSED).`
+        ? `Cloud Run container isolation: IB Gateway runs on the Frankfurt Edge Node VM (10.156.0.2:4002 via VPC connector), not inside this stateless Cloud Run container (127.0.0.1:4002 returned ECONNREFUSED).`
         : `TCP connection to ${host}:${port} failed: ${err.message}`
     });
   });

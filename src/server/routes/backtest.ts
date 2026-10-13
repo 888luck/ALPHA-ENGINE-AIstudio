@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { execFile } from "child_process";
+import path from "path";
 import { GoogleGenAI } from "@google/genai";
 import { dynamicBaskets } from "../state";
+import { getPythonExecutable } from "./research";
 
 export const backtestRouter = Router();
 
@@ -172,7 +174,11 @@ backtestRouter.post("/api/backtest", (req, res) => {
     breakevenLock,
     maxHoldBars,
     ofiFilter,
-    adaptiveStop
+    adaptiveStop,
+    capitalOverride,
+    riskBudgetPct,
+    frictionCeilingPct,
+    binaryBlackoutHours
   } = req.body;
 
   if (!symbol || !timeframe || !startDate || !endDate) {
@@ -190,28 +196,37 @@ backtestRouter.post("/api/backtest", (req, res) => {
   const cleanMaxHold = maxHoldBars !== undefined ? Number(maxHoldBars) : 15;
   const cleanOfi = ofiFilter !== undefined ? (ofiFilter ? "true" : "false") : "true";
   const cleanAdaptive = adaptiveStop !== undefined ? (adaptiveStop ? "true" : "false") : "true";
+  const cleanCapital = capitalOverride !== undefined ? String(Number(capitalOverride)) : "100000";
+  const cleanRiskBudget = riskBudgetPct !== undefined ? String(Number(riskBudgetPct)) : "0.01";
+  const cleanFrictionCeiling = frictionCeilingPct !== undefined ? String(Number(frictionCeilingPct)) : "15.0";
+  const cleanBlackout = binaryBlackoutHours !== undefined ? String(Number(binaryBlackoutHours)) : "0.0";
 
-  const commandArgs = [cleanSymbol, cleanTimeframe, cleanStartDate, cleanEndDate, String(cleanStopAtr), cleanPartial, cleanBreakeven, String(cleanMaxHold), cleanOfi, cleanAdaptive];
-  const command = "python3";
+  const commandArgs = [
+    cleanSymbol, 
+    cleanTimeframe, 
+    cleanStartDate, 
+    cleanEndDate, 
+    String(cleanStopAtr), 
+    cleanPartial, 
+    cleanBreakeven, 
+    String(cleanMaxHold), 
+    cleanOfi, 
+    cleanAdaptive,
+    cleanCapital,
+    cleanRiskBudget,
+    cleanFrictionCeiling,
+    cleanBlackout
+  ];
+  const py = getPythonExecutable();
+  const scriptPath = path.join(process.cwd(), "backtester.py");
 
-  execFile(command, ["backtester.py", ...commandArgs], (error, stdout, stderr) => {
+  execFile(py, [scriptPath, ...commandArgs], (error, stdout, stderr) => {
     if (error) {
       console.error(`Backtest executable error: ${error.message}`);
-      execFile("python", ["backtester.py", ...commandArgs], (fallbackError, fallbackStdout, fallbackStderr) => {
-        if (fallbackError) {
-          return res.status(500).json({ 
-            error: "Backtest execution failed: Python engine error or missing data. Zero Synthetic Policy blocks random-walk fallbacks.",
-            details: fallbackStderr || fallbackError.message
-          });
-        }
-        try {
-          const parsed = JSON.parse(fallbackStdout);
-          res.json({ success: true, ...parsed });
-        } catch (e: any) {
-          res.status(500).json({ error: "Failed to parse system results feed: " + e.message, output: fallbackStdout });
-        }
+      return res.status(500).json({ 
+        error: "Backtest execution failed: Python engine error or missing data. Zero Synthetic Policy blocks random-walk fallbacks.",
+        details: stderr || error.message
       });
-      return;
     }
 
     try {

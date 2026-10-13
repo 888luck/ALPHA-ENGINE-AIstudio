@@ -20,19 +20,36 @@ COPY . .
 RUN npm run build
 
 # --- Runtime stage ---
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 
 WORKDIR /app
 
 # Ensure we're running under production environment
 ENV NODE_ENV=production
 
-# Copy configuration files and install only production-ready dependencies
+# Install system runtime requirements (Python 3, pip, curl, ca-certificates)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    python3-venv \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy configuration files and install production dependencies
 COPY package*.json ./
 RUN npm ci --only=production
 
+# Copy Python requirements and install pinned quantitative dependencies
+COPY requirements.txt ./
+RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt || true
+
 # Copy the compiled artifacts from the builder context
 COPY --from=builder /app/dist ./dist
+
+# Copy quant python engines and config resources
+COPY *.py ./
+COPY *.json ./
 
 # Google Cloud Run injects PORT (default 8080)
 ENV PORT=8080

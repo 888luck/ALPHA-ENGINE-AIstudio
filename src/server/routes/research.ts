@@ -6,7 +6,7 @@ import path from "path";
 export const researchRouter = Router();
 
 // Locate Python executable dynamically
-function getPythonExecutable(): string {
+export function getPythonExecutable(): string {
   if (process.platform === "win32") {
     const py312 = "C:\\Users\\Misha\\AppData\\Local\\Programs\\Python\\Python312\\python.exe";
     if (fs.existsSync(py312)) return py312;
@@ -14,6 +14,57 @@ function getPythonExecutable(): string {
   }
   return "python3";
 }
+
+// In-memory cache for market schedule (30-second TTL to avoid frequent child-process spawns)
+let cachedScheduleData: any = null;
+let cachedScheduleExpiry: number = 0;
+
+export async function fetchMarketSchedule(): Promise<any> {
+  const now = Date.now();
+  if (cachedScheduleData && now < cachedScheduleExpiry) {
+    return cachedScheduleData;
+  }
+
+  return new Promise((resolve) => {
+    const py = getPythonExecutable();
+    const scriptPath = path.join(process.cwd(), "research_controller.py");
+
+    execFile(py, [scriptPath, "schedule"], { timeout: 10000 }, (error, stdout, stderr) => {
+      if (error) {
+        console.warn("[MARKET SCHEDULE] Dynamic resolver failed, using fallback:", stderr || error.message);
+        return resolve(null);
+      }
+      try {
+        const data = JSON.parse(stdout);
+        if (data.status === "success") {
+          cachedScheduleData = data;
+          cachedScheduleExpiry = Date.now() + 30000; // 30 seconds TTL
+          return resolve(data);
+        }
+        return resolve(null);
+      } catch (e: any) {
+        console.warn("[MARKET SCHEDULE] JSON parse failed:", e.message);
+        return resolve(null);
+      }
+    });
+  });
+}
+
+// 0. GET /api/market/schedule - Dynamic exchange hours, MOC cutoff, DST desync
+researchRouter.get("/api/market/schedule", async (req, res) => {
+  const schedule = await fetchMarketSchedule();
+  if (schedule) {
+    return res.json({ success: true, ...schedule });
+  }
+  // Resilient fallback if python is starting
+  return res.json({
+    success: true,
+    status: "fallback",
+    us: { exchange: "XNYS", is_open: true, moc_flatten_cutoff: "15:45", is_early_close: false, source: "FALLBACK_STATIC" },
+    eu: { exchange: "XPAR", is_open: true, moc_flatten_cutoff: "17:15", is_early_close: false, source: "FALLBACK_STATIC" },
+    dst_desync: { is_dst_desynced: false, hour_difference: 6.0 }
+  });
+});
 
 // 1. POST /api/research/resolve - Universal IBKR instrument disambiguation
 researchRouter.post("/api/research/resolve", (req, res) => {

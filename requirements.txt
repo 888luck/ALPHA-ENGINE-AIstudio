@@ -1,4 +1,6 @@
 # AlphaEngine Institutional Trading Platform - Pinned Python Dependencies
+# NOTE: 'ibapi' is provided via official IBKR TWS API release bundle (source/pythonclient)
+# from https://download2.interactivebrokers.com/installers/tws-api/ (v1051.01+ GPL)
 ibapi>=10.19.1
 ib_insync>=0.9.86
 exchange-calendars==4.13.2

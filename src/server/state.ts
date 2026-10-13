@@ -43,6 +43,7 @@ export const SETTINGS_DOC_PATH = "system_config/alpha_engine_v1";
 
 export let systemSettings: SystemSettings = {
   ibkrAccountNumber: "U8129384",
+  ibkrHost: process.env.EDGE_NODE_IP || "10.156.0.2",
   ibkrPort: 4002,
   ibkrClientId: 10,
   mifid2DecisionMaker: "ALGO_DEC_992",

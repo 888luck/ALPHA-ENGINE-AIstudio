@@ -161,6 +161,9 @@ class FirebaseSyncTunnel:
                 print("[FIREBASE TUNNEL] Token/Auth expired or denied. Re-authenticating...")
                 self._authenticate()
                 return self._request(method, path, body, is_retry=True)
+            if e.code == 404 and method == "GET":
+                # Document does not exist yet; return empty response gracefully
+                return {}
             err_msg = e.read().decode("utf-8")
             print(f"[FIREBASE TUNNEL API ERROR] {method} {path} failed: {e.code} - {err_msg}")
             raise Exception(f"Firestore API Error: {e.code} - {err_msg}")
@@ -205,7 +208,8 @@ class FirebaseSyncTunnel:
         body = self._dict_to_firestore_fields(log_data)
         path = f"historical_logs/{log_id}"
         self._request("PATCH", path, body)
-        print(f"[FIREBASE TUNNEL] Archived regulatory trade log {log_id} ({log_data['symbol']}) dynamically.")
+        sym = log_data.get("symbol", log_data.get("event", "SYSTEM"))
+        print(f"[FIREBASE TUNNEL] Archived regulatory trade log {log_id} ({sym}) dynamically.")
 
     def push_system_risk_state(self, net_liq: float, maint_margin: float, realized_pnl: float, unrealized_pnl: float, router_locked: bool, model_accuracy: float = 0.0, extra_metrics: Dict[str, Any] = None):
         """Pushes system pool equity, risk metrics, circuit breaker status, and model accuracy to Firestore."""
@@ -250,13 +254,11 @@ class FirebaseSyncTunnel:
             return
         
         path = "system_nodes/leader"
-        payload = {
-            "fields": self._dict_to_firestore_fields({
-                "node_id": node_id,
-                "last_heartbeat": timestamp_iso
-            })
-        }
-        self._request("PATCH", path, body=payload)
+        body = self._dict_to_firestore_fields({
+            "node_id": node_id,
+            "last_heartbeat": timestamp_iso
+        })
+        self._request("PATCH", path, body=body)
 
     def get_leader_heartbeat(self) -> Dict[str, Any]:
         """Gets the system_nodes/leader document to check for active primary node."""
@@ -268,3 +270,39 @@ class FirebaseSyncTunnel:
         if res and "fields" in res:
             return self._firestore_fields_to_dict(res["fields"])
         return {}
+
+    def poll_system_commands(self) -> List[Dict[str, Any]]:
+        """
+        Polls the system_commands collection for pending commands sent by Cloud Run / Web UI.
+        Returns commands in status PENDING_EDGE_DISPATCH or unacknowledged.
+        """
+        if not self.enabled:
+            return []
+        
+        path = "system_commands"
+        res = self._request("GET", path)
+        pending_commands = []
+        if res and "documents" in res:
+            for doc in res["documents"]:
+                doc_name = doc.get("name", "")
+                cmd_id = doc_name.split("/")[-1]
+                fields = self._firestore_fields_to_dict(doc.get("fields", {}))
+                fields["cmdId"] = cmd_id
+                if fields.get("status") in ["PENDING_EDGE_DISPATCH", "PENDING", None]:
+                    pending_commands.append(fields)
+        return pending_commands
+
+    def acknowledge_command(self, cmd_id: str, status: str = "EXECUTED", result_msg: str = ""):
+        """Updates status of a processed system command."""
+        if not self.enabled:
+            return
+        import datetime
+        body = self._dict_to_firestore_fields({
+            "status": status,
+            "executedAt": datetime.datetime.utcnow().isoformat() + "Z",
+            "executionResult": result_msg
+        })
+        path = f"system_commands/{cmd_id}"
+        self._request("PATCH", path, body)
+        print(f"[FIREBASE TUNNEL] Acknowledged system command {cmd_id} as {status}.")
+

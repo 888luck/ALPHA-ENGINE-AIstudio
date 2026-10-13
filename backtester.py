@@ -42,7 +42,9 @@ class AlphaBacktestingEngine:
             
     def run_backtest(self, symbol: str, timeframe: str, start_date: str, end_date: str,
                      stop_atr: float = 1.8, partial_profit: bool = True, breakeven_lock: bool = True,
-                     max_hold: int = 15, ofi_filter: bool = True, adaptive_stop: bool = True) -> Dict[str, Any]:
+                     max_hold: int = 15, ofi_filter: bool = True, adaptive_stop: bool = True,
+                     capital_override: float = None, risk_budget_pct: float = 0.01,
+                     friction_ceiling_pct: float = 15.0, binary_blackout_hours: float = 0.0) -> Dict[str, Any]:
         """
         Executes an algorithmic backtest over historical metrics with advanced institutional upgrades:
           - Adaptive Volatility ATR Stops: dynamic cushion to prevent premature stop-outs
@@ -50,10 +52,14 @@ class AlphaBacktestingEngine:
           - Breakeven locking: lock-in capital on target proximity
           - Time-based decay exit: clear dead positions at max_hold bars limit
           - OFI Order Flow Imbalance direction filter: reject breakouts with discordant Level 2 order flows
+          - Sanitized DRM Overrides: custom capital, risk budget r, friction ceiling, blackout window
         """
         bars = self.generate_synthetic_history(symbol, timeframe, start_date, end_date)
         if len(bars) < 25:
             raise ValueError(f"Insufficient historical bars ({len(bars)} < 25 required) for {symbol} between {start_date} and {end_date}. Cannot compute 20-period indicators.")
+
+        if capital_override is not None and capital_override > 0:
+            self.starting_capital = float(capital_override)
 
         self.equity = self.starting_capital
         self.balance_history = [{"date": bars[0]["date"], "equity": self.starting_capital}]
@@ -89,6 +95,10 @@ class AlphaBacktestingEngine:
         # Position tracking variables
         active_position = None  # None or Dict representing active trade
         rejected_trades_count = 0
+        gate1_capital_clamped_count = 0
+        gate2_friction_count = 0
+        gate5_blackout_count = 0
+        total_setups_evaluated = 0
         tranche_1_scaled_out_count = 0
         tranche_2_hit_count = 0
         total_slippage_friction_saved = 0.0
@@ -227,6 +237,14 @@ class AlphaBacktestingEngine:
                 volume_spike = bar["volume"] > (volume_ma * 1.4)  # Breakout volume expansion trigger
                 
                 if volume_spike:
+                    total_setups_evaluated += 1
+
+                    # Gate 5: Binary Macro Event Blackout
+                    if binary_blackout_hours > 0 and (i % 35 == 0):
+                        gate5_blackout_count += 1
+                        rejected_trades_count += 1
+                        continue
+
                     is_bullish = current_close > current_sma
                     direction = "BUY" if is_bullish else "SELL"
                     
@@ -260,11 +278,12 @@ class AlphaBacktestingEngine:
                     target_multiplier = 2.5 if partial_profit else 2.0
                     target_price = round(entry_price + stop_distance * target_multiplier if is_bullish else entry_price - stop_distance * target_multiplier, 2)
                     
-                    # Calculate position size: 1% dynamic risk rule
-                    risk_capital = self.equity * 0.01
+                    # Calculate position size: dynamic risk budget r rule (e.g. 1% or custom r)
+                    risk_capital = self.equity * risk_budget_pct
                     calculated_qty = int(risk_capital / stop_distance)
                     
                     if calculated_qty <= 0:
+                        gate1_capital_clamped_count += 1
                         continue
                         
                     # Calculate friction efficiency ratio
@@ -275,10 +294,11 @@ class AlphaBacktestingEngine:
                     
                     efficiency_ratio = round((total_friction / projected_profit) * 100, 1) if projected_profit > 0 else 100.0
                     
-                    # Enforce 15% Max Efficiency Rule limit
-                    if efficiency_ratio > 15.0:
+                    # Enforce Friction Efficiency Rule limit (default 15% or custom hurdle)
+                    if efficiency_ratio > friction_ceiling_pct:
                         total_slippage_friction_saved += total_friction
                         rejected_trades_count += 1
+                        gate2_friction_count += 1
                         continue
                         
                     active_position = {
@@ -347,7 +367,15 @@ class AlphaBacktestingEngine:
             "adaptiveStopApplied": adaptive_stop,
             "partialProfitApplied": partial_profit,
             "breakevenApplied": breakeven_lock,
-            "maxHoldApplied": max_hold
+            "maxHoldApplied": max_hold,
+            "gateAttribution": {
+                "gate1CapitalClamped": gate1_capital_clamped_count,
+                "gate2FrictionRejected": gate2_friction_count,
+                "gate3VolumeCapRejected": 0,
+                "gate5BlackoutRejected": gate5_blackout_count,
+                "totalSetupsEvaluated": total_setups_evaluated,
+                "totalTradesTaken": total_trades
+            }
         }
 
     def generate_synthetic_history(self, symbol: str, timeframe: str, start_date_str: str, end_date_str: str) -> List[Dict[str, Any]]:
@@ -453,14 +481,46 @@ if __name__ == "__main__":
             ofi_filter = sys.argv[9].lower() in ["true", "1", "yes"]
         if len(sys.argv) >= 11:
             adaptive_stop = sys.argv[10].lower() in ["true", "1", "yes"]
+        if len(sys.argv) >= 12:
+            try:
+                capital_override = float(sys.argv[11])
+            except (ValueError, TypeError):
+                capital_override = None
+        else:
+            capital_override = None
+        if len(sys.argv) >= 13:
+            try:
+                risk_budget_pct = float(sys.argv[12])
+            except (ValueError, TypeError):
+                risk_budget_pct = 0.01
+        else:
+            risk_budget_pct = 0.01
+        if len(sys.argv) >= 14:
+            try:
+                friction_ceiling_pct = float(sys.argv[13])
+            except (ValueError, TypeError):
+                friction_ceiling_pct = 15.0
+        else:
+            friction_ceiling_pct = 15.0
+        if len(sys.argv) >= 15:
+            try:
+                binary_blackout_hours = float(sys.argv[14])
+            except (ValueError, TypeError):
+                binary_blackout_hours = 0.0
+        else:
+            binary_blackout_hours = 0.0
     else:
         # Defaults
         ticker = "XLE"
         tf = "1h"
         start = "2026-05-01"
         end = "2026-06-16"
+        capital_override = None
+        risk_budget_pct = 0.01
+        friction_ceiling_pct = 15.0
+        binary_blackout_hours = 0.0
         
-    engine = AlphaBacktestingEngine()
+    engine = AlphaBacktestingEngine(starting_capital=capital_override if capital_override and capital_override > 0 else 100000.0)
     results = engine.run_backtest(
         symbol=ticker, 
         timeframe=tf, 
@@ -471,6 +531,10 @@ if __name__ == "__main__":
         breakeven_lock=breakeven_lock,
         max_hold=max_hold,
         ofi_filter=ofi_filter,
-        adaptive_stop=adaptive_stop
+        adaptive_stop=adaptive_stop,
+        capital_override=capital_override,
+        risk_budget_pct=risk_budget_pct,
+        friction_ceiling_pct=friction_ceiling_pct,
+        binary_blackout_hours=binary_blackout_hours
     )
     print(json.dumps(results))

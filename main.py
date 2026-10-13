@@ -197,7 +197,6 @@ def main_loop():
         if is_conn_enabled:
             print(f"[GATEWAY CONNECT] Initializing Connection: Port={config['IBKR_PORT']} ClientID={config['IBKR_CLIENT_ID']}")
             cm.connect_gateway(config["IBKR_HOST"], config["IBKR_PORT"], config["IBKR_CLIENT_ID"])
-            import time
             time.sleep(2) # Give connection time to establish
             cm.reqAccountSummary(9001, "All", "AvailableFunds,ExcessLiquidity,InitMarginReq,MaintMarginReq")
         else:
@@ -252,6 +251,41 @@ def main_loop():
                         script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "switch_gateway_mode.py")
                         if os.path.exists(script_path):
                             subprocess.Popen(["python3", script_path, "--mode", cloud_mode.upper()])
+
+            # Poll and dispatch commands from Cloud Run / Dashboard
+            try:
+                pending_cmds = firebase_tunnel.poll_system_commands()
+                for cmd in pending_cmds:
+                    c_id = cmd.get("cmdId", "UNKNOWN")
+                    c_type = cmd.get("type", "")
+                    print(f"[EDGE COMMAND INGEST] Processing command: {c_id} ({c_type})")
+                    
+                    if c_type == "EMERGENCY_FLUSH":
+                        drm.emergency_flush()
+                        for symbol in list(cm.active_positions.keys()):
+                            firebase_tunnel.delete_active_trade(f"TRD_{symbol}")
+                        firebase_tunnel.acknowledge_command(c_id, "EXECUTED", "Emergency flush completed on Edge node.")
+                    
+                    elif c_type == "SUBMIT_ORDER":
+                        sym = cmd.get("symbol", "").upper()
+                        direction = cmd.get("direction", "").upper()
+                        entry_p = float(cmd.get("entryPrice", 0.0))
+                        stop_p = float(cmd.get("stopPrice", 0.0))
+                        qty = float(cmd.get("quantity", 1.0)) if cmd.get("quantity") else 1.0
+                        
+                        if drm.router_locked:
+                            firebase_tunnel.acknowledge_command(c_id, "REJECTED", "Execution router locked by DRM circuit breaker.")
+                        else:
+                            # Submit order through DRM gatekeeper
+                            passed = drm.validate_trade_risk(sym, direction, entry_p, stop_p, qty)
+                            if passed:
+                                is_mock = not getattr(cm, "is_connected", False)
+                                strategy.submit_bracket_order(sym, direction, entry_p, stop_p, qty, is_mock=is_mock)
+                                firebase_tunnel.acknowledge_command(c_id, "EXECUTED", f"Order submitted to IBKR: {direction} {qty} {sym}")
+                            else:
+                                firebase_tunnel.acknowledge_command(c_id, "REJECTED", f"DRM risk gate rejected order for {sym}.")
+            except Exception as cmd_err:
+                print(f"[EDGE COMMAND ERROR] Failed processing system command: {cmd_err}")
 
         # Dynamic Per-Candidate Session Clock & Opening Reality Verification
         for cand in list(active_basket.candidates):

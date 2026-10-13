@@ -2,10 +2,11 @@ import { Router } from "express";
 import { systemSettings, activeTrades, executionBlotter, db_fs, persistSettings, setActiveTrades } from "../state";
 import { authMiddleware, getMaskedSettings } from "../middleware/auth";
 import { ExecutionRecord } from "../types";
+import { fetchMarketSchedule } from "./research";
 
 export const riskRouter = Router();
 
-riskRouter.get("/api/risk/status", (req, res) => {
+riskRouter.get("/api/risk/status", async (req, res) => {
   const currentUtilized = activeTrades.reduce((acc, t) => acc + Math.abs(t.quantity * t.entryPrice), 0);
   const currentDailyPnL = activeTrades.reduce((acc, t) => acc + (t.unrealizedPnL || 0), 0);
 
@@ -23,6 +24,13 @@ riskRouter.get("/api/risk/status", (req, res) => {
   const cetMinutes = nowCet.getHours() * 60 + nowCet.getMinutes();
   const euMarketOpen = cetDay >= 1 && cetDay <= 5 && cetMinutes >= 540 && cetMinutes < 1050; // 09:00 - 17:30 CET
 
+  // Fetch dynamic exchange schedule from MarketHoursResolver
+  const schedule = await fetchMarketSchedule();
+  const usMocCutoff = schedule?.us?.moc_flatten_cutoff || systemSettings.intradayFlattenTimeEST || "15:45";
+  const euMocCutoff = schedule?.eu?.moc_flatten_cutoff || systemSettings.intradayFlattenTimeCET || "17:15";
+  const isEarlyClose = Boolean(schedule?.us?.is_early_close || schedule?.eu?.is_early_close);
+  const dstDesynced = Boolean(schedule?.dst_desync?.is_dst_desynced);
+
   res.json({
     success: true,
     dailyCapitalCeiling: systemSettings.dailyCapitalCeiling,
@@ -31,12 +39,19 @@ riskRouter.get("/api/risk/status", (req, res) => {
     currentDailyPnL: Math.round(currentDailyPnL * 100) / 100,
     fractionalTradingEnabled: systemSettings.fractionalTradingEnabled,
     intradayFlatteningEnabled: systemSettings.intradayFlatteningEnabled,
-    intradayFlattenTimeEST: systemSettings.intradayFlattenTimeEST,
-    intradayFlattenTimeCET: systemSettings.intradayFlattenTimeCET,
-    nyTimeEST,
-    cetTimeCET,
-    usMarketOpen,
-    euMarketOpen,
+    intradayFlattenTimeEST: usMocCutoff,
+    intradayFlattenTimeCET: euMocCutoff,
+    usMocFlattenCutoff: usMocCutoff,
+    euMocFlattenCutoff: euMocCutoff,
+    isEarlyClose,
+    dstDesynced,
+    scheduleSource: schedule?.us?.source || "FALLBACK_STATIC",
+    nyTimeEST: schedule?.ny_time_est || nyTimeEST,
+    cetTimeCET: schedule?.cet_time_cet || cetTimeCET,
+    usMarketOpen: schedule?.us?.is_open !== undefined ? schedule.us.is_open : usMarketOpen,
+    euMarketOpen: schedule?.eu?.is_open !== undefined ? schedule.eu.is_open : euMarketOpen,
+    usCountdown: schedule?.us?.countdown || null,
+    euCountdown: schedule?.eu?.countdown || null,
     marketScope: systemSettings.marketScope || "ALL",
     killSwitchEngaged: systemSettings.killSwitchEngaged,
     tradingMode: systemSettings.tradingMode,

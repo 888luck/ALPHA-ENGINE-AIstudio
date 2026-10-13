@@ -129,6 +129,57 @@ def handle_audit(args) -> Dict[str, Any]:
     )
 
 
+def handle_schedule(args) -> Dict[str, Any]:
+    from market_hours_resolver import MarketHoursResolver
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+
+    resolver = MarketHoursResolver(flatten_buffer_mins=15)
+    us_session = resolver.resolve_session(is_european=False, exchange_code="XNYS")
+    eu_session = resolver.resolve_session(is_european=True, exchange_code="XPAR")
+
+    us_phase, us_countdown = resolver.determine_phase(us_session)
+    eu_phase, eu_countdown = resolver.determine_phase(eu_session)
+    dst_info = resolver.resolve_dst_desync()
+
+    now_utc = datetime.now(timezone.utc)
+    ny_now = now_utc.astimezone(ZoneInfo("America/New_York"))
+    cet_now = now_utc.astimezone(ZoneInfo("Europe/Paris"))
+
+    us_flatten = us_session.get("flatten_start")
+    eu_flatten = eu_session.get("flatten_start")
+
+    return {
+        "status": "success",
+        "timestamp_utc": now_utc.isoformat(),
+        "ny_time_est": ny_now.strftime("%H:%M"),
+        "cet_time_cet": cet_now.strftime("%H:%M"),
+        "us": {
+            "exchange": us_session.get("exchange", "XNYS"),
+            "is_open": us_session.get("is_open", False),
+            "phase": us_phase,
+            "countdown": us_countdown,
+            "open_time": us_session.get("open_time_str", "09:30"),
+            "close_time": us_session.get("close_time_str", "16:00"),
+            "moc_flatten_cutoff": us_flatten.strftime("%H:%M") if us_flatten else "15:45",
+            "is_early_close": us_session.get("close_time_str", "16:00") != "16:00",
+            "source": us_session.get("source", "UNKNOWN")
+        },
+        "eu": {
+            "exchange": eu_session.get("exchange", "XPAR"),
+            "is_open": eu_session.get("is_open", False),
+            "phase": eu_phase,
+            "countdown": eu_countdown,
+            "open_time": eu_session.get("open_time_str", "09:00"),
+            "close_time": eu_session.get("close_time_str", "17:30"),
+            "moc_flatten_cutoff": eu_flatten.strftime("%H:%M") if eu_flatten else "17:15",
+            "is_early_close": eu_session.get("close_time_str", "17:30") != "17:30",
+            "source": eu_session.get("source", "UNKNOWN")
+        },
+        "dst_desync": dst_info
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description="Alpha Engine Quantitative Research Lab Controller")
     subparsers = parser.add_subparsers(dest="command")
@@ -149,6 +200,9 @@ def main():
     p_aud = subparsers.add_parser("audit")
     p_aud.add_argument("--input-json", required=True, help="Path to JSON with trades and balance history")
 
+    # schedule
+    subparsers.add_parser("schedule", help="Resolve authoritative exchange schedules and MOC cutoffs")
+
     args = parser.parse_args()
 
     if args.command == "resolve":
@@ -159,6 +213,8 @@ def main():
         out = handle_analyze(args)
     elif args.command == "audit":
         out = handle_audit(args)
+    elif args.command == "schedule":
+        out = handle_schedule(args)
     else:
         out = {"error": f"Unknown or missing command: {args.command}"}
 

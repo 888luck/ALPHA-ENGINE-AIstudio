@@ -18,11 +18,11 @@ DISPLAY = os.environ.get("DISPLAY", ":1")
 ENV_PATH = "/opt/alpha-engine/.env"
 
 # Screen coordinates on 1280x800 virtual display for IB Gateway 10.50
-COORD_LIVE_TAB = (437, 398)
-COORD_PAPER_TAB = (593, 398)
-COORD_USERNAME_FIELD = (510, 468)
-COORD_PASSWORD_FIELD = (510, 518)
-COORD_LOGIN_BUTTON = (515, 608)
+COORD_LIVE_TAB = (440, 305)
+COORD_PAPER_TAB = (660, 305)
+COORD_USERNAME_FIELD = (550, 375)
+COORD_PASSWORD_FIELD = (600, 415)
+COORD_LOGIN_BUTTON = (660, 485)
 
 
 def load_env_credentials():
@@ -90,6 +90,7 @@ def dismiss_known_dialogs() -> int:
         re.compile(r"Warning", re.I),
         re.compile(r"Notice", re.I),
         re.compile(r"Simultaneous Session", re.I),
+        re.compile(r"Unrecognized", re.I),
     ]
     
     for wid, name in get_windows():
@@ -164,9 +165,9 @@ def perform_login(mode: str, username: Optional[str] = None, password: Optional[
 
             # 2. Enter Username (if provided)
             if username:
-                print(f"[AUTOLOGIN] Focusing username field at {COORD_USERNAME_FIELD}...")
+                print(f"[AUTOLOGIN] Focusing username field at {COORD_USERNAME_FIELD}...", flush=True)
                 run_xdotool(["mousemove", str(COORD_USERNAME_FIELD[0]), str(COORD_USERNAME_FIELD[1]), "click", "1"])
-                time.sleep(0.2)
+                time.sleep(0.3)
                 run_xdotool(["key", "ctrl+a", "BackSpace"])
                 time.sleep(0.1)
                 run_xdotool(["type", "--delay", "50", username])
@@ -174,16 +175,19 @@ def perform_login(mode: str, username: Optional[str] = None, password: Optional[
 
             # 3. Enter Password (if provided)
             if password:
-                print(f"[AUTOLOGIN] Focusing password field at {COORD_PASSWORD_FIELD}...")
+                print(f"[AUTOLOGIN] Focusing password field at {COORD_PASSWORD_FIELD}...", flush=True)
                 run_xdotool(["mousemove", str(COORD_PASSWORD_FIELD[0]), str(COORD_PASSWORD_FIELD[1]), "click", "1"])
-                time.sleep(0.2)
+                time.sleep(0.3)
                 run_xdotool(["key", "ctrl+a", "BackSpace"])
                 time.sleep(0.1)
-                run_xdotool(["type", "--delay", "50", password])
-                time.sleep(0.3)
+                # Type password safely without shell expansion
+                env = os.environ.copy()
+                env["DISPLAY"] = DISPLAY
+                subprocess.run(["xdotool", "type", "--delay", "80", "--", password], env=env)
+                time.sleep(0.5)
 
             # 4. Click Log In button
-            print(f"[AUTOLOGIN] Clicking Log In button at {COORD_LOGIN_BUTTON}...")
+            print(f"[AUTOLOGIN] Clicking Log In button at {COORD_LOGIN_BUTTON}...", flush=True)
             run_xdotool(["mousemove", str(COORD_LOGIN_BUTTON[0]), str(COORD_LOGIN_BUTTON[1]), "click", "1"])
             login_attempted = True
 
