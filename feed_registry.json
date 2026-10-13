@@ -1,6 +1,6 @@
 {
-  "version": "2.1.0",
-  "last_updated": "2026-10-01T00:00:00Z",
+  "version": "2.2.0",
+  "last_updated": "2026-10-13T00:00:00Z",
   "feeds": [
     {
       "name": "ibkr_news_bulletins",
@@ -46,11 +46,12 @@
       "name": "fred_economic_calendar",
       "class": "GlobalMacroAdapter",
       "type": "official_macro_api",
-      "enabled": true,
+      "enabled": false,
       "priority": 5,
       "description": "OECD CLI, IMF WEO, BIS credit gaps, central bank calendars",
       "endpoint": "https://api.stlouisfed.org/fred/releases/dates",
-      "tier": 2
+      "tier": 2,
+      "rationale": "Disabled pending dedicated FRED API key provisioning and GlobalMacroAdapter implementation to prevent silent empty polls."
     },
     {
       "name": "european_ir_rss",
@@ -58,8 +59,13 @@
       "type": "corporate_rss",
       "enabled": true,
       "priority": 6,
-      "description": "SAP, ASML, AIR, RWE, ENGI, TTE investor relations RSS",
-      "endpoint": "https://www.asml.com/en/rss",
+      "description": "SAP, ASML, AIR investor relations corporate RSS feeds",
+      "endpoint": "https://news.sap.com/feed/",
+      "corporate_feeds": {
+        "SAP": "https://news.sap.com/feed/",
+        "AIR": "https://www.airbus.com/en/rss.xml",
+        "ASML": "https://www.asml.com/en/rss"
+      },
       "tier": 1
     },
     {
@@ -68,7 +74,7 @@
       "type": "official_energy_api",
       "enabled": true,
       "priority": 7,
-      "description": "US crude/gas storage prints",
+      "description": "U.S. EIA crude/gas storage prints and official energy reports",
       "endpoint": "https://api.eia.gov/v2/",
       "tier": 1
     },
@@ -76,51 +82,56 @@
       "name": "entsoe_electricity",
       "class": "ENTSOEElectricityAdapter",
       "type": "official_energy_api",
-      "enabled": true,
+      "enabled": false,
       "priority": 8,
       "description": "EU electricity generation, load, flows",
       "endpoint": "https://transparency.entsoe.eu/api",
-      "tier": 1
+      "tier": 1,
+      "rationale": "Disabled pending ENTSO-E Transparency API security token provisioning to prevent silent empty polls."
     },
     {
       "name": "usa_spending",
       "class": "USASpendingAdapter",
       "type": "official_gov_contracts",
-      "enabled": true,
+      "enabled": false,
       "priority": 9,
       "description": "US federal defense contracts (RTX, NOC, ITA)",
       "endpoint": "https://api.usaspending.gov/api/v2/",
-      "tier": 1
+      "tier": 1,
+      "rationale": "Disabled pending USASpending API key and contracts endpoint verification to prevent silent empty polls."
     },
     {
       "name": "finra_short_interest",
       "class": "FINRAShortInterestAdapter",
       "type": "regulatory_market_data",
-      "enabled": true,
+      "enabled": false,
       "priority": 10,
       "description": "Bi-weekly short interest",
       "endpoint": "https://cdn.finra.org/equity/regsho/daily/",
-      "tier": 1
+      "tier": 1,
+      "rationale": "Disabled pending FINRA Reg SHO authentication and distribution access provisioning to prevent silent empty polls."
     },
     {
       "name": "sia_wsts",
       "class": "SIAWSTSAdapter",
       "type": "industry_association",
-      "enabled": true,
+      "enabled": false,
       "priority": 11,
       "description": "Semiconductor book-to-bill, capacity, inventory cycle",
       "endpoint": "https://www.semiconductors.org/api",
-      "tier": 2
+      "tier": 2,
+      "rationale": "Disabled pending Semiconductor Industry Association (SIA) WSTS member credentials provisioning to prevent silent empty polls."
     },
     {
       "name": "gdelt_event_database",
       "class": "GDELTAdapter",
       "type": "alternative_nlp",
-      "enabled": true,
+      "enabled": false,
       "priority": 12,
       "description": "Global event sentiment heatmaps",
       "endpoint": "https://api.gdeltproject.org/api/v2/doc/doc",
-      "tier": 3
+      "tier": 3,
+      "rationale": "Disabled pending GDELT 2.0 streaming pipeline integration to prevent rate-limited empty polls."
     }
   ]
 }

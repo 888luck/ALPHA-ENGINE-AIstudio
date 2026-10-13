@@ -51,6 +51,10 @@ COPY --from=builder /app/dist ./dist
 COPY *.py ./
 COPY *.json ./
 
+# Provision Tier 0 INT8 FinBERT ONNX model into container image
+RUN python3 provision_tier0_model.py
+
+
 # Google Cloud Run injects PORT (default 8080)
 ENV PORT=8080
 EXPOSE 8080

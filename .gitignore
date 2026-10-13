@@ -50,3 +50,4 @@ test_performance.json
 contract_spec_cache.json
 *.tar.gz
 scratch/
+models/

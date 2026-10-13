@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-13T06:52:57.342287+00:00",
+  "generatedAt": "2026-10-13T10:37:06.822841+00:00",
   "maxActiveInstruments": 3,
   "macroContext": "Dynamic multi-exchange universe calibrated from overnight news and event flow.",
   "sourceEvents": [
@@ -27,7 +27,7 @@
       "invalidationReason": "",
       "challengeStatus": "PENDING_OPEN",
       "sessionPhase": "PRE_MARKET",
-      "countdownStr": "Opens in 6h 37m",
+      "countdownStr": "Opens in 2h 52m",
       "isGated": false,
       "gateReason": ""
     },
@@ -52,7 +52,7 @@
       "invalidationReason": "",
       "challengeStatus": "PENDING_OPEN",
       "sessionPhase": "PRE_MARKET",
-      "countdownStr": "Opens in 6h 37m",
+      "countdownStr": "Opens in 2h 52m",
       "isGated": false,
       "gateReason": ""
     },
@@ -77,7 +77,7 @@
       "invalidationReason": "",
       "challengeStatus": "PENDING_OPEN",
       "sessionPhase": "PRE_MARKET",
-      "countdownStr": "Opens in 6h 37m",
+      "countdownStr": "Opens in 2h 52m",
       "isGated": false,
       "gateReason": ""
     }
