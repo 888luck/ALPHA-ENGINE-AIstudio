@@ -48,3 +48,5 @@ test_performance.json
 # Logs & Local Caches
 *.log
 contract_spec_cache.json
+*.tar.gz
+scratch/
