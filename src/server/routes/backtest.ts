@@ -53,8 +53,8 @@ backtestRouter.post("/api/backtest-audit", async (req, res) => {
     const selectedProvider = provider || "gemini-flash";
 
     const pricingTable: Record<string, { model: string; inPrice: number; outPrice: number; name: string }> = {
-      "gemini-flash": { model: "gemini-2.5-flash", inPrice: 0.075, outPrice: 0.30, name: "Gemini 2.5 Flash" },
-      "gemini-pro": { model: "gemini-2.5-pro", inPrice: 1.25, outPrice: 5.00, name: "Gemini 2.5 Pro" },
+      "gemini-flash": { model: "gemini-2.0-flash", inPrice: 0.10, outPrice: 0.40, name: "Gemini 2.0 Flash" },
+      "gemini-pro": { model: "gemini-2.0-pro", inPrice: 1.25, outPrice: 5.00, name: "Gemini 2.0 Pro" },
       "nvidia-nim": { model: "llama3-free", inPrice: 0.00, outPrice: 0.00, name: "Llama 3 (Nvidia NIM Free)" },
       "claude": { model: "claude-sonnet", inPrice: 3.00, outPrice: 15.00, name: "Claude 3.5 Sonnet" }
     };
@@ -230,7 +230,10 @@ backtestRouter.post("/api/backtest", (req, res) => {
     }
 
     try {
-      const parsed = JSON.parse(stdout);
+      const jsonStart = stdout.indexOf("{");
+      const jsonEnd = stdout.lastIndexOf("}");
+      const cleanJson = (jsonStart !== -1 && jsonEnd !== -1) ? stdout.slice(jsonStart, jsonEnd + 1) : stdout.trim();
+      const parsed = JSON.parse(cleanJson);
       res.json({ success: true, ...parsed });
     } catch (e: any) {
       res.status(500).json({ error: "Invalid JSON response from backtest engine: " + e.message, output: stdout });

@@ -433,10 +433,9 @@ class AlphaBacktestingEngine:
                         })
             
             if len(bars) > 0:
-                print(f"[BACKTESTER] Fetched {len(bars)} real historical bars for {symbol} from Yahoo Finance.")
+                print(f"[BACKTESTER] Fetched {len(bars)} real historical bars for {symbol} from Yahoo Finance.", file=sys.stderr)
                 return bars
         except Exception as e:
-            import sys
             print(f"[BACKTESTER ERROR] Failed to fetch real historical data from market feed: {e}", file=sys.stderr)
             raise RuntimeError(f"Zero Synthetic Policy Violation: Real market data unavailable for {symbol} ({start_date_str} to {end_date_str}). Refusing random-walk fabrication.") from e
             
