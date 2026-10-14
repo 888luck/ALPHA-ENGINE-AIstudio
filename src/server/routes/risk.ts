@@ -169,15 +169,17 @@ riskRouter.post("/api/risk/emergency-kill", authMiddleware, (req, res) => {
   });
 });
 
-riskRouter.post("/api/risk/unlock", authMiddleware, (req, res) => {
+riskRouter.post("/api/risk/unlock", authMiddleware, async (req, res) => {
   systemSettings.killSwitchEngaged = false;
   systemSettings.routerLocked = false;
+  await persistSettings();
   console.log("[RISK GATEWAY] Router unlocked by operator command.");
   res.json({ success: true, message: "System unlocked and armed.", killSwitchEngaged: false });
 });
 
-riskRouter.post("/api/reset-drawdown-lock", authMiddleware, (req, res) => {
+riskRouter.post("/api/reset-drawdown-lock", authMiddleware, async (req, res) => {
   systemSettings.routerLocked = false;
+  await persistSettings();
   console.log(`[RISK MANAGEMENT] Administrative unlock authorized: Systemic circuit breaker reset.`);
   res.json({ success: true, settings: getMaskedSettings(systemSettings) });
 });

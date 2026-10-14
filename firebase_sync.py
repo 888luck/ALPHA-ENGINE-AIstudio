@@ -20,8 +20,13 @@ class FirebaseSyncTunnel:
         
         # 1. Attempt to load credentials from the config file
         try:
-            if os.path.exists(config_path):
-                with open(config_path, 'r') as f:
+            resolved_path = config_path
+            if not os.path.exists(resolved_path):
+                alt_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), config_path)
+                if os.path.exists(alt_path):
+                    resolved_path = alt_path
+            if os.path.exists(resolved_path):
+                with open(resolved_path, 'r') as f:
                     config = json.load(f)
                     self.project_id = config.get("projectId", "")
                     self.api_key = config.get("apiKey", "")
