@@ -108,7 +108,7 @@ def run_dma_dry_run():
     
     # 7. Cancel the test order cleanly
     print(f"\n[DMA CLEANUP] Cancelling test order #{test_order_id} on IB Gateway...")
-    cm.cancelOrder(test_order_id, "")
+    cm.cancelOrder(test_order_id)
     
     cancelled = order_events["cancelled"].wait(timeout=10.0)
     if not cancelled:
