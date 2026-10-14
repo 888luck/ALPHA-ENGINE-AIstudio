@@ -4,6 +4,7 @@ import path from "path";
 import net from "net";
 import { systemSettings, activeTrades, historicalLogs, marketBooks, dynamicBaskets, persistSettings, setActiveTrades, setHistoricalLogs } from "../state";
 import { authMiddleware, getMaskedSettings } from "../middleware/auth";
+import { invalidateModelsCache } from "./copilot";
 
 export const systemRouter = Router();
 
@@ -136,6 +137,7 @@ systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
   if (secUserAgent !== undefined) systemSettings.secUserAgent = secUserAgent;
 
   persistSettings();
+  invalidateModelsCache();
   res.json({ success: true, settings: getMaskedSettings(systemSettings) });
 });
 

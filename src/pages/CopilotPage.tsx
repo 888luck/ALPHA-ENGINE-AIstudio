@@ -99,11 +99,37 @@ export function CopilotPage({ onNavigateHome }: { onNavigateHome?: () => void })
     try {
       await fetch("/api/set-settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-admin-key": "ALPHA_ADMIN_REVERT_992"
+        },
         body: JSON.stringify({ [key]: value }),
       });
+      await fetchStatsAndModels(true);
     } catch (e) {
       console.warn("Could not persist setting to server:", e);
+    }
+  };
+
+  const handleSaveMultipleSettings = async (updates: Record<string, any>) => {
+    setVaultSettings((prev: any) => {
+      const updated = { ...prev, ...updates };
+      localStorage.setItem("alpha_engine_settings", JSON.stringify(updated));
+      return updated;
+    });
+    try {
+      await fetch("/api/set-settings", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "x-admin-key": "ALPHA_ADMIN_REVERT_992"
+        },
+        body: JSON.stringify(updates),
+      });
+      await fetch("/api/copilot/models?refresh=1");
+      await fetchStatsAndModels(true);
+    } catch (e) {
+      console.warn("Could not persist settings batch to server:", e);
     }
   };
   const [messages, setMessages] = useState<CopilotMessage[]>(() => {
@@ -174,9 +200,10 @@ Click any quick query below or type your request:`,
   }, [messages, activeTools]);
 
   // Fetch telemetry stats & dynamic model discovery
-  const fetchStatsAndModels = async () => {
+  const fetchStatsAndModels = async (force = false) => {
     try {
-      const res = await fetch("/api/copilot/stats");
+      const url = force ? "/api/copilot/stats?refresh=1" : "/api/copilot/stats";
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setStats({
@@ -192,6 +219,16 @@ Click any quick query below or type your request:`,
           // Filter out any retired 2.5 models
           const cleanCatalog = data.models_catalog.filter((m: any) => !m.id.includes("2.5"));
           setAvailableModels(cleanCatalog);
+          // If online models were discovered, auto-select the best one if currently on offline fallback
+          if (cleanCatalog.length > 1) {
+            setSelectedModel((prev) => {
+              if (prev === "local/finbert-int8" || !cleanCatalog.some((m: any) => m.id === prev)) {
+                const online = cleanCatalog.find((m: any) => m.id !== "local/finbert-int8");
+                return online ? online.id : prev;
+              }
+              return prev;
+            });
+          }
         }
       }
     } catch (e) {
@@ -200,10 +237,20 @@ Click any quick query below or type your request:`,
   };
 
   useEffect(() => {
-    fetchStatsAndModels();
-    const interval = setInterval(fetchStatsAndModels, 10000);
+    fetchStatsAndModels(true);
+    // Load initial settings from server
+    fetch("/api/state")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.settings) {
+          setVaultSettings((prev: any) => ({ ...data.settings, ...prev }));
+        }
+      })
+      .catch(() => {});
+
+    const interval = setInterval(() => fetchStatsAndModels(false), 10000);
     const handleInvalidated = () => {
-      fetchStatsAndModels();
+      fetchStatsAndModels(true);
     };
     window.addEventListener("copilot:models_invalidated", handleInvalidated);
     return () => {
@@ -877,10 +924,11 @@ Click any quick query below or type your request:`,
         isOpen={isVaultOpen}
         onClose={() => {
           setIsVaultOpen(false);
-          fetchStatsAndModels();
+          fetchStatsAndModels(true);
         }}
         settings={vaultSettings}
         onSaveSetting={handleSaveSetting}
+        onSaveMultipleSettings={handleSaveMultipleSettings}
         customGeminiApiKey={vaultSettings.geminiApiKey || ""}
         onSaveGeminiKey={(k) => handleSaveSetting("geminiApiKey", k)}
         firebaseStatus="CONNECTED"

@@ -184,16 +184,27 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
 
   const handleSaveAiKeys = async () => {
     if (geminiKey) onSaveGeminiKey(geminiKey);
-    await onSaveSetting("geminiApiKey", geminiKey);
-    await onSaveSetting("customAiApiKey", groqKey);
-    await onSaveSetting("nvidiaApiKey", nvidiaKey);
-    await onSaveSetting("openaiApiKey", openaiKey);
-    await onSaveSetting("anthropicApiKey", anthropicKey);
-    await onSaveSetting("customAiBaseUrl", customBaseUrl);
-    await onSaveSetting("customAiModelName", customModelName);
+    const updates: Record<string, any> = {
+      geminiApiKey: geminiKey,
+      customAiApiKey: groqKey,
+      nvidiaApiKey: nvidiaKey,
+      openaiApiKey: openaiKey,
+      anthropicApiKey: anthropicKey,
+      customAiBaseUrl: customBaseUrl,
+      customAiModelName: customModelName
+    };
+
+    if (onSaveMultipleSettings) {
+      await onSaveMultipleSettings(updates);
+    } else {
+      for (const [k, v] of Object.entries(updates)) {
+        await onSaveSetting(k, v);
+      }
+    }
 
     try {
       await fetch("/api/copilot/models?refresh=1");
+      await fetch("/api/copilot/stats?refresh=1");
     } catch (e) {}
 
     if (typeof window !== "undefined") {

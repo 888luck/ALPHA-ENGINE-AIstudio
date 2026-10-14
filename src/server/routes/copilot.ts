@@ -38,9 +38,15 @@ export interface DiscoveredModel {
 let cachedDiscoveredModels: DiscoveredModel[] = [];
 let modelsCacheTimestamp = 0;
 
+export function invalidateModelsCache() {
+  cachedDiscoveredModels = [];
+  modelsCacheTimestamp = 0;
+}
+
 export async function discoverActiveModels(forceRefresh = false): Promise<DiscoveredModel[]> {
   const now = Date.now();
-  if (!forceRefresh && cachedDiscoveredModels.length > 0 && now - modelsCacheTimestamp < 300000) {
+  const cacheTtl = cachedDiscoveredModels.length > 1 ? 300000 : 2000;
+  if (!forceRefresh && cachedDiscoveredModels.length > 0 && now - modelsCacheTimestamp < cacheTtl) {
     return cachedDiscoveredModels;
   }
 
@@ -225,7 +231,8 @@ copilotRouter.get("/api/copilot/stats", async (req, res) => {
     }
   }
 
-  const models = await discoverActiveModels();
+  const force = req.query.refresh === "1" || req.query.refresh === "true";
+  const models = await discoverActiveModels(force);
 
   res.json({
     status: "SUCCESS",
