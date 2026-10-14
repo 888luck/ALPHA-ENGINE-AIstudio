@@ -596,6 +596,16 @@ Click any quick query below or type your request:`,
             </div>
           </div>
 
+          {/* Direct 4-Pillar Key Vault Access Button */}
+          <button
+            onClick={() => setIsVaultOpen(true)}
+            className="bg-indigo-950/70 hover:bg-indigo-900 border border-indigo-500/40 text-indigo-300 hover:text-white rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs font-mono transition cursor-pointer shadow-md"
+            title="Open 4-Pillar Connection & Feed Vault to configure Cloud LLMs, IBKR, and Market Feeds"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="font-bold">4-Pillar Vault</span>
+          </button>
+
           {/* Active Model Selector Dropdown with Dynamic Discovery */}
           <div className="relative">
             <button
@@ -611,11 +621,34 @@ Click any quick query below or type your request:`,
             </button>
 
             {showModelDropdown && (
-              <div className="absolute right-0 mt-2 w-72 bg-[#0e1422] border border-white/15 rounded-xl shadow-2xl p-2 z-50 animate-fade-in font-mono text-xs">
+              <div className="absolute right-0 mt-2 w-80 bg-[#0e1422] border border-white/15 rounded-xl shadow-2xl p-2 z-50 animate-fade-in font-mono text-xs">
                 <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 mb-1 flex items-center justify-between">
                   <span>Dynamic Model Catalog</span>
                   <span className="text-[9px] text-[#00ff88]">Live Discovered</span>
                 </div>
+
+                {availableModels.length === 1 && (
+                  <div className="p-2.5 my-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 text-[11px] leading-relaxed">
+                    <p className="font-bold flex items-center gap-1.5 mb-1 text-indigo-300">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                      <span>Cloud Models Locked</span>
+                    </p>
+                    <p className="text-[10px] text-slate-300 mb-2">
+                      Connect your free Gemini, Groq, NVIDIA NIM, or OpenAI key in the 4-Pillar Vault to dynamically discover and unlock cloud LLMs.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowModelDropdown(false);
+                        setIsVaultOpen(true);
+                      }}
+                      className="w-full py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] flex items-center justify-center gap-1 transition cursor-pointer"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>Configure API Keys in Vault</span>
+                    </button>
+                  </div>
+                )}
                 {availableModels.map((m) => (
                   <button
                     key={m.id}
@@ -707,6 +740,18 @@ Click any quick query below or type your request:`,
 
                 {/* Content */}
                 {renderMarkdown(msg.content)}
+
+                {msg.content.includes("4-Pillar") && (
+                  <div className="mt-3 pt-2 border-t border-white/5">
+                    <button
+                      onClick={() => setIsVaultOpen(true)}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-300 hover:text-white font-mono text-xs font-bold flex items-center gap-2 transition cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Open 4-Pillar Connection & Feed Vault</span>
+                    </button>
+                  </div>
+                )}
 
                 {/* Per-Message Telemetry Badge */}
                 {msg.telemetry && (
