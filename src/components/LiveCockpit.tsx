@@ -305,7 +305,7 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
                 {isLocked ? "ROUTER HARD-LOCKED" : isLive ? "🔴 LIVE CAPITAL AT RISK" : "🟡 PAPER SIMULATION"}
               </span>
               <span className="text-xs text-slate-300 font-mono font-bold">
-                IBKR IE: {riskStatus?.tradingMode === "LIVE" ? "U8129384" : "DU902144"}
+                IBKR IE: {riskStatus?.accountNumber || systemState?.settings?.ibkrAccountNumber || (riskStatus?.tradingMode === "LIVE" ? "LIVE_CONFIG" : "DUE263010")}
               </span>
             </div>
             <div className="text-xs sm:text-sm text-slate-300 font-sans mt-0.5">
@@ -351,7 +351,7 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
           <div>
             <span className="text-xs text-slate-400 uppercase tracking-wider block font-semibold">NET LIQUIDATION</span>
             <span className="text-sm text-white font-bold">
-              ${(riskStatus?.netLiquidation || 154200).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              €{(riskStatus?.netLiquidation || systemState?.settings?.netLiquidation || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </span>
           </div>
           <div>

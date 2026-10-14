@@ -43,12 +43,23 @@ systemRouter.get("/api/diagnostics", (req, res) => {
 
 systemRouter.get("/api/state", (req, res) => {
   try {
+    let baskets = dynamicBaskets;
+    if (!baskets || baskets.length === 0) {
+      const dbPath = path.join(process.cwd(), "dynamic_baskets.json");
+      if (fs.existsSync(dbPath)) {
+        try {
+          const raw = JSON.parse(fs.readFileSync(dbPath, "utf-8"));
+          baskets = raw.baskets || [];
+        } catch (e) {}
+      }
+    }
+
     res.json({
       settings: getMaskedSettings(systemSettings),
       activeTrades,
       historicalLogs,
       marketBooks,
-      dynamicBaskets
+      dynamicBaskets: baskets
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

@@ -26,7 +26,7 @@ export default function Launchpad({ onNavigate, systemState }: LaunchpadProps) {
   
   // Requirement Logic
   const aiConfigured = !!(settings.geminiApiKey || settings.openaiApiKey || settings.anthropicApiKey || settings.nvidiaApiKey || (settings.customAiApiKey && settings.customAiBaseUrl));
-  const gcpConfigured = settings.ibkrAccountNumber && settings.ibkrAccountNumber !== "U8129384";
+  const gcpConfigured = !!(settings.ibkrAccountNumber && settings.ibkrAccountNumber.trim() !== "");
   const riskConfigured = settings.dailyDrawdownLimitCash > 0 && settings.dailyDrawdownLimitPercent > 0;
   
   const sections = [

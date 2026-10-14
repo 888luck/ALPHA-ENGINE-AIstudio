@@ -48,9 +48,9 @@ export let systemSettings: SystemSettings = {
   ibkrClientId: 10,
   mifid2DecisionMaker: "ALGO_DEC_992",
   mifid2ExecutionTrader: "ALGO_EXE_554",
-  referenceEquity: 154200.00,
-  netLiquidation: 154200.00,
-  maintenanceMargin: 12400.00,
+  referenceEquity: 1023930.83,
+  netLiquidation: 1023930.83,
+  maintenanceMargin: 11901.58,
   routerLocked: false,
   marketTime: "10:30",
   marketPhase: "EXECUTION",
@@ -92,6 +92,18 @@ export let activeTrades: ActiveTrade[] = [];
 export let historicalLogs: HistoricalLog[] = [];
 export let marketBooks: Record<string, Level2Book> = {};
 export let dynamicBaskets: any[] = [];
+
+// Load calibrated dynamic baskets from disk on boot
+try {
+  const dbPath = path.join(process.cwd(), "dynamic_baskets.json");
+  if (fs.existsSync(dbPath)) {
+    const raw = JSON.parse(fs.readFileSync(dbPath, "utf-8"));
+    dynamicBaskets = raw.baskets || [];
+    console.log(`[STATE] Ingested ${dynamicBaskets.length} dynamic candidate baskets from disk on initialization.`);
+  }
+} catch (e: any) {
+  console.warn("[STATE] Could not read dynamic_baskets.json on boot:", e.message);
+}
 
 // Zero Synthetic Policy: executionBlotter is populated exclusively from verified IBKR execDetails callbacks.
 // No mock, fixture, or test trades may be initialised here.

@@ -58,7 +58,8 @@ riskRouter.get("/api/risk/status", async (req, res) => {
     tcpLatencyMs: 14.2,
     netLiquidation: systemSettings.netLiquidation,
     maintenanceMargin: systemSettings.maintenanceMargin,
-    activePositionsCount: activeTrades.length
+    activePositionsCount: activeTrades.length,
+    accountNumber: systemSettings.ibkrAccountNumber
   });
 });
 
