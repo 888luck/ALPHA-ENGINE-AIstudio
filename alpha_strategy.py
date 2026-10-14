@@ -262,6 +262,8 @@ class AlphaStrategy:
             parent.orderType = "MKT"
         parent.totalQuantity = qty
         parent.tif = "DAY"
+        parent.eTradeOnly = False
+        parent.firmQuoteOnly = False
         parent.transmit = False
 
         # 2. Take-Profit Child Order (LMT)
@@ -273,6 +275,8 @@ class AlphaStrategy:
         tp_order.lmtPrice = round(take_profit_price, 2)
         tp_order.parentId = parent_id
         tp_order.tif = "DAY"
+        tp_order.eTradeOnly = False
+        tp_order.firmQuoteOnly = False
         tp_order.transmit = False
 
         # 3. Stop-Loss Child Order (STP)
@@ -284,6 +288,8 @@ class AlphaStrategy:
         sl_order.totalQuantity = qty
         sl_order.parentId = parent_id
         sl_order.tif = "DAY"
+        sl_order.eTradeOnly = False
+        sl_order.firmQuoteOnly = False
         sl_order.transmit = True # Transmits the entire bracket unit atomically
 
         print(f"[IBKR TRANSMISSION] Placing Bracket Group (Parent #{parent_id}, TP #{tp_id}, SL #{sl_id}) for {sym}...")
