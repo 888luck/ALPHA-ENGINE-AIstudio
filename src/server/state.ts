@@ -101,7 +101,10 @@ export async function persistSettings() {
   if (!db_fs) return;
   try {
     await db_fs.doc(SETTINGS_DOC_PATH).set(systemSettings, { merge: true });
-    console.log("[FIREBASE] System settings successfully persisted to Firestore.");
+    await db_fs.doc("system_risk_state/current_state").set({
+      routerLocked: systemSettings.routerLocked
+    }, { merge: true });
+    console.log("[FIREBASE] System settings & router lock status successfully persisted to Firestore.");
   } catch (err) {
     console.error("[FIREBASE] Failed to persist settings:", err);
   }
@@ -157,6 +160,12 @@ export async function loadPersistentSettings() {
             systemSettings.maintenanceMargin = data.maintenanceMargin ?? systemSettings.maintenanceMargin;
             if (data.routerLocked !== undefined) {
               systemSettings.routerLocked = data.routerLocked;
+            }
+            if (data.gatewayConnected !== undefined) {
+              systemSettings.gatewayConnectionActive = Boolean(data.gatewayConnected);
+            }
+            if (data.accountNumber) {
+              systemSettings.ibkrAccountNumber = data.accountNumber;
             }
           }
         }

@@ -91,9 +91,13 @@ class ConnectionManager(EWrapper, EClient):
         if success:
             self.is_connected = True
             self._reconnect_delay = 2.0
+            try:
+                self.reqAccountSummary(9001, "All", "NetLiquidation,TotalCashValue,AvailableFunds,ExcessLiquidity,BuyingPower,MaintMarginReq")
+            except Exception as e:
+                print(f"[CONNECTION] Warning: reqAccountSummary query failed: {e}")
             # Launch dedicated pulse monitor
             threading.Thread(target=self._heartbeat_pulse, daemon=True).start()
-            print("[CONNECTION] Handshake successful. Background listener thread and heartbeat active.")
+            print("[CONNECTION] Handshake successful. Background listener thread, live account subscription, and heartbeat active.")
         else:
             print("[CONNECTION] 3-point handshake timeout (10s) - Gate 1 locked. Connection not fully established.")
             self.is_connected = False
@@ -167,7 +171,11 @@ class ConnectionManager(EWrapper, EClient):
                     self.is_connected = True
                     self._is_reconnecting = False
                     self._reconnect_delay = 2.0 # Reset backoff
-                    print(f"[AUTO-RECONNECT] Reconnection & handshake successful on attempt {attempt}! Restarting API loop.")
+                    try:
+                        self.reqAccountSummary(9001, "All", "NetLiquidation,TotalCashValue,AvailableFunds,ExcessLiquidity,BuyingPower,MaintMarginReq")
+                    except Exception as e:
+                        print(f"[AUTO-RECONNECT] Warning: reqAccountSummary query failed: {e}")
+                    print(f"[AUTO-RECONNECT] Reconnection & handshake successful on attempt {attempt}! Live account summary active.")
                     return
                 else:
                     raise Exception("Handshake timeout during reconnect")
@@ -276,7 +284,10 @@ class ConnectionManager(EWrapper, EClient):
 
     def accountSummary(self, reqId: int, account: str, tag: str, value: str, currency: str):
         """Processes account values (e.g. NetLiquidation, MaintMarginReq) needed for risk screening."""
-        self.account_summary[tag] = float(value) if value.replace('.', '', 1).isdigit() else value
+        try:
+            self.account_summary[tag] = float(value)
+        except (ValueError, TypeError):
+            self.account_summary[tag] = value
         
     def position(self, account: str, contract: Any, position: float, avgCost: float):
         """Tracks active positions across the intraday target catalog directly from broker truth."""

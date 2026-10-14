@@ -459,7 +459,15 @@ def main_loop():
             maint_margin=maint_margin,
             realized_pnl=float(cm.pnl_updates["realized"]),
             unrealized_pnl=float(cm.pnl_updates["unrealized"]),
-            router_locked=bool(drm.router_locked)
+            router_locked=bool(drm.router_locked),
+            extra_metrics={
+                "availableFunds": float(cm.account_summary.get("AvailableFunds", 0.0)),
+                "excessLiquidity": float(cm.account_summary.get("ExcessLiquidity", 0.0)),
+                "buyingPower": float(cm.account_summary.get("BuyingPower", 0.0)),
+                "totalCashValue": float(cm.account_summary.get("TotalCashValue", 0.0)),
+                "accountNumber": cm.accounts_list[0] if cm.accounts_list else "DUE263010",
+                "gatewayConnected": bool(cm.is_connected)
+            }
         )
             
         time.sleep(12)

@@ -31,5 +31,6 @@ export function getMaskedSettings(settings: SystemSettings) {
   if (masked.openFdaApiKey) masked.openFdaApiKey = "configured";
   if (masked.fredApiKey) masked.fredApiKey = "configured";
   if (masked.patentsApiKey) masked.patentsApiKey = "configured";
+  if (masked.ibkrPaperPassword) masked.ibkrPaperPassword = "configured";
   return masked;
 }
