@@ -136,7 +136,8 @@ def main_loop():
         rts22_exporter.record_transaction(
             execution, 
             config.get("MIFID2_DECISION_MAKER_ID", "ALGO_DEC_992"), 
-            config.get("MIFID2_EXECUTION_TRADER_ID", "ALGO_EXE_554")
+            config.get("MIFID2_EXECUTION_TRADER_ID", "ALGO_EXE_554"),
+            symbol=symbol
         )
         # Flush RTS-22 immediately for safety, though normally done EOD
         rts22_exporter.generate_daily_xml()

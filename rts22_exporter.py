@@ -30,15 +30,15 @@ class RTS22Exporter:
         except ImportError:
             logger.warning("[RTS-22] `xmlschema` library not found. Schema validation bypassed.")
 
-    def record_transaction(self, execution: Any, mifid2_decision: str, mifid2_execution: str):
+    def record_transaction(self, execution: Any, mifid2_decision: str, mifid2_execution: str, symbol: str = None):
         """Records a transaction for daily batch reporting."""
-        # execution parameter is an IBKR Execution object
+        sym = symbol or getattr(execution, 'symbol', None) or getattr(getattr(execution, 'contract', None), 'symbol', 'UNKNOWN')
         self.transactions.append({
             "ExecId": str(getattr(execution, 'execId', f"EXEC_{int(datetime.now().timestamp())}")),
-            "Symbol": getattr(getattr(execution, 'contract', None), 'symbol', 'UNKNOWN'),
-            "Side": "BUY" if getattr(execution, 'side', '') == "BOT" else "SELL",
-            "Qty": getattr(execution, 'shares', 0),
-            "Price": getattr(execution, 'price', 0.0),
+            "Symbol": sym,
+            "Side": "BUY" if getattr(execution, 'side', '') in ["BOT", "BUY"] else "SELL",
+            "Qty": getattr(execution, 'shares', getattr(execution, 'cumQty', 0)),
+            "Price": getattr(execution, 'price', getattr(execution, 'avgPrice', 0.0)),
             "Venue": getattr(execution, 'exchange', 'SMART'),
             "Time": getattr(execution, 'time', datetime.now(timezone.utc).strftime("%Y%m%d  %H:%M:%S")),
             "DecisionId": mifid2_decision,

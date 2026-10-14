@@ -187,6 +187,117 @@ class AlphaStrategy:
         print(f"[STRATEGY APPROVED] Target Friction: {friction_ratio*100:.1f}% of projected profit is within bounds.")
         return True
 
+    def submit_bracket_order(
+        self,
+        symbol: str,
+        direction: str,
+        entry_price: float,
+        stop_price: float,
+        quantity: float,
+        take_profit_price: float = None,
+        is_mock: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Submits an institutional DMA bracket order (Parent Entry + OCO Take-Profit & Stop-Loss).
+        In live/paper gateway mode, places real orders over IBKR socket.
+        In sandbox simulation mode (is_mock=True), dispatches simulated fill execution.
+        """
+        sym = symbol.upper().strip()
+        direction = direction.upper().strip()
+        qty = float(quantity)
+        
+        # Calculate take-profit if not explicitly provided (2.0x risk-reward ratio)
+        if take_profit_price is None or take_profit_price <= 0:
+            risk_dist = abs(entry_price - stop_price)
+            if direction == "BUY":
+                take_profit_price = round(entry_price + (2.0 * risk_dist), 2)
+            else:
+                take_profit_price = round(entry_price - (2.0 * risk_dist), 2)
+                
+        print(f"[ORDER ROUTER] Submitting Bracket Order: {direction} {qty} {sym} @ Entry ~${entry_price:.2f} | Stop ${stop_price:.2f} | Target ${take_profit_price:.2f} (Mock={is_mock})")
+
+        if is_mock or not self.cm or not getattr(self.cm, "is_connected", False):
+            # Local DMA Simulation Fill
+            mock_order_id = int(time.time() * 1000) % 1000000
+            class MockExecution:
+                def __init__(self, order_id, shares, price, sym):
+                    self.orderId = order_id
+                    self.shares = shares
+                    self.price = price
+                    self.cumQty = shares
+                    self.avgPrice = price
+                    self.symbol = sym
+                    self.exchange = "SMART"
+                    self.execId = f"EXEC_MOCK_{order_id}"
+                    self.time = time.strftime("%Y%m%d %H:%M:%S")
+                    self.side = "BOT" if direction == "BUY" else "SLD"
+            
+            mock_exec = MockExecution(mock_order_id, qty, entry_price, sym)
+            if self.cm and hasattr(self.cm, "orderStatus"):
+                self.cm.orderStatus(mock_order_id, "Filled", qty, 0.0, entry_price, mock_order_id, 0, entry_price, 10, "", entry_price)
+            if self.cm and hasattr(self.cm, "on_execution_callback") and self.cm.on_execution_callback:
+                self.cm.on_execution_callback(sym, mock_exec)
+            return {"parent_id": mock_order_id, "status": "FILLED_SIMULATION"}
+
+        # Live IBKR Socket Order Placement via IB API
+        try:
+            from ibapi.order import Order
+        except ImportError:
+            Order = getattr(self.cm, "Order", None)
+
+        parent_id = self.cm.nextOrderId()
+        tp_id = self.cm.nextOrderId()
+        sl_id = self.cm.nextOrderId()
+
+        contract = self.cm.create_contract(sym)
+
+        # 1. Parent Entry Order (LMT or MKT)
+        parent = Order()
+        parent.orderId = parent_id
+        parent.action = direction
+        if entry_price > 0:
+            parent.orderType = "LMT"
+            parent.lmtPrice = round(entry_price, 2)
+        else:
+            parent.orderType = "MKT"
+        parent.totalQuantity = qty
+        parent.tif = "DAY"
+        parent.transmit = False
+
+        # 2. Take-Profit Child Order (LMT)
+        tp_order = Order()
+        tp_order.orderId = tp_id
+        tp_order.action = "SELL" if direction == "BUY" else "BUY"
+        tp_order.orderType = "LMT"
+        tp_order.totalQuantity = qty
+        tp_order.lmtPrice = round(take_profit_price, 2)
+        tp_order.parentId = parent_id
+        tp_order.tif = "DAY"
+        tp_order.transmit = False
+
+        # 3. Stop-Loss Child Order (STP)
+        sl_order = Order()
+        sl_order.orderId = sl_id
+        sl_order.action = "SELL" if direction == "BUY" else "BUY"
+        sl_order.orderType = "STP"
+        sl_order.auxPrice = round(stop_price, 2)
+        sl_order.totalQuantity = qty
+        sl_order.parentId = parent_id
+        sl_order.tif = "DAY"
+        sl_order.transmit = True # Transmits the entire bracket unit atomically
+
+        print(f"[IBKR TRANSMISSION] Placing Bracket Group (Parent #{parent_id}, TP #{tp_id}, SL #{sl_id}) for {sym}...")
+        self.cm.placeOrder(parent_id, contract, parent)
+        self.cm.placeOrder(tp_id, contract, tp_order)
+        self.cm.placeOrder(sl_id, contract, sl_order)
+
+        return {
+            "parent_id": parent_id,
+            "tp_id": tp_id,
+            "sl_id": sl_id,
+            "status": "TRANSMITTED_TO_GATEWAY"
+        }
+
 
 class ProactiveSimulator:
     """
