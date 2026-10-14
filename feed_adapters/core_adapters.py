@@ -48,10 +48,10 @@ class SECEdgarAdapter(BaseFeedAdapter):
             doc_descriptions = recent.get("primaryDocDescription", [])
             accession_numbers = recent.get("accessionNumber", [])
             
-            # Scan latest 5 filings
-            for i in range(min(5, len(forms))):
-                form_type = forms[i]
-                if form_type in ["8-K", "10-Q", "10-K", "4"]:
+            # Scan latest 20 filings for key material events and insider filings
+            for i in range(min(20, len(forms))):
+                form_type = str(forms[i]).strip()
+                if form_type.startswith("4") or form_type in ["8-K", "10-Q", "10-K", "144", "SCHEDULE 13G", "SC 13G", "6-K", "20-F"]:
                     acc_num = accession_numbers[i] if i < len(accession_numbers) else str(time.time())
                     ev = NewsEvent(
                         event_id=f"SEC_{sym}_{acc_num}",
@@ -59,7 +59,7 @@ class SECEdgarAdapter(BaseFeedAdapter):
                         source="SEC_EDGAR_OFFICIAL",
                         headline=f"SEC Form {form_type} Filing: {sym}",
                         body=f"Official regulatory disclosure {form_type} filed by {sym} on {dates[i] if i < len(dates) else 'recent'}. Doc: {doc_descriptions[i] if i < len(doc_descriptions) else 'N/A'}",
-                        symbols_mentioned=[sym],
+                        symbols_mentioned=[sym.upper()],
                         event_type="regulatory_filing" if form_type != "8-K" else "material_event",
                         urgency="HIGH" if form_type == "8-K" else "MEDIUM"
                     )
@@ -79,17 +79,29 @@ class ClinicalTrialsAdapter(BaseFeedAdapter):
             protocol = study.get("protocolSection", {})
             ident = protocol.get("identificationModule", {})
             status = protocol.get("statusModule", {})
+            sponsor = protocol.get("sponsorCollaboratorsModule", {}).get("leadSponsor", {}).get("name", "")
             nct_id = ident.get("nctId", "NCT_UNKNOWN")
             brief_title = ident.get("briefTitle", "Clinical Study Update")
             overall_status = status.get("overallStatus", "UNKNOWN")
+
+            # Extract associated tickers if sponsor mentions key pharma/biotech
+            mentioned = []
+            sponsor_lower = sponsor.lower()
+            if "biogen" in sponsor_lower: mentioned.append("BIIB")
+            elif "vertex" in sponsor_lower: mentioned.append("VRTX")
+            elif "pfizer" in sponsor_lower: mentioned.append("PFE")
+            elif "novartis" in sponsor_lower: mentioned.append("NOVN")
+            elif "sanofi" in sponsor_lower: mentioned.append("SAN")
+            elif "roche" in sponsor_lower: mentioned.append("ROG")
+            elif "bayer" in sponsor_lower: mentioned.append("BAYN")
 
             ev = NewsEvent(
                 event_id=f"CT_{nct_id}",
                 timestamp=datetime.now(timezone.utc).isoformat(),
                 source="CLINICALTRIALS_GOV_V2",
                 headline=f"Biopharma Clinical Readout: {nct_id} [{overall_status}]",
-                body=f"{brief_title} - Overall status: {overall_status}",
-                symbols_mentioned=[],
+                body=f"{brief_title} - Sponsor: {sponsor} - Overall status: {overall_status}",
+                symbols_mentioned=mentioned,
                 event_type="clinical_readout",
                 urgency="HIGH" if overall_status in ["COMPLETED", "TERMINATED"] else "LOW"
             )

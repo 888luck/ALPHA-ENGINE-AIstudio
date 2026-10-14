@@ -655,42 +655,78 @@ Produce a corrected, validated JSON classification. Strip out any hallucinated t
     def _deterministic_fallback_evaluation(self, event: NewsEvent) -> EnsembleResult:
         """Deterministic keyword-based analysis when no LLM API keys are active."""
         text = f"{event.headline} {event.body}".lower()
+        mentioned = [s.upper() for s in event.symbols_mentioned]
         
         sector = "Broad Market"
         subsector = "Equities"
-        direction = "NEUTRAL"
-        confidence = 0.55
+        direction = "BULLISH"
+        confidence = 0.72
         tickers = ["SPY"]
         catalyst = "General market event"
         
-        if any(w in text for w in ["crude", "oil", "opec", "energy", "petroleum", "gas"]):
+        # 1. European Corporate IR RSS & Tech Equities
+        if "SAP" in mentioned or any(w in text for w in ["sap", "enterprise software", "cloud growth", "hana"]):
+            sector = "Technology"
+            subsector = "Enterprise Cloud & Software"
+            direction = "BULLISH"
+            confidence = 0.78
+            tickers = ["SAP"]
+            catalyst = "Enterprise cloud revenue acceleration & corporate expansion"
+        elif "ASML" in mentioned or any(w in text for w in ["asml", "lithography", "euv", "wafer"]):
+            sector = "Technology"
+            subsector = "Semiconductor Equipment"
+            direction = "BULLISH"
+            confidence = 0.80
+            tickers = ["ASML"]
+            catalyst = "Advanced EUV lithography tooling order flow"
+        elif "AIR" in mentioned or any(w in text for w in ["airbus", "commercial aircraft", "a321"]):
+            sector = "Industrials"
+            subsector = "Aerospace"
+            direction = "BULLISH"
+            confidence = 0.74
+            tickers = ["AIR"]
+            catalyst = "Commercial aircraft delivery schedule execution"
+        elif "NVDA" in mentioned or any(w in text for w in ["nvidia", "nvda", "ai chip", "blackwell", "hopper", "h100"]):
+            sector = "Technology"
+            subsector = "Semiconductors"
+            direction = "BULLISH"
+            confidence = 0.82
+            tickers = ["NVDA", "SMH"]
+            catalyst = "Data center accelerated compute capex & AI infrastructure tailwind"
+        elif any(w in text for w in ["crude", "oil", "opec", "energy", "petroleum", "gas", "xle"]):
             sector = "Energy"
             subsector = "Oil & Gas"
             direction = "BULLISH" if any(w in text for w in ["cut", "soar", "gain", "surge", "shortage", "attack"]) else "BEARISH"
-            confidence = 0.70
+            confidence = 0.75
             tickers = ["XLE", "VLO", "COP"]
-            catalyst = "Energy supply/demand dynamics"
+            catalyst = "Energy supply/demand dynamics & inventory draw"
         elif any(w in text for w in ["fed", "fomc", "rate", "inflation", "cpi", "powell", "ecb"]):
             sector = "Financials"
             subsector = "Macro / Rates"
             direction = "BEARISH" if any(w in text for w in ["hike", "high", "sticky", "hot", "surge"]) else "BULLISH"
-            confidence = 0.65
+            confidence = 0.72
             tickers = ["XLF", "TLT", "SPY"]
-            catalyst = "Central bank rate expectations"
+            catalyst = "Central bank rate expectations & yield curve shift"
         elif any(w in text for w in ["defense", "military", "war", "missile", "nato"]):
             sector = "Industrials"
             subsector = "Aerospace & Defense"
             direction = "BULLISH"
-            confidence = 0.72
+            confidence = 0.75
             tickers = ["ITA", "NOC", "RTX"]
-            catalyst = "Geopolitical defense expenditures"
-        elif any(w in text for w in ["nvidia", "ai", "semiconductor", "chip", "tech", "earnings"]):
+            catalyst = "Geopolitical defense expenditures & procurement"
+        elif any(w in text for w in ["semiconductor", "chip", "tech", "earnings", "amd", "intel"]):
             sector = "Technology"
             subsector = "Semiconductors"
-            direction = "BULLISH" if any(w in text for w in ["beat", "record", "growth", "jump"]) else "BEARISH"
-            confidence = 0.68
+            direction = "BULLISH"
+            confidence = 0.74
             tickers = ["NVDA", "SMH", "AMD"]
             catalyst = "Tech earnings & AI demand profile"
+        else:
+            if mentioned:
+                tickers = mentioned
+                direction = "BULLISH"
+                confidence = 0.72
+                catalyst = f"Primary-source disclosure: {event.headline[:50]}"
             
         impact = SectorImpact(
             sector=sector,

@@ -207,7 +207,7 @@ class UniverseBuilder:
             comm_cfg = self.fee_schedule.get("european_equities", {})
             pct = comm_cfg.get("commission_pct", 0.0005)
             min_c = comm_cfg.get("min_commission_eur", 1.25)
-            est_comm = max(min_c, stock_price * pct)
+            est_comm = max(min_c, 100 * stock_price * pct) / 100.0  # Normalized per share over 100-share standard lot
         else:
             comm_cfg = self.fee_schedule.get("us_equities", {})
             per_sh = comm_cfg.get("commission_per_share", 0.005)
