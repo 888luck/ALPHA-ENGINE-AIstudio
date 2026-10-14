@@ -22,10 +22,12 @@ def run_dma_dry_run():
     print("       ALPHA ENGINE - STEP 5.3 PAPER DMA ORDER ROUTING DRY RUN   ")
     print("=" * 65)
     
-    # 1. Initialize Connection Manager on dedicated test Client ID (88)
+    # 1. Initialize Connection Manager on dynamic test Client ID
+    import random
+    test_client_id = random.randint(200, 899)
     cm = ConnectionManager(trading_mode="PAPER")
-    print("[INIT] Connecting to IB Gateway on 127.0.0.1:4002 (Client ID: 88)...")
-    cm.connect_gateway("127.0.0.1", 4002, 88)
+    print(f"[INIT] Connecting to IB Gateway on 127.0.0.1:4002 (Client ID: {test_client_id})...")
+    cm.connect_gateway("127.0.0.1", 4002, test_client_id)
     
     if not cm.is_connected:
         print("[FAIL] Failed to establish broker connection within 10s.")
