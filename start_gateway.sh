@@ -30,7 +30,7 @@ echo "[IBGATEWAY-DAEMON] Spawning native headless autologin watcher..."
   if grep -qi "tradingMode=l" /root/Jts/jts.ini; then
     MODE="LIVE"
   fi
-  python3 /opt/alpha-engine/gateway_autologin.py --mode="$MODE" >> /var/log/gateway_autologin.log 2>&1
+  python3 /opt/alpha-engine/gateway_autologin.py --mode="$MODE" --daemon >> /var/log/gateway_autologin.log 2>&1
 ) &
 
 echo "[IBGATEWAY-DAEMON] Launching official IB Gateway standalone..."

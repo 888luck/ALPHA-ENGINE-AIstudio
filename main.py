@@ -326,7 +326,7 @@ def main_loop():
             avail_funds = cm.account_summary.get("AvailableFunds", 0.0)
             print(f"[MARGIN MONITOR] Excess Liquidity: ${excess_liq:,.2f} | Available Funds: ${avail_funds:,.2f}")
             
-            daily_ceiling = drm.daily_loss_limit
+            daily_ceiling = getattr(drm, "daily_loss_limit", getattr(drm, "daily_max_loss_cutoff", 1000.0))
             current_var = var_engine.calculate_var(cm.active_positions, cm.historical_data_buffer)
             if current_var > (daily_ceiling * 0.5):
                 print(f"[VAR ALERT] 99% VaR (${current_var:.2f}) exceeds 50% of daily ceiling (${daily_ceiling:.2f}). Locking router.")

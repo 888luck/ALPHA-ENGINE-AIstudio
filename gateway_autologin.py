@@ -100,6 +100,16 @@ def get_windows() -> List[tuple[str, str]]:
     return windows
 
 
+def get_window_geometry(wid: str) -> Optional[tuple[int, int, int, int]]:
+    """Return (x, y, width, height) of a window via xdotool."""
+    res = run_xdotool(["getwindowgeometry", wid])
+    pos_match = re.search(r"Position:\s*(\d+),(\d+)", res.stdout)
+    geo_match = re.search(r"Geometry:\s*(\d+)x(\d+)", res.stdout)
+    if pos_match and geo_match:
+        return (int(pos_match.group(1)), int(pos_match.group(2)), int(geo_match.group(1)), int(geo_match.group(2)))
+    return None
+
+
 def dismiss_known_dialogs() -> int:
     """Dismiss auxiliary popups (Login Messages, Bulletins, Paper notices, etc.)."""
     dismissed = 0
@@ -116,10 +126,20 @@ def dismiss_known_dialogs() -> int:
         for pat in patterns:
             if pat.search(name):
                 print(f"[AUTOLOGIN] Dismissing auxiliary dialog: '{name}' (WID: {wid})")
+                geo = get_window_geometry(wid)
+                if geo:
+                    gx, gy, gw, gh = geo
+                    btn_x = gx + gw // 2
+                    btn_y = gy + gh - 25
+                    # Click modal confirmation button at bottom center
+                    run_xdotool(["mousemove", str(btn_x), str(btn_y), "click", "1"])
+                    time.sleep(0.2)
                 run_xdotool(["windowactivate", "--sync", wid])
-                time.sleep(0.3)
+                time.sleep(0.2)
                 run_xdotool(["key", "--window", wid, "Return"])
-                time.sleep(0.3)
+                time.sleep(0.2)
+                run_xdotool(["key", "--window", wid, "space"])
+                time.sleep(0.2)
                 dismissed += 1
                 break
     return dismissed
@@ -232,9 +252,26 @@ def main():
     parser.add_argument("--username", default=os.environ.get("IBKR_USERNAME"), help="Account username")
     parser.add_argument("--password", default=os.environ.get("IBKR_PASSWORD"), help="Account password")
     parser.add_argument("--timeout", type=int, default=120, help="Timeout in seconds")
+    parser.add_argument("--daemon", action="store_true", help="Run indefinitely as a background dialog-clearing daemon")
 
     args = parser.parse_args()
     success = perform_login(mode=args.mode, username=args.username, password=args.password, timeout=args.timeout)
+    
+    if args.daemon:
+        print(f"[AUTOLOGIN DAEMON] Entering persistent modal watcher loop (polling every 3s)...", flush=True)
+        target_port = 4001 if args.mode.upper() == "LIVE" else 4002
+        while True:
+            try:
+                # If port went down, attempt relogin
+                if not is_port_open(target_port):
+                    print(f"[AUTOLOGIN DAEMON] Socket {target_port} closed! Initiating self-healing re-login...", flush=True)
+                    perform_login(mode=args.mode, username=args.username, password=args.password, timeout=args.timeout)
+                else:
+                    dismiss_known_dialogs()
+            except Exception as e:
+                print(f"[AUTOLOGIN DAEMON] Watcher cycle exception: {e}", flush=True)
+            time.sleep(3)
+            
     sys.exit(0 if success else 1)
 
 

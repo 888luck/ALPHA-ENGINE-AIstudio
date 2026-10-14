@@ -40,6 +40,14 @@ class DRMMiddleware:
         # Lock status indicator
         self.router_locked = False
 
+    @property
+    def daily_loss_limit(self) -> float:
+        return self.daily_max_loss_cutoff
+
+    @daily_loss_limit.setter
+    def daily_loss_limit(self, val: float):
+        self.daily_max_loss_cutoff = float(val)
+
     def update_settings(self, settings: Dict[str, Any]):
         """Updates risk gateway settings dynamically from API/UI."""
         if "daily_capital_ceiling" in settings:

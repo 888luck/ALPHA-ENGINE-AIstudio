@@ -82,7 +82,8 @@ class ConnectionManager(EWrapper, EClient):
         # Wait up to 10s for the handshake criteria
         success = False
         for _ in range(100):
-            if hasattr(self, 'serverVersion') and self.serverVersion() >= 170 and len(self.accounts_list) > 0 and self.next_order_id > 0 and self._handshake_time_received:
+            sv = self.serverVersion() if hasattr(self, 'serverVersion') else None
+            if sv is not None and sv > 0 and len(self.accounts_list) > 0 and self.next_order_id > 0 and self._handshake_time_received:
                 success = True
                 break
             time.sleep(0.1)
@@ -156,7 +157,8 @@ class ConnectionManager(EWrapper, EClient):
                     
                 success = False
                 for _ in range(100):
-                    if hasattr(self, 'serverVersion') and self.serverVersion() >= 170 and len(self.accounts_list) > 0 and self.next_order_id > 0 and self._handshake_time_received:
+                    sv = self.serverVersion() if hasattr(self, 'serverVersion') else None
+                    if sv is not None and sv > 0 and len(self.accounts_list) > 0 and self.next_order_id > 0 and self._handshake_time_received:
                         success = True
                         break
                     time.sleep(0.1)
