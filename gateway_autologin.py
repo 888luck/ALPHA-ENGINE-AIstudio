@@ -18,11 +18,12 @@ DISPLAY = os.environ.get("DISPLAY", ":1")
 ENV_PATH = "/opt/alpha-engine/.env"
 
 # Screen coordinates on 1280x800 virtual display for IB Gateway 10.50
-COORD_LIVE_TAB = (440, 305)
-COORD_PAPER_TAB = (660, 305)
-COORD_USERNAME_FIELD = (550, 375)
-COORD_PASSWORD_FIELD = (600, 415)
+COORD_LIVE_TAB = (440, 398)
+COORD_PAPER_TAB = (590, 398)
+COORD_USERNAME_FIELD = (660, 378)
+COORD_PASSWORD_FIELD = (660, 422)
 COORD_LOGIN_BUTTON = (660, 485)
+
 
 
 def load_env_credentials():
@@ -52,6 +53,24 @@ def run_xdotool(args: List[str]) -> subprocess.CompletedProcess:
         stderr=subprocess.PIPE,
         text=True,
     )
+
+
+def paste_clipboard(text: str) -> None:
+    """Inject text safely via X11 clipboard without shell or layout interpretation."""
+    env = os.environ.copy()
+    env["DISPLAY"] = DISPLAY
+    try:
+        p = subprocess.Popen(["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE, env=env, stderr=subprocess.PIPE)
+        p.communicate(input=text.encode("utf-8"))
+        time.sleep(0.1)
+        p = subprocess.Popen(["xclip", "-selection", "primary"], stdin=subprocess.PIPE, env=env, stderr=subprocess.PIPE)
+        p.communicate(input=text.encode("utf-8"))
+        time.sleep(0.1)
+        run_xdotool(["key", "ctrl+v"])
+    except Exception as e:
+        print(f"[AUTOLOGIN] Warning: xclip injection fallback ({e})...")
+        subprocess.run(["xdotool", "type", "--delay", "50", "--", text], env=env)
+
 
 
 def is_port_open(port: int, host: str = "127.0.0.1", timeout: float = 1.0) -> bool:
@@ -175,20 +194,19 @@ def perform_login(mode: str, username: Optional[str] = None, password: Optional[
 
             # 3. Enter Password (if provided)
             if password:
-                print(f"[AUTOLOGIN] Focusing password field at {COORD_PASSWORD_FIELD}...", flush=True)
-                run_xdotool(["mousemove", str(COORD_PASSWORD_FIELD[0]), str(COORD_PASSWORD_FIELD[1]), "click", "1"])
+                print("[AUTOLOGIN] Navigating to password field via Tab...", flush=True)
+                run_xdotool(["key", "Tab"])
                 time.sleep(0.3)
                 run_xdotool(["key", "ctrl+a", "BackSpace"])
                 time.sleep(0.1)
-                # Type password safely without shell expansion
-                env = os.environ.copy()
-                env["DISPLAY"] = DISPLAY
-                subprocess.run(["xdotool", "type", "--delay", "80", "--", password], env=env)
+                run_xdotool(["type", "--delay", "50", "--", password])
                 time.sleep(0.5)
 
             # 4. Click Log In button
             print(f"[AUTOLOGIN] Clicking Log In button at {COORD_LOGIN_BUTTON}...", flush=True)
             run_xdotool(["mousemove", str(COORD_LOGIN_BUTTON[0]), str(COORD_LOGIN_BUTTON[1]), "click", "1"])
+            time.sleep(0.3)
+            run_xdotool(["key", "Return"])
             login_attempted = True
 
             if mode == "LIVE":

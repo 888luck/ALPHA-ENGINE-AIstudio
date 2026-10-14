@@ -1,0 +1,1552 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-10-14T07:29:46.429648+00:00",
+  "ttl_seconds": 86400,
+  "total_tools": 57,
+  "categories": [
+    "biomedical_regulatory",
+    "broker_account",
+    "broker_contract",
+    "broker_market_data",
+    "broker_news",
+    "broker_orders",
+    "broker_scanner",
+    "commodity_energy",
+    "regulatory_sec"
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "reqAccountSummary",
+        "description": "Call this method to request and keep up to date the data that appears\non the TWS Account Window Summary tab. The data is returned by\naccountSummary().\n\nNote:   This request is designed for an FA managed account but can be\nused for any multi-account structure.\n\nreqId:int - The ID of the data request. Ensures that responses are matched\n    to requests If several requests are in process.\ngroupName:str - Set to All to returnrn account summary data for all\n    accounts, or set to a specific Advisor Account Group name that has\n    already been created in TWS Global Configuration.\ntags:str - A comma-separated list of account tags.  Available tags are:\n    accountountType\n    NetLiquidation,\n    TotalCashValue - Total cash including futures pnl\n    SettledCash - For cash accounts, this is the same as\n    TotalCashValue\n    AccruedCash - Net accrued interest\n    BuyingPower - The maximum amount of marginable US stocks the\n        account can buy\n    EquityWithLoanValue - Cash + stocks + bonds + mutual funds\n    PreviousDayEquityWithLoanValue,\n    GrossPositionValue - The sum of the absolute value of all stock\n        and equity option positions\n    RegTEquity,\n    RegTMargin,\n    SMA - Special Memorandum Account\n    InitMarginReq,\n    MaintMarginReq,\n    AvailableFunds,\n    ExcessLiquidity,\n    Cushion - Excess liquidity as a percentage of net liquidation value\n    FullInitMarginReq,\n    FullMaintMarginReq,\n    FullAvailableFunds,\n    FullExcessLiquidity,\n    LookAheadNextChange - Time when look-ahead values take effect\n    LookAheadInitMarginReq,\n    LookAheadMaintMarginReq,\n    LookAheadAvailableFunds,\n    LookAheadExcessLiquidity,\n    HighestSeverity - A measure of how close the account is to liquidation\n    DayTradesRemaining - The Number of Open/Close trades a user\n        could put on before Pattern Day Trading is detected. A value of \"-1\"\n        means that the user can put on unlimited day trades.\n    Leverage - GrossPositionValue / NetLiquidation\n    $LEDGER - Single flag to relay all cash balance tags*, only in base\n        currency.\n    $LEDGER:CURRENCY - Single flag to relay all cash balance tags*, only in\n        the specified currency.\n    $LEDGER:ALL - Single flag to relay all cash balance tags* in all\n    currencies.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "int - The ID of the data request. Ensures that responses are matched"
+            },
+            "groupName": {
+              "type": "string",
+              "description": "str - Set to All to returnrn account summary data for all"
+            },
+            "tags": {
+              "type": "string",
+              "description": "str - A comma-separated list of account tags.  Available tags are:"
+            }
+          },
+          "required": [
+            "reqId",
+            "groupName",
+            "tags"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelAccountSummary",
+        "description": "Cancels the request for Account Window Summary tab data.\n\nreqId:int - The ID of the data request being canceled.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "int - The ID of the data request being canceled."
+            }
+          },
+          "required": [
+            "reqId"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqAccountUpdates",
+        "description": "Call this function to start getting account values, portfolio,\nand last update time information via EWrapper.updateAccountValue(),\nEWrapperi.updatePortfolio() and Wrapper.updateAccountTime().\n\nsubscribe:bool - If set to TRUE, the client will start receiving account\n    and Portfoliolio updates. If set to FALSE, the client will stop\n    receiving this information.\nacctCode:str -The account code for which to receive account and\n    portfolio updates.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "subscribe": {
+              "type": "boolean",
+              "description": "bool - If set to TRUE, the client will start receiving account"
+            },
+            "acctCode": {
+              "type": "string",
+              "description": "str -The account code for which to receive account and"
+            }
+          },
+          "required": [
+            "subscribe",
+            "acctCode"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqPositions",
+        "description": "Requests real-time position data for all accounts.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelPositions",
+        "description": "Cancels real-time position updates.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqPositionsMulti",
+        "description": "Requests positions for account and/or model.\nResults are delivered via EWrapper.positionMulti() and\nEWrapper.positionMultiEnd()",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Parameter reqId for reqPositionsMulti"
+            },
+            "account": {
+              "type": "string",
+              "description": "Parameter account for reqPositionsMulti"
+            },
+            "modelCode": {
+              "type": "string",
+              "description": "Parameter modelCode for reqPositionsMulti"
+            }
+          },
+          "required": [
+            "reqId",
+            "account",
+            "modelCode"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelPositionsMulti",
+        "description": "Interactive Brokers API method: cancelPositionsMulti",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Parameter reqId for cancelPositionsMulti"
+            }
+          },
+          "required": [
+            "reqId"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqPnL",
+        "description": "Interactive Brokers API method: reqPnL",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Parameter reqId for reqPnL"
+            },
+            "account": {
+              "type": "string",
+              "description": "Parameter account for reqPnL"
+            },
+            "modelCode": {
+              "type": "string",
+              "description": "Parameter modelCode for reqPnL"
+            }
+          },
+          "required": [
+            "reqId",
+            "account",
+            "modelCode"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelPnL",
+        "description": "Interactive Brokers API method: cancelPnL",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Parameter reqId for cancelPnL"
+            }
+          },
+          "required": [
+            "reqId"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqPnLSingle",
+        "description": "Interactive Brokers API method: reqPnLSingle",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Parameter reqId for reqPnLSingle"
+            },
+            "account": {
+              "type": "string",
+              "description": "Parameter account for reqPnLSingle"
+            },
+            "modelCode": {
+              "type": "string",
+              "description": "Parameter modelCode for reqPnLSingle"
+            },
+            "conid": {
+              "type": "integer",
+              "description": "Parameter conid for reqPnLSingle"
+            }
+          },
+          "required": [
+            "reqId",
+            "account",
+            "modelCode",
+            "conid"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelPnLSingle",
+        "description": "Interactive Brokers API method: cancelPnLSingle",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Parameter reqId for cancelPnLSingle"
+            }
+          },
+          "required": [
+            "reqId"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqManagedAccts",
+        "description": "Call this function to request the list of managed accounts. The list\nwill be returned by the managedAccounts() function on the EWrapper.\n\nNote:  This request can only be made when connected to a FA managed account.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqContractDetails",
+        "description": "Call this function to download all details for a particular\nunderlying. The contract details will be received via the contractDetails()\nfunction on the EWrapper.\n\nreqId:int - The ID of the data request. Ensures that responses are\n    make_fieldatched to requests if several requests are in process.\ncontract:Contract - The summary description of the contract being looked\n    up.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "int - The ID of the data request. Ensures that responses are"
+            },
+            "contract": {
+              "type": "string",
+              "description": "Contract - The summary description of the contract being looked"
+            }
+          },
+          "required": [
+            "reqId",
+            "contract"
+          ]
+        }
+      },
+      "category": "broker_contract",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqMatchingSymbols",
+        "description": "Interactive Brokers API method: reqMatchingSymbols",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Parameter reqId for reqMatchingSymbols"
+            },
+            "pattern": {
+              "type": "string",
+              "description": "Parameter pattern for reqMatchingSymbols"
+            }
+          },
+          "required": [
+            "reqId",
+            "pattern"
+          ]
+        }
+      },
+      "category": "broker_contract",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqSecDefOptParams",
+        "description": "Requests security definition option parameters for viewing a\ncontract's option chain reqId the ID chosen for the request\nunderlyingSymbol futFopExchange The exchange on which the returned\noptions are trading. Can be set to the empty string \"\" for all\nexchanges. underlyingSecType The type of the underlying security,\ni.e. STK underlyingConId the contract ID of the underlying security.\nResponse comes via EWrapper.securityDefinitionOptionParameter()",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Parameter reqId for reqSecDefOptParams"
+            },
+            "underlyingSymbol": {
+              "type": "string",
+              "description": "Parameter underlyingSymbol for reqSecDefOptParams"
+            },
+            "futFopExchange": {
+              "type": "string",
+              "description": "Parameter futFopExchange for reqSecDefOptParams"
+            },
+            "underlyingSecType": {
+              "type": "string",
+              "description": "Parameter underlyingSecType for reqSecDefOptParams"
+            },
+            "underlyingConId": {
+              "type": "integer",
+              "description": "Parameter underlyingConId for reqSecDefOptParams"
+            }
+          },
+          "required": [
+            "reqId",
+            "underlyingSymbol",
+            "futFopExchange",
+            "underlyingSecType",
+            "underlyingConId"
+          ]
+        }
+      },
+      "category": "broker_contract",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqMktData",
+        "description": "Call this function to request market data. The market data\nwill be returned by the tickPrice and tickSize events.\n\nreqId: TickerId - The ticker id. Must be a unique value. When the\n    market data returns, it will be identified by this tag. This is\n    also used when canceling the market data.\ncontract:Contract - This structure contains a description of the\n    Contractt for which market data is being requested.\ngenericTickList:str - A commma delimited list of generic tick types.\n    Tick types can be found in the Generic Tick Types page.\n    Prefixing w/ 'mdoff' indicates that top mkt data shouldn't tick.\n    You can specify the news source by postfixing w/ ':<source>.\n    Example: \"mdoff,292:FLY+BRF\"\nsnapshot:bool - Check to return a single snapshot of Market data and\n    have the market data subscription cancel. Do not enter any\n    genericTicklist values if you use snapshots.\nregulatorySnapshot: bool - With the US Value Snapshot Bundle for stocks,\n    regulatory snapshots are available for 0.01 USD each.\nmktDataOptions:TagValueList - For internal use only.\n    Use default value XYZ.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "TickerId - The ticker id. Must be a unique value. When the"
+            },
+            "contract": {
+              "type": "string",
+              "description": "Contract - This structure contains a description of the"
+            },
+            "genericTickList": {
+              "type": "string",
+              "description": "str - A commma delimited list of generic tick types."
+            },
+            "snapshot": {
+              "type": "boolean",
+              "description": "bool - Check to return a single snapshot of Market data and"
+            },
+            "regulatorySnapshot": {
+              "type": "boolean",
+              "description": "bool - With the US Value Snapshot Bundle for stocks,"
+            },
+            "mktDataOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "TagValueList - For internal use only."
+            }
+          },
+          "required": [
+            "reqId",
+            "contract",
+            "genericTickList",
+            "snapshot",
+            "regulatorySnapshot",
+            "mktDataOptions"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelMktData",
+        "description": "After calling this function, market data for the specified id\nwill stop flowing.\n\nreqId: TickerId - The ID that was specified in the call to\n    reqMktData().",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "TickerId - The ID that was specified in the call to"
+            }
+          },
+          "required": [
+            "reqId"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqMarketDataType",
+        "description": "The API can receive frozen market data from Trader\nWorkstation. Frozen market data is the last data recorded in our system.\nDuring normal trading hours, the API receives real-time market data. If\nyou use this function, you are telling TWS to automatically switch to\nfrozen market data after the close. Then, before the opening of the next\ntrading day, market data will automatically switch back to real-time\nmarket data.\n\nmarketDataType:int - 1 for real-time streaming market data or 2 for\n    frozen market data",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "marketDataType": {
+              "type": "integer",
+              "description": "int - 1 for real-time streaming market data or 2 for"
+            }
+          },
+          "required": [
+            "marketDataType"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqMktDepth",
+        "description": "Call this function to request market depth for a specific\ncontract. The market depth will be returned by the updateMktDepth() and\nupdateMktDepthL2() events.\n\nRequests the contract's market depth (order book). Note this request must be\ndirect-routed to an exchange and not smart-routed. The number of simultaneous\nmarket depth requests allowed in an account is calculated based on a formula\nthat looks at an accounts equity, commissions, and quote booster packs.\n\nreqId:TickerId - The ticker id. Must be a unique value. When the market\n    depth data returns, it will be identified by this tag. This is\n    also used when canceling the market depth\ncontract:Contact - This structure contains a description of the contract\n    for which market depth data is being requested.\nnumRows:int - Specifies the numRowsumber of market depth rows to display.\nisSmartDepth:bool - specifies SMART depth request\nmktDepthOptions:TagValueList - For internal use only. Use default value\n    XYZ.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "TickerId - The ticker id. Must be a unique value. When the market"
+            },
+            "contract": {
+              "type": "string",
+              "description": "Contact - This structure contains a description of the contract"
+            },
+            "numRows": {
+              "type": "integer",
+              "description": "int - Specifies the numRowsumber of market depth rows to display."
+            },
+            "isSmartDepth": {
+              "type": "boolean",
+              "description": "bool - specifies SMART depth request"
+            },
+            "mktDepthOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "TagValueList - For internal use only. Use default value"
+            }
+          },
+          "required": [
+            "reqId",
+            "contract",
+            "numRows",
+            "isSmartDepth",
+            "mktDepthOptions"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelMktDepth",
+        "description": "After calling this function, market depth data for the specified id\nwill stop flowing.\n\nreqId:TickerId - The ID that was specified in the call to\n    reqMktDepth().\nisSmartDepth:bool - specifies SMART depth request",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "TickerId - The ID that was specified in the call to"
+            },
+            "isSmartDepth": {
+              "type": "boolean",
+              "description": "bool - specifies SMART depth request"
+            }
+          },
+          "required": [
+            "reqId",
+            "isSmartDepth"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqHistogramData",
+        "description": "Interactive Brokers API method: reqHistogramData",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "tickerId": {
+              "type": "integer",
+              "description": "Parameter tickerId for reqHistogramData"
+            },
+            "contract": {
+              "type": "string",
+              "description": "Parameter contract for reqHistogramData"
+            },
+            "useRTH": {
+              "type": "boolean",
+              "description": "Parameter useRTH for reqHistogramData"
+            },
+            "timePeriod": {
+              "type": "string",
+              "description": "Parameter timePeriod for reqHistogramData"
+            }
+          },
+          "required": [
+            "tickerId",
+            "contract",
+            "useRTH",
+            "timePeriod"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelHistogramData",
+        "description": "Interactive Brokers API method: cancelHistogramData",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "tickerId": {
+              "type": "integer",
+              "description": "Parameter tickerId for cancelHistogramData"
+            }
+          },
+          "required": [
+            "tickerId"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqHistoricalData",
+        "description": "Requests contracts' historical data. When requesting historical data, a\nfinishing time and date is required along with a duration string. The\nresulting bars will be returned in EWrapper.historicalData()\n\nreqId:TickerId - The id of the request. Must be a unique value. When the\n    market data returns, it whatToShowill be identified by this tag. This is also\n    used when canceling the market data.\ncontract:Contract - This object contains a description of the contract for which\n    market data is being requested.\nendDateTime:str - Defines a query end date and time at any point during the past 6 mos.\n    Valid values include any date/time within the past six months in the format:\n    yyyymmdd HH:mm:ss ttt\n\n    where \"ttt\" is the optional time zone.\ndurationStr:str - Set the query duration up to one week, using a time unit\n    of seconds, days or weeks. Valid values include any integer followed by a space\n    and then S (seconds), D (days) or W (week). If no unit is specified, seconds is used.\nbarSizeSetting:str - Specifies the size of the bars that will be returned (within IB/TWS listimits).\n    Valid values include:\n    1 sec\n    5 secs\n    15 secs\n    30 secs\n    1 min\n    2 mins\n    3 mins\n    5 mins\n    15 mins\n    30 mins\n    1 hour\n    1 day\nwhatToShow:str - Determines the nature of data beinging extracted. Valid values include:\n\n    TRADES\n    MIDPOINT\n    BID\n    ASK\n    BID_ASK\n    HISTORICAL_VOLATILITY\n    OPTION_IMPLIED_VOLATILITY\nuseRTH:int - Determines whether to return all data available during the requested time span,\n    or only data that falls within regular trading hours. Valid values include:\n\n    0 - all data is returned even where the market in question was outside of its\n    regular trading hours.\n    1 - only data within the regular trading hours is returned, even if the\n    requested time span falls partially or completely outside of the RTH.\nformatDate: int - Determines the date format applied to returned bars. validd values include:\n\n    1 - dates applying to bars returned in the format: yyyymmdd{space}{space}hh:mm:dd\n    2 - dates are returned as a long integer specifying the number of seconds since\n        1/1/1970 GMT.\nchartOptions:TagValueList - For internal use only. Use default value XYZ.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "TickerId - The id of the request. Must be a unique value. When the"
+            },
+            "contract": {
+              "type": "string",
+              "description": "Contract - This object contains a description of the contract for which"
+            },
+            "endDateTime": {
+              "type": "string",
+              "description": "str - Defines a query end date and time at any point during the past 6 mos."
+            },
+            "durationStr": {
+              "type": "string",
+              "description": "str - Set the query duration up to one week, using a time unit"
+            },
+            "barSizeSetting": {
+              "type": "string",
+              "description": "str - Specifies the size of the bars that will be returned (within IB/TWS listimits)."
+            },
+            "whatToShow": {
+              "type": "string",
+              "description": "str - Determines the nature of data beinging extracted. Valid values include:"
+            },
+            "useRTH": {
+              "type": "integer",
+              "description": "int - Determines whether to return all data available during the requested time span,"
+            },
+            "formatDate": {
+              "type": "integer",
+              "description": "int - Determines the date format applied to returned bars. validd values include:"
+            },
+            "keepUpToDate": {
+              "type": "boolean",
+              "description": "Parameter keepUpToDate for reqHistoricalData"
+            },
+            "chartOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "TagValueList - For internal use only. Use default value XYZ."
+            }
+          },
+          "required": [
+            "reqId",
+            "contract",
+            "endDateTime",
+            "durationStr",
+            "barSizeSetting",
+            "whatToShow",
+            "useRTH",
+            "formatDate",
+            "keepUpToDate",
+            "chartOptions"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelHistoricalData",
+        "description": "Used if an internet disconnect has occurred or the results of a query\nare otherwise delayed and the application is no longer interested in receiving\nthe data.\n\nreqId:TickerId - The ticker ID. Must be a unique value.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "TickerId - The ticker ID. Must be a unique value."
+            }
+          },
+          "required": [
+            "reqId"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqHeadTimeStamp",
+        "description": "Interactive Brokers API method: reqHeadTimeStamp",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Parameter reqId for reqHeadTimeStamp"
+            },
+            "contract": {
+              "type": "string",
+              "description": "Parameter contract for reqHeadTimeStamp"
+            },
+            "whatToShow": {
+              "type": "string",
+              "description": "Parameter whatToShow for reqHeadTimeStamp"
+            },
+            "useRTH": {
+              "type": "integer",
+              "description": "Parameter useRTH for reqHeadTimeStamp"
+            },
+            "formatDate": {
+              "type": "integer",
+              "description": "Parameter formatDate for reqHeadTimeStamp"
+            }
+          },
+          "required": [
+            "reqId",
+            "contract",
+            "whatToShow",
+            "useRTH",
+            "formatDate"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelHeadTimeStamp",
+        "description": "Interactive Brokers API method: cancelHeadTimeStamp",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Parameter reqId for cancelHeadTimeStamp"
+            }
+          },
+          "required": [
+            "reqId"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "calculateImpliedVolatility",
+        "description": "Call this function to calculate volatility for a supplied\noption price and underlying price. Result will be delivered\nvia EWrapper.tickOptionComputation()\n\nreqId:TickerId -  The request id.\ncontract:Contract -  Describes the contract.\noptionPrice:double - The price of the option.\nunderPrice:double - Price of the underlying.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "TickerId -  The request id."
+            },
+            "contract": {
+              "type": "string",
+              "description": "Contract -  Describes the contract."
+            },
+            "optionPrice": {
+              "type": "number",
+              "description": "double - The price of the option."
+            },
+            "underPrice": {
+              "type": "number",
+              "description": "double - Price of the underlying."
+            },
+            "implVolOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Parameter implVolOptions for calculateImpliedVolatility"
+            }
+          },
+          "required": [
+            "reqId",
+            "contract",
+            "optionPrice",
+            "underPrice",
+            "implVolOptions"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "calculateOptionPrice",
+        "description": "Call this function to calculate option price and greek values\nfor a supplied volatility and underlying price.\n\nreqId:TickerId -    The ticker ID.\ncontract:Contract - Describes the contract.\nvolatility:double - The volatility.\nunderPrice:double - Price of the underlying.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "TickerId -    The ticker ID."
+            },
+            "contract": {
+              "type": "string",
+              "description": "Contract - Describes the contract."
+            },
+            "volatility": {
+              "type": "number",
+              "description": "double - The volatility."
+            },
+            "underPrice": {
+              "type": "number",
+              "description": "double - Price of the underlying."
+            },
+            "optPrcOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Parameter optPrcOptions for calculateOptionPrice"
+            }
+          },
+          "required": [
+            "reqId",
+            "contract",
+            "volatility",
+            "underPrice",
+            "optPrcOptions"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelCalculateImpliedVolatility",
+        "description": "Call this function to cancel a request to calculate\nvolatility for a supplied option price and underlying price.\n\nreqId:TickerId - The request ID.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "TickerId - The request ID."
+            }
+          },
+          "required": [
+            "reqId"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelCalculateOptionPrice",
+        "description": "Call this function to cancel a request to calculate the option\nprice and greek values for a supplied volatility and underlying price.\n\nreqId:TickerId - The request ID.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "TickerId - The request ID."
+            }
+          },
+          "required": [
+            "reqId"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqOpenOrders",
+        "description": "Call this function to request the open orders that were\nplaced from this client. Each open order will be fed back through the\nopenOrder() and orderStatus() functions on the EWrapper.\n\nNote:  The client with a clientId of 0 will also receive the TWS-owned\nopen orders. These orders will be associated with the client and a new\norderId will be generated. This association will persist over multiple\nAPI and TWS sessions.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "category": "broker_orders",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqAllOpenOrders",
+        "description": "Call this function to request the open orders placed from all\nclients and also from TWS. Each open order will be fed back through the\nopenOrder() and orderStatus() functions on the EWrapper.\n\nNote:  No association is made between the returned orders and the\nrequesting client.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "category": "broker_orders",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqAutoOpenOrders",
+        "description": "Call this function to request that newly created TWS orders\nbe implicitly associated with the client. When a new TWS order is\ncreated, the order will be associated with the client, and fed back\nthrough the openOrder() and orderStatus() functions on the EWrapper.\n\nNote:  This request can only be made from a client with clientId of 0.\n\nbAutoBind: If set to TRUE, newly created TWS orders will be implicitly\nassociated with the client. If set to FALSE, no association will be\nmade.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "bAutoBind": {
+              "type": "boolean",
+              "description": "If set to TRUE, newly created TWS orders will be implicitly"
+            }
+          },
+          "required": [
+            "bAutoBind"
+          ]
+        }
+      },
+      "category": "broker_orders",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "placeOrder",
+        "description": "Call this function to place an order. The order status will\nbe returned by the orderStatus event.\n\norderId:OrderId - The order id. You must specify a unique value. When the\n    order START_APItus returns, it will be identified by this tag.\n    This tag is also used when canceling the order.\ncontract:Contract - This structure contains a description of the\n    contract which is being traded.\norder:Order - This structure contains the details of tradedhe order.\n    Note: Each client MUST connect with a unique clientId.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "orderId": {
+              "type": "integer",
+              "description": "OrderId - The order id. You must specify a unique value. When the"
+            },
+            "contract": {
+              "type": "string",
+              "description": "Contract - This structure contains a description of the"
+            },
+            "order": {
+              "type": "string",
+              "description": "Order - This structure contains the details of tradedhe order."
+            }
+          },
+          "required": [
+            "orderId",
+            "contract",
+            "order"
+          ]
+        }
+      },
+      "category": "broker_orders",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelOrder",
+        "description": "Call this function to cancel an order.\n\norderId:OrderId - The order ID that was specified previously in the call\n    to placeOrder()",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "orderId": {
+              "type": "integer",
+              "description": "OrderId - The order ID that was specified previously in the call"
+            }
+          },
+          "required": [
+            "orderId"
+          ]
+        }
+      },
+      "category": "broker_orders",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqGlobalCancel",
+        "description": "Use this function to cancel all open orders globally. It\ncancels both API and TWS open orders.\n\nIf the order was created in TWS, it also gets canceled. If the order\nwas initiated in the API, it also gets canceled.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqIds",
+        "description": "Call this function to request from TWS the next valid ID that\ncan be used when placing an order.  After calling this function, the\nnextValidId() event will be triggered, and the id returned is that next\nvalid ID. That ID will reflect any autobinding that has occurred (which\ngenerates new IDs and increments the next valid ID therein).\n\nnumIds:int - deprecated",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "numIds": {
+              "type": "integer",
+              "description": "int - deprecated"
+            }
+          },
+          "required": [
+            "numIds"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqExecutions",
+        "description": "When this function is called, the execution reports that meet the\nfilter criteria are downloaded to the client via the execDetails()\nfunction. To view executions beyond the past 24 hours, open the\nTrade Log in TWS and, while the Trade Log is displayed, request\nthe executions again from the API.\n\nreqId:int - The ID of the data request. Ensures that responses are\n    matched to requests if several requests are in process.\nexecFilter:ExecutionFilter - This object contains attributes that\n    describe the filter criteria used to determine which execution\n    reports are returned.\n\nNOTE: Time format must be 'yyyymmdd-hh:mm:ss' Eg: '20030702-14:55'",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "int - The ID of the data request. Ensures that responses are"
+            },
+            "execFilter": {
+              "type": "string",
+              "description": "ExecutionFilter - This object contains attributes that"
+            }
+          },
+          "required": [
+            "reqId",
+            "execFilter"
+          ]
+        }
+      },
+      "category": "broker_orders",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqNewsBulletins",
+        "description": "Call this function to start receiving news bulletins. Each bulletin\nwill be returned by the updateNewsBulletin() event.\n\nallMsgs:bool - If set to TRUE, returns all the existing bulletins for\nthe currencyent day and any new ones. If set to FALSE, will only\nreturn new bulletins.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "allMsgs": {
+              "type": "boolean",
+              "description": "bool - If set to TRUE, returns all the existing bulletins for"
+            }
+          },
+          "required": [
+            "allMsgs"
+          ]
+        }
+      },
+      "category": "broker_news",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelNewsBulletins",
+        "description": "Call this function to stop receiving news bulletins.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "category": "broker_news",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqNewsProviders",
+        "description": "Interactive Brokers API method: reqNewsProviders",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "category": "broker_news",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqHistoricalNews",
+        "description": "Interactive Brokers API method: reqHistoricalNews",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Parameter reqId for reqHistoricalNews"
+            },
+            "conId": {
+              "type": "integer",
+              "description": "Parameter conId for reqHistoricalNews"
+            },
+            "providerCodes": {
+              "type": "string",
+              "description": "Parameter providerCodes for reqHistoricalNews"
+            },
+            "startDateTime": {
+              "type": "string",
+              "description": "Parameter startDateTime for reqHistoricalNews"
+            },
+            "endDateTime": {
+              "type": "string",
+              "description": "Parameter endDateTime for reqHistoricalNews"
+            },
+            "totalResults": {
+              "type": "integer",
+              "description": "Parameter totalResults for reqHistoricalNews"
+            },
+            "historicalNewsOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Parameter historicalNewsOptions for reqHistoricalNews"
+            }
+          },
+          "required": [
+            "reqId",
+            "conId",
+            "providerCodes",
+            "startDateTime",
+            "endDateTime",
+            "totalResults",
+            "historicalNewsOptions"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqNewsArticle",
+        "description": "Interactive Brokers API method: reqNewsArticle",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Parameter reqId for reqNewsArticle"
+            },
+            "providerCode": {
+              "type": "string",
+              "description": "Parameter providerCode for reqNewsArticle"
+            },
+            "articleId": {
+              "type": "string",
+              "description": "Parameter articleId for reqNewsArticle"
+            },
+            "newsArticleOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Parameter newsArticleOptions for reqNewsArticle"
+            }
+          },
+          "required": [
+            "reqId",
+            "providerCode",
+            "articleId",
+            "newsArticleOptions"
+          ]
+        }
+      },
+      "category": "broker_news",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqFundamentalData",
+        "description": "Call this function to receive fundamental data for\nstocks. The appropriate market data subscription must be set up in\nAccount Management before you can receive this data.\nFundamental data will be returned at EWrapper.fundamentalData().\n\nreqFundamentalData() can handle conid specified in the Contract object,\nbut not tradingClass or multiplier. This is because reqFundamentalData()\nis used only for stocks and stocks do not have a multiplier and\ntrading class.\n\nreqId:tickerId - The ID of the data request. Ensures that responses are\n     matched to requests if several requests are in process.\ncontract:Contract - This structure contains a description of the\n    contract for which fundamental data is being requested.\nreportType:str - One of the following XML reports:\n    ReportSnapshot (company overview)\n    ReportsFinSummary (financial summary)\n    ReportRatios (financial ratios)\n    ReportsFinStatements (financial statements)\n    RESC (analyst estimates)",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "tickerId - The ID of the data request. Ensures that responses are"
+            },
+            "contract": {
+              "type": "string",
+              "description": "Contract - This structure contains a description of the"
+            },
+            "reportType": {
+              "type": "string",
+              "description": "str - One of the following XML reports:"
+            },
+            "fundamentalDataOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Parameter fundamentalDataOptions for reqFundamentalData"
+            }
+          },
+          "required": [
+            "reqId",
+            "contract",
+            "reportType",
+            "fundamentalDataOptions"
+          ]
+        }
+      },
+      "category": "broker_news",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelFundamentalData",
+        "description": "Call this function to stop receiving fundamental data.\n\nreqId:TickerId - The ID of the data request.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "TickerId - The ID of the data request."
+            }
+          },
+          "required": [
+            "reqId"
+          ]
+        }
+      },
+      "category": "broker_news",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqCurrentTime",
+        "description": "Asks the current system time on the server side.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqScannerParameters",
+        "description": "Requests an XML string that describes all possible scanner queries.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "category": "broker_scanner",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqScannerSubscription",
+        "description": "reqId:int - The ticker ID. Must be a unique value.\nscannerSubscription:ScannerSubscription - This structure contains\n    possible parameters used to filter results.\nscannerSubscriptionOptions:TagValueList - For internal use only.\n    Use default value XYZ.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "int - The ticker ID. Must be a unique value."
+            },
+            "subscription": {
+              "type": "string",
+              "description": "Parameter subscription for reqScannerSubscription"
+            },
+            "scannerSubscriptionOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "TagValueList - For internal use only."
+            },
+            "scannerSubscriptionFilterOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Parameter scannerSubscriptionFilterOptions for reqScannerSubscription"
+            }
+          },
+          "required": [
+            "reqId",
+            "subscription",
+            "scannerSubscriptionOptions",
+            "scannerSubscriptionFilterOptions"
+          ]
+        }
+      },
+      "category": "broker_scanner",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelScannerSubscription",
+        "description": "reqId:int - The ticker ID. Must be a unique value.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "int - The ticker ID. Must be a unique value."
+            }
+          },
+          "required": [
+            "reqId"
+          ]
+        }
+      },
+      "category": "broker_scanner",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "resolve_contract_details_blocking",
+        "description": "Requests contract details via live socket and blocks until completed or timeout.\nReturns cached dictionary or None.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "contract": {
+              "type": "string",
+              "description": "Parameter contract for resolve_contract_details_blocking"
+            },
+            "timeout": {
+              "type": "number",
+              "description": "Parameter timeout for resolve_contract_details_blocking",
+              "default": 3.0
+            }
+          },
+          "required": [
+            "contract"
+          ]
+        }
+      },
+      "category": "broker_contract",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "create_contract",
+        "description": "Constructs an institutional Contract specification.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "description": "Parameter symbol for create_contract"
+            },
+            "sec_type": {
+              "type": "string",
+              "description": "Parameter sec_type for create_contract",
+              "default": "STK"
+            },
+            "exchange": {
+              "type": "string",
+              "description": "Parameter exchange for create_contract",
+              "default": "SMART"
+            },
+            "currency": {
+              "type": "string",
+              "description": "Parameter currency for create_contract",
+              "default": "USD"
+            }
+          },
+          "required": [
+            "symbol"
+          ]
+        }
+      },
+      "category": "broker_contract",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "create_market_order",
+        "description": "Constructs a compliant IBKR Market order (MKT DAY).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "description": "Parameter action for create_market_order"
+            },
+            "quantity": {
+              "type": "number",
+              "description": "Parameter quantity for create_market_order"
+            }
+          },
+          "required": [
+            "action",
+            "quantity"
+          ]
+        }
+      },
+      "category": "broker_orders",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "is_quote_stale",
+        "description": "Stale quote watchdog: drops ticks arriving older than threshold during socket jitter.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "timestamp": {
+              "type": "number",
+              "description": "Parameter timestamp for is_quote_stale"
+            },
+            "max_latency_ms": {
+              "type": "number",
+              "description": "Parameter max_latency_ms for is_quote_stale",
+              "default": 500.0
+            }
+          },
+          "required": [
+            "timestamp"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_sec_filings",
+        "description": "Queries real SEC EDGAR primary filings (10-K, 10-Q, 8-K, Form 4) for any ticker symbol via official data.sec.gov primary sources. Returns accession numbers, filing dates, and direct links.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ticker": {
+              "type": "string",
+              "description": "Stock ticker symbol (e.g. NVDA, AAPL, MSFT, TSLA, COP)"
+            },
+            "form_type": {
+              "type": "string",
+              "description": "Optional form filter: '8-K' (material events), '10-Q' (quarterly report), '10-K' (annual report), '4' (insider transactions). If omitted, returns all recent filings."
+            }
+          },
+          "required": [
+            "ticker"
+          ]
+        }
+      },
+      "category": "regulatory_sec",
+      "source": "U.S. Securities and Exchange Commission (SEC EDGAR)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_clinical_trials",
+        "description": "Queries real-time clinical protocol readouts from ClinicalTrials.gov API v2. Returns protocol phases, study titles, and overall status (COMPLETED, RECRUITING, TERMINATED).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "condition_or_intervention": {
+              "type": "string",
+              "description": "Medical condition, disease, or drug molecule (e.g. Oncology, Pain, Epilepsy)"
+            },
+            "status": {
+              "type": "string",
+              "description": "Optional status filter: 'COMPLETED', 'RECRUITING', 'ACTIVE_NOT_RECRUITING'"
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "biomedical_regulatory",
+      "source": "U.S. National Library of Medicine (ClinicalTrials.gov API v2)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_fda_safety_reports",
+        "description": "Queries official FDA adverse drug reaction and safety reports from api.fda.gov.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "drug_name": {
+              "type": "string",
+              "description": "Target medicinal product or active pharmaceutical ingredient"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Maximum number of reports to retrieve (default: 5)"
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "biomedical_regulatory",
+      "source": "U.S. Food and Drug Administration (OpenFDA)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_energy_telemetry",
+        "description": "Queries official EIA (Energy Information Administration) v2 telemetry for weekly natural gas underground storage, petroleum status, and inventory shifts.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "commodity": {
+              "type": "string",
+              "description": "Energy commodity report: 'natural_gas', 'petroleum', 'crude_oil'"
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "commodity_energy",
+      "source": "U.S. Energy Information Administration (EIA v2)"
+    }
+  ]
+}

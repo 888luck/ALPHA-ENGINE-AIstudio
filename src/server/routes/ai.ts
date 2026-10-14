@@ -115,118 +115,194 @@ Only output raw valid JSON.`;
 });
 
 aiRouter.post("/api/test-ai-key", async (req, res) => {
-  const { provider, apiKey } = req.body;
+  const { provider, apiKey, baseUrl } = req.body;
   const startTime = Date.now();
-  const testPrompt = "Ping: respond with READY.";
 
   try {
     if (provider === "gemini") {
       const key = apiKey || systemSettings.geminiApiKey || process.env.GEMINI_API_KEY;
       if (!key || key === "MY_GEMINI_API_KEY") throw new Error("No Gemini API key supplied.");
-      const ai = new GoogleGenAI({ apiKey: key });
-      const resp = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: testPrompt });
+      
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Google API returned ${response.status}: ${errText}`);
+      }
+      const data = await response.json();
+      const rawModels = data.models || [];
+      const discoveredModels = rawModels
+        .filter((m: any) => m.supportedGenerationMethods?.includes("generateContent"))
+        .map((m: any) => {
+          const cleanId = m.name?.replace(/^models\//, "");
+          return {
+            id: `google/${cleanId}`,
+            rawId: cleanId,
+            name: m.displayName || cleanId,
+            description: m.description || "",
+            provider: "Google GenAI",
+            tier: cleanId.includes("flash") ? "Tier 1 Next-Gen" : "Tier 2 Deep Reasoning",
+            badge: "Active Discovered",
+            costStr: cleanId.includes("flash") ? "$0.10 / 1M tokens" : "$1.25 / 1M tokens",
+            icon: "💎"
+          };
+        });
+
       const latencyMs = Date.now() - startTime;
       return res.json({
         success: true,
         latencyMs,
-        provider: "Google Gemini 2.5 Flash",
-        reply: resp.text?.trim() || "READY",
-        message: `Gemini 2.5 Flash responded in ${latencyMs}ms.`
+        provider: "Google GenAI",
+        models: discoveredModels,
+        message: `Google GenAI verified. Discovered ${discoveredModels.length} active models directly from API.`
       });
     }
 
-    if (provider === "openai") {
-      const key = apiKey || systemSettings.openaiApiKey || process.env.OPENAI_API_KEY;
-      if (!key) throw new Error("No OpenAI API key supplied.");
-      const openai = new OpenAI({ apiKey: key });
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: testPrompt }],
-        max_tokens: 5,
-      });
-      const latencyMs = Date.now() - startTime;
-      return res.json({
-        success: true,
-        latencyMs,
-        provider: "OpenAI (GPT-4o-mini)",
-        reply: completion.choices[0]?.message?.content?.trim() || "READY",
-        message: `OpenAI GPT-4o-mini responded in ${latencyMs}ms.`
-      });
-    }
+    if (provider === "groq") {
+      const key = apiKey || systemSettings.customAiApiKey || process.env.GROQ_API_KEY;
+      if (!key) throw new Error("No Groq API key supplied.");
 
-    if (provider === "anthropic") {
-      const key = apiKey || systemSettings.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
-      if (!key) throw new Error("No Anthropic API key supplied.");
-      const anthropic = new Anthropic({ apiKey: key });
-      const msg = await anthropic.messages.create({
-        model: "claude-3-haiku-20240307",
-        max_tokens: 5,
-        messages: [{ role: "user", content: testPrompt }],
+      const response = await fetch("https://api.groq.com/openai/v1/models", {
+        headers: { "Authorization": `Bearer ${key}` }
       });
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Groq API returned ${response.status}: ${errText}`);
+      }
+      const data = await response.json();
+      const rawModels = data.data || [];
+      const discoveredModels = rawModels
+        .filter((m: any) => m.active !== false && !m.id?.includes("whisper"))
+        .map((m: any) => ({
+          id: `groq/${m.id}`,
+          rawId: m.id,
+          name: m.id,
+          provider: "Groq",
+          tier: m.id.includes("70b") ? "Tier 1 LPU" : "Tier 0.5 LPU",
+          badge: "Ultra-Fast LPU",
+          costStr: "$0.59 / 1M tokens",
+          icon: "⚡"
+        }));
+
       const latencyMs = Date.now() - startTime;
       return res.json({
         success: true,
         latencyMs,
-        provider: "Anthropic (Claude 3 Haiku)",
-        reply: (msg.content[0] as any)?.text?.trim() || "READY",
-        message: `Claude 3 Haiku responded in ${latencyMs}ms.`
+        provider: "Groq Cloud",
+        models: discoveredModels,
+        message: `Groq Cloud verified. Discovered ${discoveredModels.length} active models directly from API.`
       });
     }
 
     if (provider === "nvidia") {
       const key = apiKey || systemSettings.nvidiaApiKey || process.env.NVIDIA_API_KEY;
       if (!key) throw new Error("No NVIDIA API key supplied.");
-      const openai = new OpenAI({ apiKey: key, baseURL: "https://integrate.api.nvidia.com/v1" });
-      const completion = await openai.chat.completions.create({
-        model: "meta/llama-3.1-70b-instruct",
-        messages: [{ role: "user", content: testPrompt }],
-        max_tokens: 5,
+
+      const response = await fetch("https://integrate.api.nvidia.com/v1/models", {
+        headers: { "Authorization": `Bearer ${key}` }
       });
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`NVIDIA API returned ${response.status}: ${errText}`);
+      }
+      const data = await response.json();
+      const rawModels = data.data || [];
+      const discoveredModels = rawModels.map((m: any) => ({
+        id: `nvidia/${m.id}`,
+        rawId: m.id,
+        name: m.id,
+        provider: "NVIDIA NIM",
+        tier: "Tier 1 NIM",
+        badge: "NIM Microservice",
+        costStr: "$0.70 / 1M tokens",
+        icon: "🟢"
+      }));
+
       const latencyMs = Date.now() - startTime;
       return res.json({
         success: true,
         latencyMs,
-        provider: "NVIDIA NIM (Llama 3.1 70B)",
-        reply: completion.choices[0]?.message?.content?.trim() || "READY",
-        message: `NVIDIA NIM responded in ${latencyMs}ms.`
+        provider: "NVIDIA NIM",
+        models: discoveredModels,
+        message: `NVIDIA NIM verified. Discovered ${discoveredModels.length} active models directly from API.`
+      });
+    }
+
+    if (provider === "openai") {
+      const key = apiKey || systemSettings.openaiApiKey || process.env.OPENAI_API_KEY;
+      if (!key) throw new Error("No OpenAI API key supplied.");
+
+      const response = await fetch("https://api.openai.com/v1/models", {
+        headers: { "Authorization": `Bearer ${key}` }
+      });
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`OpenAI API returned ${response.status}: ${errText}`);
+      }
+      const data = await response.json();
+      const rawModels = data.data || [];
+      const discoveredModels = rawModels
+        .filter((m: any) => m.id?.startsWith("gpt-") || m.id?.startsWith("o1"))
+        .map((m: any) => ({
+          id: `openai/${m.id}`,
+          rawId: m.id,
+          name: m.id,
+          provider: "OpenAI",
+          tier: "Tier 1 Frontier",
+          badge: "OpenAI Official",
+          costStr: "$2.50 / 1M tokens",
+          icon: "🧠"
+        }));
+
+      const latencyMs = Date.now() - startTime;
+      return res.json({
+        success: true,
+        latencyMs,
+        provider: "OpenAI",
+        models: discoveredModels,
+        message: `OpenAI verified. Discovered ${discoveredModels.length} active models directly from API.`
+      });
+    }
+
+    if (provider === "custom") {
+      const targetUrl = baseUrl || systemSettings.customAiBaseUrl || "http://localhost:11434/v1";
+      const modelsEndpoint = targetUrl.endsWith("/") ? `${targetUrl}models` : `${targetUrl}/models`;
+      const response = await fetch(modelsEndpoint);
+      if (!response.ok) {
+        throw new Error(`Custom endpoint returned ${response.status}`);
+      }
+      const data = await response.json();
+      const rawModels = data.data || data.models || [];
+      const discoveredModels = rawModels.map((m: any) => {
+        const mid = typeof m === "string" ? m : (m.id || m.name || "custom-model");
+        return {
+          id: `custom/${mid}`,
+          rawId: mid,
+          name: mid,
+          provider: "Custom Local",
+          tier: "Tier 0 Self-Hosted",
+          badge: "Local Runtime",
+          costStr: "$0.00 (Self-Hosted)",
+          icon: "🦙"
+        };
+      });
+
+      const latencyMs = Date.now() - startTime;
+      return res.json({
+        success: true,
+        latencyMs,
+        provider: "Custom Endpoint",
+        models: discoveredModels,
+        message: `Custom endpoint verified. Discovered ${discoveredModels.length} models.`
       });
     }
 
     throw new Error(`Unsupported provider for test: ${provider}`);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message, message: err.message });
   }
 });
 
 aiRouter.get("/api/models/live-catalog", async (req, res) => {
-  const catalog = {
-    google_genai: [
-      { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", inputTokenLimit: 1048576, outputTokenLimit: 8192, recommendedRole: "verifier_2", status: "active" },
-      { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", inputTokenLimit: 2097152, outputTokenLimit: 8192, recommendedRole: "judge", status: "active" }
-    ],
-    openai: [
-      { id: "gpt-4o", name: "GPT-4o", recommendedRole: "judge", status: "active" },
-      { id: "gpt-4o-mini", name: "GPT-4o Mini", recommendedRole: "generator", status: "active" }
-    ],
-    anthropic: [
-      { id: "claude-3-5-sonnet-20240620", name: "Claude 3.5 Sonnet", recommendedRole: "judge", status: "active" },
-      { id: "claude-3-haiku-20240307", name: "Claude 3 Haiku", recommendedRole: "generator", status: "active" }
-    ],
-    nvidia_nim: [
-      { id: "meta/llama-3.1-405b-instruct", name: "Llama 3.1 405B", recommendedRole: "judge", status: "active" },
-      { id: "meta/llama-3.1-70b-instruct", name: "Llama 3.1 70B", recommendedRole: "verifier_1", status: "active" }
-    ]
-  };
-
-  res.json({ success: true, catalog });
-});
-
-aiRouter.get("/api/gemini/available-models", async (req, res) => {
-  res.json({
-    success: true,
-    models: [
-      { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash (Default)" },
-      { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro (Deep Reasoning)" }
-    ]
-  });
+  // Purged static catalogs - redirect to dynamic model discovery
+  res.redirect("/api/copilot/models");
 });

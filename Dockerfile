@@ -47,7 +47,9 @@ RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt || t
 # Copy the compiled artifacts from the builder context
 COPY --from=builder /app/dist ./dist
 
-# Copy quant python engines and config resources
+# Copy quant python engines, adapters, backend and config resources
+COPY feed_adapters ./feed_adapters
+COPY backend ./backend
 COPY *.py ./
 COPY *.json ./
 

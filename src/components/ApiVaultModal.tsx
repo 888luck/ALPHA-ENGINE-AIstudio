@@ -90,13 +90,14 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
     setShowKeys((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // Test Results State
+  // Test Results State with Live Discovered Models
   const [testResults, setTestResults] = useState<Record<string, {
     loading?: boolean;
     success?: boolean;
     latencyMs?: number;
     message?: string;
     sample?: string;
+    models?: any[];
   }>>({});
 
   // Generic Probe Runner
@@ -121,6 +122,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
           latencyMs: data.latencyMs,
           message: data.message || data.error,
           sample: data.sample || data.reply,
+          models: data.models || [],
         },
       }));
     } catch (err: any) {
@@ -178,6 +180,8 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
     }
   };
 
+  const [aiSavedMsg, setAiSavedMsg] = useState<string | null>(null);
+
   const handleSaveAiKeys = async () => {
     if (geminiKey) onSaveGeminiKey(geminiKey);
     await onSaveSetting("geminiApiKey", geminiKey);
@@ -187,6 +191,16 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
     await onSaveSetting("anthropicApiKey", anthropicKey);
     await onSaveSetting("customAiBaseUrl", customBaseUrl);
     await onSaveSetting("customAiModelName", customModelName);
+
+    try {
+      await fetch("/api/copilot/models?refresh=1");
+    } catch (e) {}
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("copilot:models_invalidated"));
+    }
+    setAiSavedMsg("AI credentials persisted. Copilot model catalog dynamically synchronized.");
+    setTimeout(() => setAiSavedMsg(null), 4000);
   };
 
   const handleSaveFeedSettings = async () => {
@@ -713,6 +727,23 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       {testResults["gemini"].message}
                     </div>
                   )}
+
+                  {testResults["gemini"]?.models && testResults["gemini"].models.length > 0 && (
+                    <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-200 space-y-1.5">
+                      <div className="text-[10px] font-mono font-bold text-blue-900 uppercase flex items-center justify-between">
+                        <span>Discovered Active Models ({testResults["gemini"].models.length}):</span>
+                        <span className="text-[9px] text-blue-600 font-normal">Live from Google API</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {testResults["gemini"].models.map((m: any) => (
+                          <span key={m.id || m} className="px-2 py-0.5 bg-white border border-blue-200 text-blue-800 text-[10px] font-mono rounded-md shadow-xs flex items-center gap-1">
+                            <span>💎</span>
+                            <span className="font-bold">{m.name || m.id || m}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. Groq Cloud */}
@@ -722,7 +753,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-black text-xs font-mono">Q</div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-slate-900">Groq Cloud (Llama 3.1 70B)</span>
+                          <span className="text-xs font-bold text-slate-900">Groq Cloud LPU</span>
                           <span className="text-[9px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-mono font-bold">VERIFIER 1 (ULTRA-FAST)</span>
                           <span className="text-[9px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-mono font-bold">GENEROUS FREE TIER</span>
                         </div>
@@ -775,6 +806,23 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       {testResults["groq"].message}
                     </div>
                   )}
+
+                  {testResults["groq"]?.models && testResults["groq"].models.length > 0 && (
+                    <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200 space-y-1.5">
+                      <div className="text-[10px] font-mono font-bold text-amber-900 uppercase flex items-center justify-between">
+                        <span>Discovered Active Models ({testResults["groq"].models.length}):</span>
+                        <span className="text-[9px] text-amber-700 font-normal">Live from Groq API</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {testResults["groq"].models.map((m: any) => (
+                          <span key={m.id || m} className="px-2 py-0.5 bg-white border border-amber-200 text-amber-900 text-[10px] font-mono rounded-md shadow-xs flex items-center gap-1">
+                            <span>⚡</span>
+                            <span className="font-bold">{m.name || m.id || m}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 3. NVIDIA NIM */}
@@ -784,7 +832,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-xs font-mono">NV</div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-slate-900">NVIDIA NIM (Nemotron / Llama 405B)</span>
+                          <span className="text-xs font-bold text-slate-900">NVIDIA NIM Microservices</span>
                           <span className="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono font-bold">GENERATOR</span>
                           <span className="text-[9px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-mono font-bold">1,000 FREE CREDITS</span>
                         </div>
@@ -828,6 +876,32 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       Test Ping
                     </button>
                   </div>
+
+                  {testResults["nvidia"] && (
+                    <div className={`p-2.5 rounded-lg font-mono text-[11px] ${
+                      testResults["nvidia"].success ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"
+                    }`}>
+                      {testResults["nvidia"].success ? "🟢 " : "🔴 "}
+                      {testResults["nvidia"].message}
+                    </div>
+                  )}
+
+                  {testResults["nvidia"]?.models && testResults["nvidia"].models.length > 0 && (
+                    <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-200 space-y-1.5">
+                      <div className="text-[10px] font-mono font-bold text-emerald-900 uppercase flex items-center justify-between">
+                        <span>Discovered Active Models ({testResults["nvidia"].models.length}):</span>
+                        <span className="text-[9px] text-emerald-700 font-normal">Live from NVIDIA NIM API</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {testResults["nvidia"].models.map((m: any) => (
+                          <span key={m.id || m} className="px-2 py-0.5 bg-white border border-emerald-200 text-emerald-900 text-[10px] font-mono rounded-md shadow-xs flex items-center gap-1">
+                            <span>🟢</span>
+                            <span className="font-bold">{m.name || m.id || m}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 4. Local Self-Hosted Ollama / Custom Bridge */}
@@ -842,7 +916,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                         </div>
                       </div>
                     </div>
-                    <span className="text-[10px] text-slate-500 font-mono">Run: <code className="bg-slate-200 px-1 rounded">ollama run llama3.1</code></span>
+                    <span className="text-[10px] text-slate-500 font-mono">Run: <code className="bg-slate-200 px-1 rounded">ollama run deepseek-r1</code></span>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -857,15 +931,56 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       type="text"
                       value={customModelName}
                       onChange={(e) => setCustomModelName(e.target.value)}
-                      placeholder="Model Name: e.g. llama3.1 or deepseek-r1:8b"
+                      placeholder="Model Name: e.g. deepseek-r1 or llama3.2"
                       className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-900"
                     />
                   </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={() => runTestProbe("custom", "/api/test-ai-key", { provider: "custom", baseUrl: customBaseUrl })}
+                      disabled={testResults["custom"]?.loading}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0"
+                    >
+                      {testResults["custom"]?.loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />}
+                      Test Ping Endpoint
+                    </button>
+                    {testResults["custom"] && (
+                      <span className={`text-[11px] font-mono ${testResults["custom"].success ? "text-emerald-700" : "text-red-700"}`}>
+                        {testResults["custom"].success ? "🟢 " + testResults["custom"].message : "🔴 " + testResults["custom"].message}
+                      </span>
+                    )}
+                  </div>
+
+                  {testResults["custom"]?.models && testResults["custom"].models.length > 0 && (
+                    <div className="p-3 bg-purple-50/70 rounded-xl border border-purple-200 space-y-1.5">
+                      <div className="text-[10px] font-mono font-bold text-purple-900 uppercase">
+                        Discovered Local Models ({testResults["custom"].models.length}):
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {testResults["custom"].models.map((m: any) => (
+                          <span key={m.id || m} className="px-2 py-0.5 bg-white border border-purple-200 text-purple-900 text-[10px] font-mono rounded-md shadow-xs flex items-center gap-1">
+                            <span>🦙</span>
+                            <span className="font-bold">{m.name || m.id || m}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Save All AI Keys */}
-              <div className="flex justify-end pt-3 border-t border-slate-200">
+              <div className="flex items-center justify-between pt-3 border-t border-slate-200">
+                <div>
+                  {aiSavedMsg && (
+                    <span className="text-xs font-mono font-bold text-emerald-700 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4" />
+                      {aiSavedMsg}
+                    </span>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={handleSaveAiKeys}

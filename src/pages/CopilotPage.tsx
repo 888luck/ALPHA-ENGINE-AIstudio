@@ -1,0 +1,847 @@
+import React, { useState, useEffect, useRef } from "react";
+import {
+  MessageSquare,
+  Sparkles,
+  Send,
+  Square,
+  Trash2,
+  Cpu,
+  Shield,
+  ShieldAlert,
+  ArrowLeft,
+  ChevronDown,
+  Activity,
+  DollarSign,
+  Layers,
+  CheckCircle2,
+  Clock,
+  Terminal,
+  Zap,
+  RefreshCw,
+  ExternalLink,
+  Copy,
+  Check,
+  AlertTriangle
+} from "lucide-react";
+
+export interface CopilotMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp: string;
+  activeTools?: string[];
+  telemetry?: {
+    provider: string;
+    model: string;
+    model_name: string;
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+    latency_ms: number;
+    cost_usd: number;
+    daily_spent_usd: number;
+    daily_requests: number;
+    daily_quota: number;
+    circuit_breaker_active: boolean;
+  };
+}
+
+interface ModelItem {
+  id: string;
+  name: string;
+  provider: string;
+  tier: string;
+  badge: string;
+  costStr: string;
+  icon: string;
+}
+
+interface CopilotStats {
+  daily_spent_usd: number;
+  daily_requests: number;
+  daily_quota: number;
+  daily_budget_ceiling_usd: number;
+  circuit_breaker_active: boolean;
+  provider_counts: Record<string, number>;
+}
+
+import { ApiVaultModal } from "../components/ApiVaultModal";
+
+// Offline default model (local CPU ONNX embedded in container)
+const TIER0_OFFLINE_MODEL: ModelItem = {
+  id: "local/finbert-int8",
+  name: "INT8 ONNX FinBERT (CPU Offline)",
+  provider: "Local Tier 0",
+  tier: "Tier 0 Offline",
+  badge: "$0 Cost / <15ms",
+  costStr: "$0.00 (Offline)",
+  icon: "🛡️"
+};
+
+export function CopilotPage({ onNavigateHome }: { onNavigateHome?: () => void }) {
+  const [availableModels, setAvailableModels] = useState<ModelItem[]>([TIER0_OFFLINE_MODEL]);
+  const [isVaultOpen, setIsVaultOpen] = useState(false);
+  const [vaultSettings, setVaultSettings] = useState<any>(() => {
+    try {
+      const raw = localStorage.getItem("alpha_engine_settings");
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+
+  const handleSaveSetting = async (key: string, value: any) => {
+    setVaultSettings((prev: any) => {
+      const updated = { ...prev, [key]: value };
+      localStorage.setItem("alpha_engine_settings", JSON.stringify(updated));
+      return updated;
+    });
+    try {
+      await fetch("/api/set-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: value }),
+      });
+    } catch (e) {
+      console.warn("Could not persist setting to server:", e);
+    }
+  };
+  const [messages, setMessages] = useState<CopilotMessage[]>(() => {
+    const saved = localStorage.getItem("alpha_copilot_messages");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.warn("Failed to parse saved copilot messages", e);
+      }
+    }
+    return [
+      {
+        id: "welcome-1",
+        role: "assistant",
+        content: `### 🤖 AlphaEngine Institutional Trading Copilot
+
+Welcome to your standalone conversational trading co-pilot. I am connected directly to:
+- 🏛️ **Frankfurt GCE Edge Node** (\`10.156.0.2:4002\`) for live IBKR Pro portfolio & cash balances.
+- 📋 **SEC EDGAR Submissions API** for real-time 8-K, 10-Q, 10-K, and Form 4 regulatory filings.
+- 🧬 **ClinicalTrials.gov (API v2) & OpenFDA** for Phase II/III trial readouts and drug safety alerts.
+- ⚡ **U.S. EIA Energy Telemetry** for real-time natural gas underground storage & petroleum prints.
+- 🛡️ **Local Tier 0 INT8 ONNX FinBERT** for zero-cost, instant offline sentiment inference.
+
+Click any quick query below or type your request:`,
+        timestamp: new Date().toLocaleTimeString()
+      }
+    ];
+  });
+
+  const [input, setInput] = useState("");
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    const saved = localStorage.getItem("alpha_copilot_model");
+    if (saved && !saved.includes("2.5")) {
+      return saved;
+    }
+    return "google/gemini-2.0-flash";
+  });
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [activeTools, setActiveTools] = useState<string[]>([]);
+  const [stats, setStats] = useState<CopilotStats>({
+    daily_spent_usd: 0.00041,
+    daily_requests: 2,
+    daily_quota: 1500,
+    daily_budget_ceiling_usd: 1.00,
+    circuit_breaker_active: false,
+    provider_counts: { Groq: 0, "Google GenAI": 0, "NVIDIA NIM": 2, "Local Tier 0": 0 }
+  });
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Sync messages with localStorage
+  useEffect(() => {
+    localStorage.setItem("alpha_copilot_messages", JSON.stringify(messages));
+  }, [messages]);
+
+  // Sync selected model
+  useEffect(() => {
+    localStorage.setItem("alpha_copilot_model", selectedModel);
+  }, [selectedModel]);
+
+  // Auto scroll
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, activeTools]);
+
+  // Fetch telemetry stats & dynamic model discovery
+  const fetchStatsAndModels = async () => {
+    try {
+      const res = await fetch("/api/copilot/stats");
+      if (res.ok) {
+        const data = await res.json();
+        setStats({
+          daily_spent_usd: data.daily_spent_usd || 0.0,
+          daily_requests: data.daily_requests || 0,
+          daily_quota: data.daily_quota || 1500,
+          daily_budget_ceiling_usd: data.daily_budget_ceiling_usd || 1.0,
+          circuit_breaker_active: !!data.circuit_breaker_active,
+          provider_counts: data.provider_counts || {}
+        });
+
+        if (Array.isArray(data.models_catalog) && data.models_catalog.length > 0) {
+          // Filter out any retired 2.5 models
+          const cleanCatalog = data.models_catalog.filter((m: any) => !m.id.includes("2.5"));
+          setAvailableModels(cleanCatalog);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch copilot stats", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchStatsAndModels();
+    const interval = setInterval(fetchStatsAndModels, 10000);
+    const handleInvalidated = () => {
+      fetchStatsAndModels();
+    };
+    window.addEventListener("copilot:models_invalidated", handleInvalidated);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("copilot:models_invalidated", handleInvalidated);
+    };
+  }, []);
+
+  const handleSend = async (queryText?: string) => {
+    const textToSend = (queryText !== undefined ? queryText : input).trim();
+    if (!textToSend || isGenerating) return;
+
+    setInput("");
+    const userMsgId = `user-${Date.now()}`;
+    const assistantMsgId = `assistant-${Date.now()}`;
+
+    const userMessage: CopilotMessage = {
+      id: userMsgId,
+      role: "user",
+      content: textToSend,
+      timestamp: new Date().toLocaleTimeString()
+    };
+
+    const initialAssistantMessage: CopilotMessage = {
+      id: assistantMsgId,
+      role: "assistant",
+      content: "",
+      timestamp: new Date().toLocaleTimeString(),
+      activeTools: []
+    };
+
+    setMessages((prev) => [...prev, userMessage, initialAssistantMessage]);
+    setIsGenerating(true);
+    setActiveTools([]);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    let receivedAnyText = false;
+
+    try {
+      const payloadMessages = [...messages, userMessage].map((m) => ({
+        role: m.role,
+        content: m.content
+      }));
+
+      const res = await fetch("/api/copilot/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: payloadMessages,
+          model: selectedModel,
+          temperature: 0.2,
+          max_tokens: 2048,
+          daily_budget_ceiling: stats.daily_budget_ceiling_usd
+        }),
+        signal: controller.signal
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+      }
+
+      if (!res.body) {
+        throw new Error("No response body received from copilot API.");
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || "";
+
+        for (const part of parts) {
+          const lines = part.trim().split("\n");
+          let eventType = "";
+          let dataStr = "";
+
+          for (const line of lines) {
+            if (line.startsWith("event: ")) {
+              eventType = line.slice(7).trim();
+            } else if (line.startsWith("data: ")) {
+              dataStr = line.slice(6).trim();
+            }
+          }
+
+          if (eventType === "tool_call" && dataStr) {
+            try {
+              const parsed = JSON.parse(dataStr);
+              setActiveTools((prev) => [...prev, parsed.tool]);
+            } catch (e) {}
+          } else if (eventType === "delta" && dataStr) {
+            try {
+              const parsed = JSON.parse(dataStr);
+              const chunk = parsed.content || "";
+              if (chunk) receivedAnyText = true;
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMsgId ? { ...msg, content: msg.content + chunk } : msg
+                )
+              );
+            } catch (e) {}
+          } else if (eventType === "telemetry" && dataStr) {
+            try {
+              const tel = JSON.parse(dataStr);
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMsgId ? { ...msg, telemetry: tel } : msg
+                )
+              );
+              fetchStatsAndModels();
+            } catch (e) {}
+          }
+        }
+      }
+
+      // If stream ended with zero text, provide fallback notice
+      if (!receivedAnyText) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMsgId && !msg.content
+              ? {
+                  ...msg,
+                  content: `> ⚠️ **Connection Stream Complete**: No text output received from agent. The edge socket may be synchronizing.`
+                }
+              : msg
+          )
+        );
+      }
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMsgId
+              ? {
+                  ...msg,
+                  content:
+                    msg.content +
+                    `\n\n> ❌ **Execution Error**: ${err.message || "Failed to complete stream."}`
+                }
+              : msg
+          )
+        );
+      }
+    } finally {
+      setIsGenerating(false);
+      setActiveTools([]);
+      abortControllerRef.current = null;
+    }
+  };
+
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsGenerating(false);
+      setActiveTools([]);
+    }
+  };
+
+  const handleClearHistory = () => {
+    if (confirm("Clear conversational history?")) {
+      setMessages([
+        {
+          id: "welcome-1",
+          role: "assistant",
+          content: "### 🤖 Copilot Memory Reset\n\nSession history cleared. Ask any query to initiate a new analysis.",
+          timestamp: new Date().toLocaleTimeString()
+        }
+      ]);
+    }
+  };
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  // Markdown Simple Renderer for tables and styling
+  const renderMarkdown = (text: string) => {
+    if (!text || text.trim() === "") {
+      return (
+        <div className="flex items-center gap-2 text-xs text-slate-400 py-1">
+          <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#00ff88]" />
+          <span>Synthesizing response from verified institutional tools...</span>
+        </div>
+      );
+    }
+
+    if (!text.includes("|")) {
+      return (
+        <div className="whitespace-pre-wrap leading-relaxed text-sm text-slate-200 font-sans">
+          {text}
+        </div>
+      );
+    }
+
+    const lines = text.split("\n");
+    const elements: React.ReactNode[] = [];
+    let tableLines: string[] = [];
+    let inTable = false;
+
+    const flushTable = (key: number) => {
+      if (tableLines.length < 2) {
+        elements.push(
+          <div key={`txt-${key}`} className="whitespace-pre-wrap leading-relaxed text-sm text-slate-200">
+            {tableLines.join("\n")}
+          </div>
+        );
+        tableLines = [];
+        return;
+      }
+
+      const headers = tableLines[0]
+        .split("|")
+        .map((h) => h.trim())
+        .filter((h) => h.length > 0);
+
+      const rows = tableLines.slice(2).map((rowStr) =>
+        rowStr
+          .split("|")
+          .map((c) => c.trim())
+          .filter((c, idx, arr) => idx > 0 && idx < arr.length)
+      );
+
+      elements.push(
+        <div key={`tbl-${key}`} className="my-3 overflow-x-auto rounded-lg border border-white/10 shadow-lg">
+          <table className="w-full text-xs font-mono text-left border-collapse">
+            <thead className="bg-slate-900/90 text-slate-200 uppercase tracking-wider border-b border-white/10">
+              <tr>
+                {headers.map((h, i) => (
+                  <th key={i} className="py-2.5 px-3 font-bold border-r border-white/5 last:border-none">
+                    {h.replace(/\*\*/g, "")}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5 bg-slate-950/60">
+              {rows.map((r, ri) => (
+                <tr key={ri} className="hover:bg-white/5 transition-colors">
+                  {r.map((cell, ci) => {
+                    const isProfit = cell.includes("+$");
+                    const isLoss = cell.includes("-$");
+                    return (
+                      <td
+                        key={ci}
+                        className={`py-2 px-3 border-r border-white/5 last:border-none ${
+                          isProfit ? "text-emerald-400 font-bold" : isLoss ? "text-rose-400 font-bold" : "text-slate-300"
+                        }`}
+                      >
+                        {cell.replace(/\*\*/g, "").replace(/`/g, "")}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      tableLines = [];
+    };
+
+    lines.forEach((line, idx) => {
+      if (line.trim().startsWith("|") && line.trim().endsWith("|")) {
+        inTable = true;
+        tableLines.push(line);
+      } else {
+        if (inTable) {
+          flushTable(idx);
+          inTable = false;
+        }
+        if (line.startsWith("### ")) {
+          elements.push(
+            <h3 key={idx} className="text-base font-bold text-white mt-4 mb-2 flex items-center gap-2">
+              {line.replace("### ", "")}
+            </h3>
+          );
+        } else if (line.startsWith("#### ")) {
+          elements.push(
+            <h4 key={idx} className="text-sm font-bold text-[#00ff88] mt-3 mb-1.5">
+              {line.replace("#### ", "")}
+            </h4>
+          );
+        } else if (line.startsWith("- ")) {
+          elements.push(
+            <li key={idx} className="ml-4 text-xs text-slate-300 my-1 list-disc">
+              {line.replace("- ", "")}
+            </li>
+          );
+        } else if (line.trim().length > 0) {
+          elements.push(
+            <p key={idx} className="text-xs text-slate-300 my-1 font-sans leading-relaxed">
+              {line}
+            </p>
+          );
+        }
+      }
+    });
+
+    if (inTable) {
+      flushTable(lines.length);
+    }
+
+    return <div className="space-y-1">{elements}</div>;
+  };
+
+  const activeModelObj = availableModels.find((m) => m.id === selectedModel) || availableModels[0];
+  const quotaPct = Math.min(100, Math.round((stats.daily_requests / stats.daily_quota) * 100));
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-[#00ff88]/30 selection:text-white">
+      {/* Institutional Top Header */}
+      <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-white/10 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          {onNavigateHome && (
+            <button
+              onClick={onNavigateHome}
+              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition cursor-pointer"
+              title="Return to Dashboard"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
+          <div className="p-2 rounded-lg bg-[#00ff88]/10 border border-[#00ff88]/20 text-[#00ff88]">
+            <Sparkles className="w-5 h-5 animate-pulse" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm sm:text-base font-extrabold tracking-tight text-white uppercase flex items-center gap-1.5">
+                ALPHA ENGINE <span className="text-[#00ff88]">COPILOT</span>
+              </h1>
+              <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-[10px] font-bold">
+                STANDALONE AD-HOC
+              </span>
+            </div>
+            <p className="text-[11px] font-mono text-slate-400 flex items-center gap-2">
+              <span>Edge Node: <strong className="text-white">10.156.0.2:4002</strong> (Frankfurt GCE)</span>
+              <span className="text-emerald-400 font-bold">• ACTIVE</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Cost Governance Header Telemetry Bar */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Daily Quota Meter */}
+          <div className="bg-slate-900/90 border border-white/10 rounded-lg px-3 py-1.5 flex items-center gap-2.5 text-xs font-mono">
+            <Activity className="w-3.5 h-3.5 text-indigo-400" />
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Today's Quota</div>
+              <div className="text-white font-bold flex items-center gap-1.5">
+                <span>{stats.daily_requests} / {stats.daily_quota.toLocaleString()}</span>
+                <span className={`text-[10px] px-1 rounded ${quotaPct > 80 ? "bg-amber-500/20 text-amber-300" : "bg-emerald-500/20 text-emerald-300"}`}>
+                  {quotaPct}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Daily Cumulative Spent */}
+          <div className="bg-slate-900/90 border border-white/10 rounded-lg px-3 py-1.5 flex items-center gap-2.5 text-xs font-mono">
+            <DollarSign className="w-3.5 h-3.5 text-[#00ff88]" />
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Daily Estimated Cost</div>
+              <div className="text-[#00ff88] font-bold">
+                ${stats.daily_spent_usd.toFixed(4)}
+              </div>
+            </div>
+          </div>
+
+          {/* Circuit Breaker Ceiling Badge */}
+          <div className={`border rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs font-mono ${
+            stats.circuit_breaker_active
+              ? "bg-rose-950/80 border-rose-500/50 text-rose-300 animate-pulse"
+              : "bg-slate-900/90 border-white/10 text-slate-300"
+          }`}>
+            <Shield className={`w-3.5 h-3.5 ${stats.circuit_breaker_active ? "text-rose-400" : "text-blue-400"}`} />
+            <div>
+              <div className="text-[10px] uppercase tracking-wider opacity-75">Ceiling: ${stats.daily_budget_ceiling_usd.toFixed(2)}</div>
+              <div className="font-bold text-[11px]">
+                {stats.circuit_breaker_active ? "THROTTLED (CIRCUIT BREAKER)" : "CIRCUIT BREAKER: ARMED"}
+              </div>
+            </div>
+          </div>
+
+          {/* Active Model Selector Dropdown with Dynamic Discovery */}
+          <div className="relative">
+            <button
+              onClick={() => setShowModelDropdown(!showModelDropdown)}
+              className="bg-slate-900 hover:bg-slate-800 border border-[#00ff88]/30 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs font-mono transition cursor-pointer shadow-md"
+            >
+              <span>{activeModelObj.icon}</span>
+              <div className="text-left">
+                <div className="text-[9px] text-[#00ff88] font-bold uppercase">{activeModelObj.provider}</div>
+                <div className="text-white font-bold max-w-[150px] truncate">{activeModelObj.name}</div>
+              </div>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1" />
+            </button>
+
+            {showModelDropdown && (
+              <div className="absolute right-0 mt-2 w-72 bg-[#0e1422] border border-white/15 rounded-xl shadow-2xl p-2 z-50 animate-fade-in font-mono text-xs">
+                <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 mb-1 flex items-center justify-between">
+                  <span>Dynamic Model Catalog</span>
+                  <span className="text-[9px] text-[#00ff88]">Live Discovered</span>
+                </div>
+                {availableModels.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => {
+                      setSelectedModel(m.id);
+                      setShowModelDropdown(false);
+                    }}
+                    className={`w-full text-left p-2 rounded-lg flex items-start gap-2.5 transition cursor-pointer ${
+                      selectedModel === m.id
+                        ? "bg-[#00ff88]/15 border border-[#00ff88]/40 text-white"
+                        : "hover:bg-white/5 text-slate-300"
+                    }`}
+                  >
+                    <span className="text-base">{m.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-white truncate flex items-center justify-between">
+                        <span>{m.name}</span>
+                        {selectedModel === m.id && <Check className="w-3.5 h-3.5 text-[#00ff88]" />}
+                      </div>
+                      <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
+                        <span className="text-[#00ff88]">{m.badge}</span>
+                        <span>•</span>
+                        <span>{m.costStr}</span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+
+                <div className="mt-2 pt-2 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowModelDropdown(false);
+                      setIsVaultOpen(true);
+                    }}
+                    className="w-full p-2 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-[11px] font-mono font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Manage 4-Pillar Vault Keys</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Main Chat Workspace */}
+      <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 flex flex-col justify-between">
+        {/* Messages Feed */}
+        <div className="space-y-4 mb-4">
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
+            >
+              <div className="flex items-center gap-2 mb-1 px-1 text-[11px] font-mono text-slate-400">
+                {msg.role === "user" ? (
+                  <>
+                    <span>OPERATOR</span>
+                    <span>•</span>
+                    <span>{msg.timestamp}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[#00ff88] font-bold">ALPHA COPILOT</span>
+                    <span>•</span>
+                    <span>{msg.timestamp}</span>
+                  </>
+                )}
+              </div>
+
+              {/* Message Bubble */}
+              <div
+                className={`rounded-2xl p-4 sm:p-5 max-w-[90%] sm:max-w-[85%] border shadow-lg relative group ${
+                  msg.role === "user"
+                    ? "bg-indigo-950/40 border-indigo-500/30 text-white rounded-tr-none"
+                    : "bg-slate-900/80 border-white/10 text-slate-100 rounded-tl-none"
+                }`}
+              >
+                {/* Copy Button */}
+                <button
+                  onClick={() => copyToClipboard(msg.content, msg.id)}
+                  className="absolute top-3 right-3 p-1 rounded bg-black/40 hover:bg-black/60 text-slate-400 hover:text-white transition opacity-0 group-hover:opacity-100 cursor-pointer"
+                  title="Copy message"
+                >
+                  {copiedId === msg.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                </button>
+
+                {/* Content */}
+                {renderMarkdown(msg.content)}
+
+                {/* Per-Message Telemetry Badge */}
+                {msg.telemetry && (
+                  <div className="mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center gap-2 text-[10px] font-mono text-slate-400">
+                    <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 font-bold">
+                      {msg.telemetry.provider} • {msg.telemetry.model_name}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
+                      {msg.telemetry.total_tokens} tokens ({msg.telemetry.prompt_tokens}p / {msg.telemetry.completion_tokens}c)
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-[#00ff88]/10 border border-[#00ff88]/20 text-[#00ff88] font-bold">
+                      ${msg.telemetry.cost_usd.toFixed(5)}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                      {msg.telemetry.latency_ms}ms latency
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {/* Active Tool Execution Indicator */}
+          {activeTools.length > 0 && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-900/90 border border-[#00ff88]/30 max-w-md animate-pulse">
+              <RefreshCw className="w-4 h-4 text-[#00ff88] animate-spin" />
+              <div className="text-xs font-mono text-slate-300">
+                <span className="text-[#00ff88] font-bold">Executing Tools: </span>
+                {activeTools.map((t) => (
+                  <span key={t} className="px-1.5 py-0.5 mx-1 rounded bg-black/50 border border-white/10 text-white font-bold">
+                    {t}()
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Quick Query Recommendation Pills */}
+        <div className="pt-2 pb-3">
+          <div className="text-[10px] font-mono text-slate-400 mb-2 uppercase tracking-wider font-semibold">
+            Institutional Tool Presets
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              "What is my ibkr cash balance?",
+              "What are my current IBKR positions and cash balance?",
+              "What are the latest SEC filings for NVDA?",
+              "Show me recent FDA alerts or Phase 3 trial updates.",
+              "Check U.S. EIA energy storage telemetry for natural gas."
+            ].map((preset, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleSend(preset)}
+                disabled={isGenerating}
+                className="px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-white/10 hover:border-[#00ff88]/40 text-xs font-mono text-slate-300 hover:text-white transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Terminal className="w-3 h-3 text-[#00ff88]" />
+                <span>{preset}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Chat Input Console */}
+        <div className="sticky bottom-4 bg-[#0e1422]/95 backdrop-blur-md border border-white/15 rounded-2xl p-2.5 shadow-2xl flex flex-col gap-2">
+          <div className="flex items-center justify-between px-2 text-[10px] font-mono text-slate-400">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>ACTIVE: <strong className="text-white">{activeModelObj.name}</strong></span>
+            </div>
+            <button
+              onClick={handleClearHistory}
+              className="hover:text-rose-400 transition cursor-pointer flex items-center gap-1"
+              title="Clear conversational memory"
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>Reset Context</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder="Ask an ad-hoc portfolio question, SEC filing check, or clinical trial query..."
+              rows={1}
+              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs sm:text-sm font-sans text-white placeholder:text-slate-500 focus:outline-none focus:border-[#00ff88]/50 resize-none"
+            />
+
+            {isGenerating ? (
+              <button
+                onClick={handleStop}
+                className="p-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white transition cursor-pointer shadow-lg flex items-center justify-center"
+                title="Stop generation"
+              >
+                <Square className="w-4 h-4 fill-current" />
+              </button>
+            ) : (
+              <button
+                onClick={() => handleSend()}
+                disabled={!input.trim()}
+                className="p-3 rounded-xl bg-[#00ff88] hover:bg-[#00ff88]/80 text-black transition cursor-pointer shadow-lg shadow-[#00ff88]/20 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+                title="Send query"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 4-Pillar API Connection & Feed Vault Modal */}
+      <ApiVaultModal
+        isOpen={isVaultOpen}
+        onClose={() => {
+          setIsVaultOpen(false);
+          fetchStatsAndModels();
+        }}
+        settings={vaultSettings}
+        onSaveSetting={handleSaveSetting}
+        customGeminiApiKey={vaultSettings.geminiApiKey || ""}
+        onSaveGeminiKey={(k) => handleSaveSetting("geminiApiKey", k)}
+        firebaseStatus="CONNECTED"
+      />
+    </div>
+  );
+}
+
+export default CopilotPage;

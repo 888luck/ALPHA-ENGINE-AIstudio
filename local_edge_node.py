@@ -95,7 +95,7 @@ class LocalEdgeNode(EWrapper, EClient):
             
             # Submit scanner request through Native client API
             # Passes default empty tag list and options list
-            self.reqScannerSubscription(reqId=req_id, subscription=subscription, tagValueList=[], list_arg=[])
+            self.reqScannerSubscription(req_id, subscription, [], [])
             
     def cancel_active_scanners(self):
         """Standard teardown for scanner nodes."""

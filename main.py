@@ -48,6 +48,7 @@ def run_premarket_calibration(news_ingestor: NewsIngestor, ensemble: MultiModelE
     print("==============================================================")
     
     # 0. Dynamic Market Discovery via IBKR Multi-Exchange Scanner
+    discovered_symbols = []
     if edge_node:
         try:
             print("[SCANNER DISCOVERY] Initiating multi-exchange scanners...")

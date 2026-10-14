@@ -62,3 +62,47 @@ Keep code split modularly to prevent token-limit trashing or syntax corruption:
 *   Maintain `src/components/GcpCompanion.tsx` for all cloud and backtesting control modules.
 *   Maintain `src/components/Dashboard.tsx` for layout, regulatory telemetry, active trades ledger, and live indicators.
 *   Run `lint_applet` and `compile_applet` to verify compilation health after edits.
+
+---
+
+## 🤖 6. Dynamic LLM Model Discovery & Zero-Hardcoding Invariant
+
+To ensure platform resilience against rapid LLM release and retirement cycles:
+
+1. **Zero Hardcoded Model Names**:
+   - Never hardcode model strings, versions, or tiers (e.g. `gemini-2.0`, `llama-3.3`, etc.) in frontend components, backend routers, configuration defaults, or documentation.
+   - Any prior list from training cutoffs is strictly prohibited.
+2. **Runtime Provider Discovery via 4-Pillar Vault**:
+   - All available LLM models must be retrieved dynamically at runtime by querying each active provider's official `/models` API endpoint (Google GenAI, Groq, NVIDIA NIM, OpenAI, Anthropic, etc.).
+   - Credentials must be sourced directly from the existing **4-Pillar API Connection & Feed Vault**.
+   - Only models verified active and supporting chat/function-calling for the user's specific credentials may be exposed in the UI.
+3. **Automatic Lifecycle Handling**:
+   - Deprecated or sunset models must drop off automatically without code modification.
+   - Newly released upstream models must appear immediately upon provider catalog refresh.
+   - If a provider has no active key or fails the Vault live probe, the system must report this transparently, prevent execution with stale mocks, and guide the user through the configuration flow.
+4. **4-Pillar Vault Configuration & Provisioning Workflow**:
+   - When an unconfigured or unauthenticated provider is selected, the Copilot must not dead-end; it must execute the standard Vault workflow:
+     a. **Status Detection**: The UI flags the provider status as `UNCONFIGURED` or `PROBE_FAILED`.
+     b. **Direct Vault Action**: The Copilot provides a one-click action to open the 4-Pillar Vault modal (`ApiVaultModal`) with the direct acquisition guide and input fields for that provider.
+     c. **Interactive Live Test Probe**: The user inputs the key and runs the Vault's built-in live probe (`probe_connection`) to verify credentials against the provider API.
+     d. **Two-Way Vault UI Reflection**: When a key passes the test probe or is saved, the probe response returns the live discovered models, and the 4-Pillar Vault modal immediately renders these active models as verified badges under that provider's card (e.g. `Discovered Models: [model-1, model-2]`).
+     e. **Dynamic Invalidation & Instant Copilot Sync**: Upon a successful probe, the credentials and discovered models are persisted to Vault storage, the Copilot catalog cache is invalidated, and the new models instantly appear in the Copilot header dropdown without requiring page reloads or container redeployments.
+
+---
+
+## 🛠️ 7. Cross-Container Tool Catalog & Full API Reflection Standard
+
+To support autonomous, high-depth conversational reasoning across current and future services:
+
+1. **Root-Level Shared Catalog (`tools_registry.json`)**:
+   - The tool schema registry must be stored at the root level (`tools_registry.json`) and mounted/copied into `/app/` across all container images so all current and future modules (Copilot, Trading Engine, Risk Guard, Daemons) share a unified source of truth.
+   - Containers may also query `GET /api/v1/tools/registry` on the edge/control plane for cross-pod discovery.
+2. **Full-Surface Reflection (No Artificial Capping)**:
+   - Tool schemas must be extracted dynamically by reflecting the entire official Interactive Brokers API surface (`ibapi.client.EClient` / `ConnectionManager`) and data feed adapters using Python's `inspect` module.
+   - Never restrict or hardcode tool exposure to an arbitrary subset (e.g. 5 or 15 methods). The full callable surface of inquiries, account data, contract specs, and order telemetry must be exposed.
+3. **Official Built-in Docstrings**:
+   - Schema descriptions and parameter definitions must be populated directly from official IBKR docstrings and type annotations to guarantee vendor-accurate semantics.
+4. **24-Hour Persistence & Invalidation**:
+   - The reflected catalog must be cached on disk with a 24-hour TTL to ensure microsecond lookup latency during agent turns.
+   - The cache must support forced invalidation and on-demand refresh via the 4-Pillar Vault test probe.
+

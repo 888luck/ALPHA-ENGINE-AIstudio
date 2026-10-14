@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import Dashboard from "./components/Dashboard";
 import { LiveCockpit } from "./components/LiveCockpit";
 import { QuantResearchLab } from "./components/QuantResearchLab";
-import { Sun, Moon, Activity, Tag, Globe, HelpCircle, LayoutGrid, Home, ShieldAlert, Layers, Sliders } from "lucide-react";
+import { CopilotPage } from "./pages/CopilotPage";
+import { Sun, Moon, Activity, Tag, Globe, HelpCircle, LayoutGrid, Home, ShieldAlert, Layers, Sliders, Sparkles } from "lucide-react";
 
 export default function App() {
   // Safe default persistent theme
@@ -11,15 +12,41 @@ export default function App() {
     return (saved as "dark" | "light") || "dark";
   });
 
-  const [view, setView] = useState<"mission-control" | "blotter" | "risk" | "lab" | "config">(() => {
+  const [view, setView] = useState<"mission-control" | "blotter" | "risk" | "lab" | "config" | "copilot">(() => {
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname.toLowerCase();
+      if (path === "/copilot" || path === "/chat") return "copilot";
+    }
     const saved = localStorage.getItem("alpha_dashboard_view");
     return (saved as any) || "mission-control";
   });
   const [navTarget, setNavTarget] = useState<string | null>(null);
 
-  const handleNavigate = (newView: "mission-control" | "blotter" | "risk" | "lab" | "config", target?: string) => {
+  // Sync with browser back/forward history
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname.toLowerCase();
+      if (path === "/copilot" || path === "/chat") {
+        setView("copilot");
+      } else {
+        const saved = (localStorage.getItem("alpha_dashboard_view") as any) || "mission-control";
+        setView(saved === "copilot" ? "mission-control" : saved);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const handleNavigate = (newView: "mission-control" | "blotter" | "risk" | "lab" | "config" | "copilot", target?: string) => {
     setView(newView);
     localStorage.setItem("alpha_dashboard_view", newView);
+    if (newView === "copilot") {
+      window.history.pushState(null, "", "/copilot");
+    } else {
+      if (window.location.pathname === "/copilot" || window.location.pathname === "/chat") {
+        window.history.pushState(null, "", "/");
+      }
+    }
     if (target) {
       setNavTarget(target);
       // Reset target after a short delay so it can be re-triggered
@@ -86,6 +113,10 @@ export default function App() {
       body.classList.remove("theme-light");
     }
   }, [theme]);
+
+  if (view === "copilot") {
+    return <CopilotPage onNavigateHome={() => handleNavigate("mission-control")} />;
+  }
 
   return (
     <div 
@@ -257,6 +288,19 @@ export default function App() {
             >
               <Globe className="w-4 h-4" />
               <span>CONFIG</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleNavigate("copilot")}
+              className={`px-3.5 py-2 rounded-lg transition-all duration-200 cursor-pointer text-xs font-mono tracking-wider font-bold flex items-center gap-2 ${
+                view === "copilot"
+                  ? "bg-[#00ff88] text-slate-950 shadow-md shadow-[#00ff88]/30 font-black"
+                  : "text-[#00ff88] hover:text-white hover:bg-[#00ff88]/10 border border-[#00ff88]/30"
+              }`}
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>COPILOT</span>
             </button>
           </div>
 
