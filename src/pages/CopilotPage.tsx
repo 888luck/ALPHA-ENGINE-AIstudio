@@ -203,7 +203,14 @@ Click any quick query below or type your request:`,
   const fetchStatsAndModels = async (force = false) => {
     try {
       const url = force ? "/api/copilot/stats?refresh=1" : "/api/copilot/stats";
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: {
+          "x-gemini-api-key": vaultSettings.geminiApiKey || "",
+          "x-groq-api-key": vaultSettings.customAiApiKey || "",
+          "x-nvidia-api-key": vaultSettings.nvidiaApiKey || "",
+          "x-openai-api-key": vaultSettings.openaiApiKey || ""
+        }
+      });
       if (res.ok) {
         const data = await res.json();
         setStats({

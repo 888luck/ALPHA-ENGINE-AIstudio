@@ -43,7 +43,7 @@ export function invalidateModelsCache() {
   modelsCacheTimestamp = 0;
 }
 
-export async function discoverActiveModels(forceRefresh = false): Promise<DiscoveredModel[]> {
+export async function discoverActiveModels(forceRefresh = false, incomingKeys?: Record<string, string>): Promise<DiscoveredModel[]> {
   const now = Date.now();
   const cacheTtl = cachedDiscoveredModels.length > 1 ? 300000 : 2000;
   if (!forceRefresh && cachedDiscoveredModels.length > 0 && now - modelsCacheTimestamp < cacheTtl) {
@@ -65,9 +65,9 @@ export async function discoverActiveModels(forceRefresh = false): Promise<Discov
   });
 
   // 2. Google GenAI (Query live API if key is present)
-  const geminiKey = (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY") 
+  const geminiKey = incomingKeys?.gemini || (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY" 
     ? process.env.GEMINI_API_KEY 
-    : systemSettings.geminiApiKey;
+    : systemSettings.geminiApiKey);
   if (geminiKey && geminiKey.length > 20 && !geminiKey.includes("MY_GEMINI")) {
     try {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiKey}`, {
@@ -98,7 +98,7 @@ export async function discoverActiveModels(forceRefresh = false): Promise<Discov
   }
 
   // 3. Groq Cloud (Query live API if key is present)
-  const groqKey = process.env.GROQ_API_KEY || systemSettings.customAiApiKey;
+  const groqKey = incomingKeys?.groq || process.env.GROQ_API_KEY || systemSettings.customAiApiKey;
   if (groqKey) {
     try {
       const res = await fetch("https://api.groq.com/openai/v1/models", {
@@ -129,7 +129,7 @@ export async function discoverActiveModels(forceRefresh = false): Promise<Discov
   }
 
   // 4. NVIDIA NIM (Query live API if key is present)
-  const nvidiaKey = process.env.NVIDIA_API_KEY || process.env.NVIDIA_INFERENCE_API_KEY || systemSettings.nvidiaApiKey;
+  const nvidiaKey = incomingKeys?.nvidia || process.env.NVIDIA_API_KEY || process.env.NVIDIA_INFERENCE_API_KEY || systemSettings.nvidiaApiKey;
   if (nvidiaKey) {
     try {
       const res = await fetch("https://integrate.api.nvidia.com/v1/models", {
@@ -158,7 +158,7 @@ export async function discoverActiveModels(forceRefresh = false): Promise<Discov
   }
 
   // 5. OpenAI (Query live API if key is present)
-  const openaiKey = process.env.OPENAI_API_KEY || systemSettings.openaiApiKey;
+  const openaiKey = incomingKeys?.openai || process.env.OPENAI_API_KEY || systemSettings.openaiApiKey;
   if (openaiKey && openaiKey.startsWith("sk-")) {
     try {
       const res = await fetch("https://api.openai.com/v1/models", {
@@ -195,8 +195,14 @@ export async function discoverActiveModels(forceRefresh = false): Promise<Discov
 
 // 1. GET /api/copilot/models - Return discovered active models
 copilotRouter.get("/api/copilot/models", async (req, res) => {
+  const incomingKeys = {
+    gemini: (req.headers["x-gemini-api-key"] as string) || "",
+    groq: (req.headers["x-groq-api-key"] as string) || "",
+    nvidia: (req.headers["x-nvidia-api-key"] as string) || "",
+    openai: (req.headers["x-openai-api-key"] as string) || ""
+  };
   const force = req.query.refresh === "1" || req.query.refresh === "true";
-  const models = await discoverActiveModels(force);
+  const models = await discoverActiveModels(force, incomingKeys);
   res.json({
     status: "SUCCESS",
     models: models
@@ -231,8 +237,14 @@ copilotRouter.get("/api/copilot/stats", async (req, res) => {
     }
   }
 
+  const incomingKeys = {
+    gemini: (req.headers["x-gemini-api-key"] as string) || "",
+    groq: (req.headers["x-groq-api-key"] as string) || "",
+    nvidia: (req.headers["x-nvidia-api-key"] as string) || "",
+    openai: (req.headers["x-openai-api-key"] as string) || ""
+  };
   const force = req.query.refresh === "1" || req.query.refresh === "true";
-  const models = await discoverActiveModels(force);
+  const models = await discoverActiveModels(force, incomingKeys);
 
   res.json({
     status: "SUCCESS",
