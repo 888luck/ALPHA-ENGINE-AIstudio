@@ -306,7 +306,13 @@ Click any quick query below or type your request:`,
 
       const res = await fetch("/api/copilot/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-gemini-api-key": vaultSettings.geminiApiKey || "",
+          "x-groq-api-key": vaultSettings.customAiApiKey || "",
+          "x-nvidia-api-key": vaultSettings.nvidiaApiKey || "",
+          "x-openai-api-key": vaultSettings.openaiApiKey || ""
+        },
         body: JSON.stringify({
           messages: payloadMessages,
           model: selectedModel,
