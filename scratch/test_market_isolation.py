@@ -84,7 +84,7 @@ def test_market_isolation():
         req_all = urllib.request.Request(
             "http://localhost:3000/api/risk/settings",
             data=json.dumps({"marketScope": "ALL"}).encode("utf-8"),
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json", "x-admin-key": "ALPHA_ADMIN_REVERT_992"}
         )
         urllib.request.urlopen(req_all)
         print("[PASS] Reverted API marketScope back to 'ALL'.")

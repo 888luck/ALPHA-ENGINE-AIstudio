@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   MessageSquare,
   Sparkles,
@@ -21,7 +21,9 @@ import {
   ExternalLink,
   Copy,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  Search,
+  X
 } from "lucide-react";
 
 export interface CopilotMessage {
@@ -170,6 +172,8 @@ Click any quick query below or type your request:`,
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [modelSearchQuery, setModelSearchQuery] = useState("");
+  const [selectedProviderFilter, setSelectedProviderFilter] = useState<string>("ALL");
   const [activeTools, setActiveTools] = useState<string[]>([]);
   const [stats, setStats] = useState<CopilotStats>({
     daily_spent_usd: 0.00041,
@@ -591,6 +595,27 @@ Click any quick query below or type your request:`,
     return <div className="space-y-1">{elements}</div>;
   };
 
+  const filteredModels = useMemo(() => {
+    return availableModels.filter((m) => {
+      if (selectedProviderFilter !== "ALL") {
+        if (selectedProviderFilter === "LOCAL" && !m.id.startsWith("local")) return false;
+        if (selectedProviderFilter === "NVIDIA" && !m.id.startsWith("nvidia")) return false;
+        if (selectedProviderFilter === "GOOGLE" && !m.id.startsWith("google")) return false;
+        if (selectedProviderFilter === "GROQ" && !m.id.startsWith("groq")) return false;
+        if (selectedProviderFilter === "OPENAI" && !m.id.startsWith("openai")) return false;
+      }
+      if (modelSearchQuery.trim()) {
+        const q = modelSearchQuery.toLowerCase();
+        return (
+          m.name.toLowerCase().includes(q) ||
+          m.id.toLowerCase().includes(q) ||
+          m.provider.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [availableModels, selectedProviderFilter, modelSearchQuery]);
+
   const activeModelObj = availableModels.find((m) => m.id === selectedModel) || availableModels[0];
   const quotaPct = Math.min(100, Math.round((stats.daily_requests / stats.daily_quota) * 100));
 
@@ -694,62 +719,99 @@ Click any quick query below or type your request:`,
             </button>
 
             {showModelDropdown && (
-              <div className="absolute right-0 mt-2 w-80 bg-[#0e1422] border border-white/15 rounded-xl shadow-2xl p-2 z-50 animate-fade-in font-mono text-xs">
-                <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 mb-1 flex items-center justify-between">
+              <div className="absolute right-0 mt-2 w-96 bg-[#0e1422] border border-white/15 rounded-xl shadow-2xl p-2.5 z-50 animate-fade-in font-mono text-xs">
+                {/* Catalog Header */}
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 mb-2 flex items-center justify-between">
                   <span>Dynamic Model Catalog</span>
-                  <span className="text-[9px] text-[#00ff88]">Live Discovered</span>
+                  <span className="text-[9px] text-[#00ff88] bg-[#00ff88]/10 px-1.5 py-0.5 rounded border border-[#00ff88]/20">
+                    {availableModels.length} Active
+                  </span>
                 </div>
 
-                {availableModels.length === 1 && (
-                  <div className="p-2.5 my-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 text-[11px] leading-relaxed">
-                    <p className="font-bold flex items-center gap-1.5 mb-1 text-indigo-300">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                      <span>Cloud Models Locked</span>
-                    </p>
-                    <p className="text-[10px] text-slate-300 mb-2">
-                      Connect your free Gemini, Groq, NVIDIA NIM, or OpenAI key in the 4-Pillar Vault to dynamically discover and unlock cloud LLMs.
-                    </p>
+                {/* Instant Search Bar */}
+                <div className="relative mb-2">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={modelSearchQuery}
+                    onChange={(e) => setModelSearchQuery(e.target.value)}
+                    placeholder="Search by name, provider, or size..."
+                    className="w-full bg-slate-900 border border-white/10 rounded-lg pl-8 pr-7 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00ff88]/50"
+                  />
+                  {modelSearchQuery && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setShowModelDropdown(false);
-                        setIsVaultOpen(true);
-                      }}
-                      className="w-full py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] flex items-center justify-center gap-1 transition cursor-pointer"
+                      onClick={() => setModelSearchQuery("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
                     >
-                      <Sparkles className="w-3 h-3" />
-                      <span>Configure API Keys in Vault</span>
+                      <X className="w-3.5 h-3.5" />
                     </button>
-                  </div>
-                )}
-                {availableModels.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => {
-                      setSelectedModel(m.id);
-                      setShowModelDropdown(false);
-                    }}
-                    className={`w-full text-left p-2 rounded-lg flex items-start gap-2.5 transition cursor-pointer ${
-                      selectedModel === m.id
-                        ? "bg-[#00ff88]/15 border border-[#00ff88]/40 text-white"
-                        : "hover:bg-white/5 text-slate-300"
-                    }`}
-                  >
-                    <span className="text-base">{m.icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-white truncate flex items-center justify-between">
-                        <span>{m.name}</span>
-                        {selectedModel === m.id && <Check className="w-3.5 h-3.5 text-[#00ff88]" />}
-                      </div>
-                      <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
-                        <span className="text-[#00ff88]">{m.badge}</span>
-                        <span>•</span>
-                        <span>{m.costStr}</span>
-                      </div>
-                    </div>
-                  </button>
-                ))}
+                  )}
+                </div>
 
+                {/* Provider Filter Tabs */}
+                <div className="flex items-center gap-1 mb-2 pb-2 border-b border-white/10 overflow-x-auto text-[10px]">
+                  {["ALL", "LOCAL", "NVIDIA", "GOOGLE", "GROQ"].map((tab) => {
+                    const count = tab === "ALL" 
+                      ? availableModels.length 
+                      : availableModels.filter(m => m.id.toUpperCase().startsWith(tab)).length;
+                    return (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setSelectedProviderFilter(tab)}
+                        className={`px-2 py-0.5 rounded transition cursor-pointer font-bold whitespace-nowrap ${
+                          selectedProviderFilter === tab
+                            ? "bg-[#00ff88]/20 text-[#00ff88] border border-[#00ff88]/40"
+                            : "bg-white/5 hover:bg-white/10 text-slate-400"
+                        }`}
+                      >
+                        {tab} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Scrollable Model List */}
+                <div className="max-h-72 overflow-y-auto space-y-1 pr-1">
+                  {filteredModels.length === 0 ? (
+                    <div className="text-center py-6 text-slate-400 text-xs">
+                      No models matching "{modelSearchQuery}"
+                    </div>
+                  ) : (
+                    filteredModels.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedModel(m.id);
+                          setShowModelDropdown(false);
+                          setModelSearchQuery("");
+                        }}
+                        className={`w-full text-left p-2 rounded-lg flex items-start gap-2.5 transition cursor-pointer ${
+                          selectedModel === m.id
+                            ? "bg-[#00ff88]/15 border border-[#00ff88]/40 text-white"
+                            : "hover:bg-white/5 text-slate-300"
+                        }`}
+                      >
+                        <span className="text-base shrink-0">{m.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-white truncate flex items-center justify-between">
+                            <span className="truncate" title={m.name}>{m.name}</span>
+                            {selectedModel === m.id && <Check className="w-3.5 h-3.5 text-[#00ff88] shrink-0 ml-1" />}
+                          </div>
+                          <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                            <span className="text-indigo-400 font-bold">{m.provider}</span>
+                            <span>•</span>
+                            <span className="text-slate-300">{m.costStr}</span>
+                          </div>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                {/* Vault Config Button Footer */}
                 <div className="mt-2 pt-2 border-t border-white/10">
                   <button
                     type="button"
@@ -760,7 +822,7 @@ Click any quick query below or type your request:`,
                     className="w-full p-2 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-[11px] font-mono font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Manage 4-Pillar Vault Keys</span>
+                    <span>Manage Keys in 4-Pillar Vault</span>
                   </button>
                 </div>
               </div>

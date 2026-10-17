@@ -77,7 +77,13 @@ export async function discoverActiveModels(forceRefresh = false, incomingKeys?: 
         const data = await res.json();
         const raw = data.models || [];
         raw
-          .filter((m: any) => m.supportedGenerationMethods?.includes("generateContent"))
+          .filter((m: any) => {
+            if (!m.supportedGenerationMethods?.includes("generateContent")) return false;
+            const cleanId = (m.name || "").replace(/^models\//, "").toLowerCase();
+            // Exclude audio, speech, TTS, image generation, transcription, and preview audio models
+            const nonChatKeywords = ["tts", "audio", "speech", "banana", "imagen", "image", "embedding", "aqa", "preview", "lyria", "transcribe"];
+            return !nonChatKeywords.some((k) => cleanId.includes(k));
+          })
           .forEach((m: any) => {
             const cleanId = m.name?.replace(/^models\//, "");
             models.push({
@@ -109,7 +115,12 @@ export async function discoverActiveModels(forceRefresh = false, incomingKeys?: 
         const data = await res.json();
         const raw = data.data || [];
         raw
-          .filter((m: any) => m.active !== false && !m.id?.includes("whisper"))
+          .filter((m: any) => {
+            if (m.active === false) return false;
+            const mid = (m.id || "").toLowerCase();
+            if (mid.includes("whisper") || mid.includes("guard") || mid.includes("distil-whisper")) return false;
+            return true;
+          })
           .forEach((m: any) => {
             models.push({
               id: `groq/${m.id}`,
@@ -139,18 +150,28 @@ export async function discoverActiveModels(forceRefresh = false, incomingKeys?: 
       if (res.ok) {
         const data = await res.json();
         const raw = data.data || [];
-        raw.forEach((m: any) => {
-          models.push({
-            id: `nvidia/${m.id}`,
-            rawId: m.id,
-            name: m.id,
-            provider: "NVIDIA NIM",
-            tier: "Tier 1 NIM",
-            badge: "Live Discovered",
-            costStr: "$0.70 / 1M tokens",
-            icon: "🟢"
+        raw
+          .filter((m: any) => {
+            const mid = (m.id || "").toLowerCase();
+            // Filter strictly to chat, instruct, and conversational LLMs
+            const isChat = mid.includes("instruct") || mid.includes("chat") || mid.includes("nemotron");
+            if (!isChat) return false;
+            // Exclude safety guards, embeddings, rerankers, speech, audio, and reward models
+            const nonChatKeywords = ["guard", "safety", "embed", "rerank", "whisper", "audio", "parakeet", "canary", "reward", "judge", "steerlm"];
+            return !nonChatKeywords.some((k) => mid.includes(k));
+          })
+          .forEach((m: any) => {
+            models.push({
+              id: `nvidia/${m.id}`,
+              rawId: m.id,
+              name: m.id,
+              provider: "NVIDIA NIM",
+              tier: "Tier 1 NIM",
+              badge: "Live Discovered",
+              costStr: "$0.70 / 1M tokens",
+              icon: "🟢"
+            });
           });
-        });
       }
     } catch (e) {
       console.warn("[COPILOT DISCOVERY] Error querying NVIDIA NIM /models:", e);

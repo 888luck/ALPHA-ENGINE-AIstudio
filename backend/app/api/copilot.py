@@ -154,10 +154,11 @@ def discover_active_models(api_keys: Optional[Dict[str, str]] = None) -> List[Di
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
                     raw = data.get("models", [])
+                    non_chat = ["tts", "audio", "speech", "banana", "imagen", "image", "embedding", "aqa", "preview", "lyria", "transcribe"]
                     for m in raw:
                         clean_id = m.get("name", "").replace("models/", "")
                         methods = m.get("supportedGenerationMethods", [])
-                        if "generateContent" in methods:
+                        if "generateContent" in methods and not any(k in clean_id.lower() for k in non_chat):
                             models.append({
                                 "id": f"google/{clean_id}",
                                 "rawId": clean_id,
@@ -182,7 +183,7 @@ def discover_active_models(api_keys: Optional[Dict[str, str]] = None) -> List[Di
                     raw = data.get("data", [])
                     for m in raw:
                         mid = m.get("id", "")
-                        if m.get("active") is not False and "whisper" not in mid:
+                        if m.get("active") is not False and not any(k in mid.lower() for k in ["whisper", "guard", "distil"]):
                             models.append({
                                 "id": f"groq/{mid}",
                                 "rawId": mid,
@@ -205,19 +206,24 @@ def discover_active_models(api_keys: Optional[Dict[str, str]] = None) -> List[Di
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
                     raw = data.get("data", [])
+                    non_chat_nim = ["guard", "safety", "embed", "rerank", "whisper", "audio", "parakeet", "canary", "reward", "judge", "steerlm"]
                     for m in raw:
                         mid = m.get("id", "")
-                        models.append({
-                            "id": f"nvidia/{mid}",
-                            "rawId": mid,
-                            "name": mid,
-                            "provider": "NVIDIA NIM",
-                            "tier": "Tier 1 NIM",
-                            "badge": "Live Discovered",
-                            "costStr": "$0.70 / 1M tokens",
-                            "icon": "🟢"
-                        })
+                        lower_mid = mid.lower()
+                        is_chat = "instruct" in lower_mid or "chat" in lower_mid or "nemotron" in lower_mid
+                        if is_chat and not any(k in lower_mid for k in non_chat_nim):
+                            models.append({
+                                "id": f"nvidia/{mid}",
+                                "rawId": mid,
+                                "name": mid,
+                                "provider": "NVIDIA NIM",
+                                "tier": "Tier 1 NIM",
+                                "badge": "Live Discovered",
+                                "costStr": "$0.70 / 1M tokens",
+                                "icon": "🟢"
+                            })
         except Exception as e:
+            logger.debug("NVIDIA NIM live discovery notice: %s", e)
             logger.debug("NVIDIA NIM live discovery notice: %s", e)
 
     return models
