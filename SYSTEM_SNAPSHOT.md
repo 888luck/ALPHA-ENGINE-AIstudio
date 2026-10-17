@@ -1,152 +1,145 @@
-# 🗄️ Alpha Engine — Complete System Snapshot & Handover Manifest
+# Alpha Engine: Master System Snapshot & Architectural Blueprint
 
-This document serves as the absolute source of truth (the "Gold Standard" state blueprint) for the **Alpha Engine Hybrid Trading Framework**. It provides a comprehensive, self-contained overview of the architecture, database models, compliance algorithms, directory maps, and operational states. 
-
-If you need to transition to another AI assistant, developer, or platform, **copy-paste this entire markdown file as the initial prompt**. This will instantly align the new agent with the exact system state, architectural rules, and operational boundaries without losing a single drop of context.
+This document is the authoritative institutional blueprint of the Alpha Engine Hybrid Platform. It details verified system states, communication protocols, AI provider matrices, and execution pipelines.
 
 ---
 
-## 🏗️ 1. Core Architecture Blueprint
-
-The Alpha Engine operates as a **two-tier hybrid trading platform** designed for institutional-grade quantitative execution with ultra-low latency co-location and zero capital exposure leakage.
+## 🌐 1. System Topology & Network Map
 
 ```
-+-------------------------------------------------------------+
-|               1. FRONTEND / WEB CONTROL PLANE               |
-|  - Framework: React 18+ (Vite) + Express (Custom Server)    |
-|  - Role: Dashboard Visualizer, Risk State Manager, API      |
-|          and Quantitative Backtesting Subprocess Runner.    |
-|  - Ingress: Port 3000 (Exposed via GCR / Local Proxy)       |
-|  - Host Platform: Google Cloud Run (Autoscaling scale-to-0) |
-+------------------------------+------------------------------+
-                               |
-                  ⚡ Secure REST & WebSockets
-                               |
-                               v
-+------------------------------+------------------------------+
-|            2. FIRESTORE REAL-TIME SYNC ENGINE                |
-|  - Database: Google Firestore (Serverless NoSQL)             |
-|  - Role: Microsecond-level state synchronization between     |
-|          Web Dashboard and Edge Execution VM.               |
-|  - Core Collection: `system_risk_state/current_state`        |
-+------------------------------+------------------------------+
-                               |
-                    📡 Firestore Event Listener
-                               |
-                               v
-+------------------------------+------------------------------+
-|              3. EDGE EXECUTION NODE (Frankfurt)             |
-|  - Framework: Python 3.11+ Continuous TCP loop              |
-|  - Daemon Services: `main.py` + `local_edge_node.py`         |
-|  - Role: Direct co-located connection to Interactive Brokers |
-|          Europe Gateway (IBIE) with sub-2ms ping latency.    |
-|  - Host Platform: GCP Compute Engine (GCE) e2-micro (Spot)   |
-+-------------------------------------------------------------+
++-----------------------------------------------------------------------------------+
+|                        TIER 1: WEB CONTROL PLANE & API                            |
+|                 Google Cloud Run (Frankfurt europe-west3)                         |
+|                                                                                   |
+|  - Dashboard, Quant Lab, Copilot & REST API: Port 3000                            |
+|  - Modular Express + Vite Bundle (dist/server.cjs)                                |
+|  - Live Endpoint: https://alpha-engine-aistudio-138990607360.europe-west3.run.app |
++-----------------------------------------------------------------------------------+
+                                        |
+           Direct TCP Socket Streaming (<5ms latency, token-authenticated)
+                                        v
++-----------------------------------------------------------------------------------+
+|                     TIER 2: EDGE EXECUTION DAEMON (VM)                            |
+|             GCP Compute Engine e2-medium (Frankfurt europe-west3)                 |
+|                                                                                   |
+|  - Direct TCP Bridge Server: Port 4005 (edge_bridge.py)                           |
+|  - Continuous Python Pipeline: main.py + local_edge_node.py                       |
+|  - Dynamic Risk Guard & Order Router: dynamic_risk_manager.py                     |
+|  - Alpha Strategy & Candlestick Engine: alpha_strategy.py                         |
+|  - Custom Strategy Hot-Reload Engine: custom_strategy_loader.py                    |
+|  - Offline NLP Encoders: INT8 ONNX FinBERT & ModernBERT (CPU $0 cost)             |
+|  - Local Atomic Persistence: ha_leader_lock.json, tca_executions.json             |
++-----------------------------------------------------------------------------------+
+                                        |
+                    Loopback IPC (Microsecond Socket Memory)
+                                        v
++-----------------------------------------------------------------------------------+
+|                       INTERACTIVE BROKERS GATEWAY (IBC)                           |
+|                                                                                   |
+|  - Port 4001: LIVE Production Gateway                                             |
+|  - Port 4002: PAPER Simulation Gateway                                            |
+|  - Connects to Funded IBKR Pro European Data Tape & SMART Router                  |
++-----------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 📊 2. Algorithmic Trading Rules & Risk Safeguards
+## 🔐 2. The 4-Pillar API Connection & Feed Vault
 
-The Alpha Engine executes a custom quantitative trend breakout and order flow strategy strictly constrained by institutional risk controls. Any code modification must respect these 6 parameters:
+The 4-Pillar Vault (`ApiVaultModal.tsx` & `/api/vault/credentials`) governs all system connectivity. Credentials persist to masked server-side memory (`system_settings.json` via `state.ts`) and GCP Secret Manager (`alpha-engine-env`):
 
-1. **SMA-20 Trend Alignment**: Checks Simple Moving Average (20-period) on the daily or intraday candle. Buys are strictly locked to when prices trade above the SMA-20; Shorts are locked to prices trading below it.
-2. **OFI Volume Imbalance Expansion**: Breakthrough signal triggers exclusively when the Order Flow Imbalance volume spike exceeds **$1.4\times$** the 10-period volume moving average.
-3. **1% Total Capital Risk Rule**: Dynamically sizes active market entries so that the absolute distance from entry price to the Stop-Loss risks a maximum of **1%** of the cumulative portfolio capital.
-4. **1.8 ATR Stop-Loss Bracket**: Automatically positions the stop boundary at **$1.8\times$** the Average True Range (ATR) from entry. Take-Profit limits are automatically placed at **$2.0\times$** the Stop-Loss distance.
-5. **15% MiFID-II Commission & Friction Filter**: Protects funds by calculating trade profitability before routing. If projected slippage + two-way broker commissions exceeds **15%** of maximum potential profit, the trade is rejected:
-   $$\text{Efficiency Ratio} = \frac{\text{Projected Friction (Slippage + } 2\times\text{ Commission)}}{\text{Projected Max Profit (Take-Profit Distance)}} \times 100 \le 15\%$$
-6. **Drawdown Circuit Breakers**:
-   * **Percentage-Based Lock**: Automatically locks the order router when daily account drawdown exceeds a custom percentage (e.g., `2.5%`).
-   * **Absolute Cash Lock**: Locks the router when total daily losses exceed a custom cash cap (e.g., `€1,500.00`).
-   * **Admin Clear Overrides**: Includes an **ADMIN UNLOCK** panel for manually releasing the router lock after risk reviews, alongside a high-priority **PANIC FLUSH** emergency button to instantly market-close all active risk.
+### Pillar 1: Broker & Execution Infrastructure
+* **Target:** Interactive Brokers Gateway / TWS via `connection.py` and `edge_bridge.py`.
+* **Configured Fields:**
+  - `ibkrAccountNumber`: Funded IBKR Account ID (e.g. `DUE263010` / `DU1234567`).
+  - `ibkrHost`: Edge private IP (Frankfurt VPC `10.156.0.2` or loopback `127.0.0.1`).
+  - `ibkrPort`: `4001` (Live Production) or `4002` (Paper Simulation).
+  - `ibkrClientId`: Socket client identifier (default `10`).
+  - `mifid2DecisionMaker` & `mifid2ExecutionTrader`: Regulatory algorithm shortcodes (e.g. `ALGO_DEC_992` / `ALGO_EXE_554`).
+* **Wiring & Mechanics:** Toggling execution lanes updates `server.ts` state and pushes an atomic payload across Direct TCP Bridge port `4005` to synchronize `dynamic_risk_manager.py`.
 
----
+### Pillar 2: Cloud & Edge Infrastructure (Zero Cloud DB / Zero Firestore)
+* **Target:** Frankfurt Compute Engine VM (`alpha-edge-node` in `europe-west3-a`) + Cloud Run control plane.
+* **Mechanics:**
+  - **Zero Firebase / Firestore Invariant:** Completely purged. All synchronization is direct TCP socket streaming over port `4005` (<5ms latency).
+  - **Local Atomic Persistence:** Failover leases (`ha_leader_lock.json`), transaction audits (`tca_executions.json`), attribution lessons (`audit_history.json`), and risk limits (`system_risk_state.json`) use atomic file write-and-replace (`.tmp` write followed by `os.replace`).
 
-## 📁 3. Workspace Directory Map
+### Pillar 3: AI Model Providers & Execution Runtimes
+* **Supported External Cloud Providers:**
+  1. **Google (Google GenAI / Gemini):** Deep macro synthesis and multi-modal market reasoning.
+  2. **NVIDIA NIM:** GPU-accelerated low-latency enterprise models.
+  3. **Groq Cloud:** Ultra-fast LPU inference (<300ms time-to-first-token) for real-time order-flow decisions.
+  4. **OpenRouter:** Universal gateway accessing Claude, GPT, Llama, DeepSeek, and Mistral via a single unified key.
+* **Custom & Local Inference Endpoints:**
+  5. **Custom Cloud Endpoint:** User-specified Base URL + API Key for private or self-hosted OpenAI-compatible LLMs.
+  6. **Custom Local Endpoint:** Direct connection to local inference runtimes (`http://localhost:11434` for Ollama, `http://localhost:8080` for llama.cpp, vLLM, LM Studio) for 100% private execution.
+* **Interactive Live Probing & Two-Way UI Reflection:**
+  - In `ApiVaultModal.tsx`, every provider card includes a built-in **Live Test Probe** button (`probe_connection`).
+  - Probing verifies the API key against the provider's official `/models` endpoint in real time.
+  - On success, the response immediately renders the discovered models as active badges under that provider's card (e.g. `Discovered Models: [model-1, model-2]`).
+  - Simultaneously, the Copilot catalog cache is invalidated, and the new models instantly populate the Copilot header dropdown without requiring page reloads or container redeployments.
+* **Embedded Local NLP & Sentiment Tier ($0 Cost, CPU/ONNX):**
+  - **INT8 ONNX FinBERT (CPU Offline):** Embedded in container; evaluates news bulletins and headlines into `Positive`, `Negative`, or `Neutral` sentiment in sub-10ms with zero network egress.
+  - **ModernBERT & Financial Variants:** 8,192-token long-context local encoder used for deep semantic extraction and SEC filing analysis directly on CPU.
 
-Below is a complete index of all functional files currently active in the workspace:
-
-```
-├── .env.example              # Example environment keys template for developers
-├── AGENTS.md                 # System-wide framework and compilation constraints
-├── backtester.py             # Quantitative backtester python model for historical simulation
-├── config_loader.py          # VM config parser for secure database/gateway keys
-├── connection.py             # Native Interactive Brokers execution callbacks wrapper
-├── deploy_to_gcp.sh          # Automated deployment script for GCP Compute Engine
-├── deploy_to_hetzner.sh      # Automated deployment script for Hetzner Cloud VM
-├── MULTI_CLOUD_SETUP_GUIDE.md# Comparative manual for cloud execution options
-├── firebase_sync.py          # Secure Firestore tunnel REST communications bridge
-├── local_edge_node.py        # Co-located daemon pipeline loop coordinator
-├── main.py                   # Python entry point runner executing continuous loops
-├── metadata.json             # AI Studio applet name, capabilities, and iframe permissions
-├── package.json              # Front-end build tools, scripts, and npm dependencies
-├── server.ts                 # Full-stack Express server proxy and static asset server
-├── SYSTEM_SNAPSHOT.md        # This document (Handover & Alignment Blueprint)
-└── src
-    ├── App.tsx               # Main layout container & integrated Runbook modal state
-    ├── index.css             # Global CSS and Tailwind theme configurations
-    ├── main.tsx              # Front-end React compiler entry point
-    └── components
-        ├── Dashboard.tsx     # Performance trackers, active trades ledger, and risk controls
-        └── GcpCompanion.tsx  # Dynamic 5-tab VM Provisioning, Backtester, and Git Sync Panel
-```
-
----
-
-## 📡 4. Cloud Environment & Secrets Configuration
-
-### Tier A: Express Web Server Environment (`.env` in Root Folder)
-* `GEMINI_API_KEY`: Server-side API key for processing AI geopolitical calibrations and macro narrative sentiment.
-* `APP_URL`: The deployment address of your web panel (used for synchronizing workspace states to GitHub).
-* `NODE_ENV`: Mode switch (`production` or `development`).
-
-### Tier B: Edge Node VM Environment (`.env` inside VM `~/ALPHA-ENGINE-AIstudio`)
-* `IBKR_ACCOUNT_NUMBER`: Your target Interactive Brokers account ID (e.g. `U9876543`).
-* `IBKR_PORT`: Port `4002` for paper (simulated), `4001` for live production.
-* `IBKR_HOST`: Loopback network address hosting the headless gateway container (`127.0.0.1`).
-* `FIREBASE_PROJECT_ID`: Your Google Cloud project ID enabling direct firestore syncing.
-* `FIREBASE_API_KEY`: The authorization token securing direct Firestore API communication.
+### Pillar 4: Institutional Domain Data Feeds
+Orthogonal, non-market feeds permitted strictly for domain-specific data not provided by IBKR:
+1. **U.S. SEC EDGAR (`data.sec.gov` via `get_sec_filings`):** Primary filings (**8-K** material events, **10-Q** quarterly reports, **10-K** annual statements, **Form 4** insider trades) queried with compliant `secUserAgent` headers.
+2. **ClinicalTrials.gov API v2 (`get_clinical_trials`):** NIH/NLM protocol database tracking Phase I/II/III clinical trials, study recruitment, and primary completion dates.
+3. **U.S. FDA OpenFDA (`api.fda.gov` via `get_fda_safety_reports`):** Adverse Event Reporting System (FAERS), black-box warnings, and drug recalls.
+4. **U.S. Energy Information Administration (`api.eia.gov/v2` via `get_energy_telemetry`):** Weekly natural gas storage (WNGS), crude oil inventories, and refinery utilization metrics.
+5. **Macro & IP Infrastructure:** Federal Reserve Economic Data (FRED API for yields, SOFR, CPI) and USPTO PatentsView API (patent velocity and litigation risk).
 
 ---
 
-## 🤖 5. Copy-Paste Handover Prompt (For New AI Agents)
+## 🤖 3. Autonomous Copilot Architecture
 
-*Copy the text inside the block below and paste it directly into your chat with a new AI assistant to instantly align its capabilities:*
+The Copilot (`CopilotPage.tsx`, `src/server/routes/copilot.ts`, `backend/app/api/copilot.py`) serves as the autonomous institutional trading assistant:
 
-```text
-Hello! You are now the leading Systems and Quant Coding Engineer for the Alpha Engine. 
-
-Our application is a two-tier hybrid trading platform combining a full-stack React + Express dashboard on Google Cloud Run (Port 3000) with a co-located Python execution daemon on a GCP Compute Engine (GCE) e2-micro Spot VM located in Frankfurt. The two tiers synchronize state in real-time using Google Firestore.
-
-Your core directives:
-1. Always maintain strict type-safety. Ensure React components are modular and built using React 18+ and Tailwind CSS.
-2. Maintain port 3000 as the sole external port for the Web Dashboard. Keep the Python socket ports (4001/4002) secured to local loopbacks.
-3. Protect credentials! Never generate public UI elements (inputs or dialogs) requesting secret API keys. Keep the Gemini API Key strictly server-side inside our Express 'server.ts' proxy.
-4. Adhere to our exact risk management rules:
-   - SMA-20 Congruence (buy only when above SMA-20, short below).
-   - OFI Breakout Signal (volume imbalance expansion threshold of 1.4x).
-   - 1% Max Capital Risk sizing constraint.
-   - 1.8 ATR Stop-loss bracket and 2.0x Take-Profit target.
-   - 15% Max Transaction Friction Filter.
-   - Drawdown Circuit Breakers (Daily Percentage Drawdown & Daily Cash Drawdown thresholds with Manual Admin Overrides and Panic Flush buttons).
-5. Always consult '/SYSTEM_SNAPSHOT.md' and '/AGENTS.md' as your system guidelines.
-6. Before delivering code, run compilation tools to verify compile health.
-
-Let's begin analyzing our workspace files. Please read '/AGENTS.md' and '/src/App.tsx' to understand the current configuration.
-```
+* **Conversational Reasoning & Streaming:** Multi-turn streaming chat grounded in live portfolio telemetry, market phase (Pre-market, Execution, Post-market), and MiFID-II compliance.
+* **Cost & Quota Governance:** Built-in circuit breakers, daily spending caps, latency telemetry, and token tracking per provider.
+* **Direct Function Calling via 78-Tool Registry:** The Copilot directly executes tools reflected in `tools_registry.json`:
+  - `reqMktData` / `get_market_quote`: Pulls real-time NBBO quotes from IBKR Pro.
+  - `reqHistoricalData`: Pulls OHLCV candlesticks across any timeframe.
+  - `reqPositions` / `reqAccountSummary`: Inspects live exposure and margin headroom.
+  - `get_sec_filings`, `get_clinical_trials`, `get_fda_safety_reports`, `get_energy_telemetry`: Fetches orthogonal regulatory filings and clinical readouts.
+  - `submit_order`: Dispatches validated bracket orders across Direct TCP Bridge port 4005.
 
 ---
 
-## 📊 6. Current Deployment Status & Verified Specs
+## 🧪 4. Quant Lab & GCE Companion
 
-* **Linter Checks**: Passed and verified compilation clean.
-* **Applet Build**: Compiled successfully into production static assets.
-* **Co-location Integration**: Verified for Frankfurt network route latency optimizations.
+The Quant Lab (`GcpCompanion.tsx`, `src/server/routes/backtest.ts`, `backtester.py`) provides the quantitative research and backtesting environment:
 
-## ✨ Latest Features: Phase 4 Additions
-- **Tier A Event-Study Backtester (vent_backtester.py)**: A native execution simulator that loops historical NewsEvent datasets against our MultiModelEnsemble, calculating Directional Hit Rates, Brier Scores for confidence calibration, and Maximum Favorable/Adverse Excursion (MFE/MAE) benchmarks.
-- **AI Intelligence Tab & Universe Manager**: A live React dashboard (GcpCompanion.tsx) module streaming real-time LLM Critic-Verifier consensus decisions and managing basket execution sizes directly via a frontend slider.
-- **Two-Step Live Gate (Security)**: A hardcoded ADMIN_LIVE_CONFIRMATION_TOKEN pre-flight check in the Risk API. The router strictly rejects 'PAPER' -> 'LIVE' mode mutations without explicit password validation to prevent accidental live execution.
-- **Real-Time Portfolio Margin & VaR (historical_var.py)**: Advanced risk bounds utilizing 1-Day 99% Value-at-Risk modeling and SPY Beta hedging to ensure position limits respect dynamically allocated capital caps.
+1. **AI Intelligence & LLM Critic-Verifier Consensus:** Multi-model consensus voting on event catalysts and sector impacts.
+2. **Universe Manager:** Dynamic candidate basket generation (`dynamic_baskets.json`) filtering high-momentum, volume-expanding stocks.
+3. **Audit Dashboard & Institutional Backtester:**
+   - Evaluates strategies against authentic historical bars pulled from IBKR Pro Tape or verified local caches (zero synthetic random-walk fabrication).
+   - Generates Recharts equity curves, Profit Factor, Sharpe Ratio, Maximum Favorable Excursion (MFE), and gate rejection attribution (Gate 1 Capital, Gate 2 Friction, Gate 5 Blackout).
+4. **Custom Strategy Framework (User & LLM Co-Authoring):**
+   - Pluggable strategy loader (`custom_strategy_loader.py`) allowing the user and Copilot to design, code, and hot-reload custom strategies (e.g. Mean Reversion, Statistical Arbitrage, Pairs Trading, News Sentiment Momentum).
+   - Mandatory DRM risk clamping: All custom strategies strictly adhere to the 1.8 ATR stop-loss, 15% friction filter, and capital ceilings before reaching the broker router.
+5. **GCE Operations & Topology Matrix:** Real-time console emulation for Method B Headless Docker + IBC runtime setups and Frankfurt latency matrix monitoring.
 
+---
+
+## 📁 5. Production File Manifest
+
+| File Path | Role & Operational Responsibility |
+| :--- | :--- |
+| **`main.py`** | Edge node root entrypoint; initializes daemons, risk gates, and registers the synchronous `ibkr_dispatcher` callback on the TCP Bridge. |
+| **`connection.py`** | IBKR `EClient`/`EWrapper` manager; features `execute_synchronous_request` with thread-safe `Event` callback synchronization. |
+| **`edge_bridge.py`** | Direct TCP Bridge server on port `4005`; handles remote order routing, quote retrieval, and generic `DISPATCH_IBKR` execution. |
+| **`alpha_strategy.py`** | Quantitative breakout strategy (SMA-20 trend congruence, OFI order flow imbalance, 1.8 ATR stop, 15% friction filter). |
+| **`backtester.py`** | Historical backtester; queries real historical bars via Direct TCP Bridge (port `4005`) or verified local caches (zero synthetic fallback). |
+| **`ha_manager.py`** | High-Availability failover coordinator; uses atomic local file lease (`ha_leader_lock.json`) and OS PID validation. |
+| **`tca_engine.py`** | Transaction Cost Analysis engine; benchmarks arrival prices, slippage, and MiFID-II efficiency into `tca_executions.json`. |
+| **`reasoning_auditor.py`** | Attribution engine; evaluates prediction hit rates and MFE, persisting daily lessons learned into `audit_history.json`. |
+| **`tools_reflector.py`** | Dynamic reflection engine; inspects `ibapi.client.EClient` to build `tools_registry.json` with normalized parameters. |
+| **`tools_registry.json`** | Unified catalog containing 78 callable tools across 10 categories cached with a 24-hour TTL. |
+| **`server.ts`** | Production Express + Vite server on port `3000`; mounts modular routers (`/api/diagnostics`, `/api/copilot`, `/api/v1/tools/registry`, etc.). |
+| **`src/pages/CopilotPage.tsx`** | Copilot frontend with multi-model dropdown, tool telemetry, token budgeting, and interactive chat. |
+| **`src/components/GcpCompanion.tsx`** | Quant Lab UI; hosts AI intelligence consensus, universe manager, and backtesting dashboard. |
+| **`src/components/ApiVaultModal.tsx`** | 4-Pillar Vault modal with live test probes, badge reflection, and credential synchronization. |
+| **`deploy_to_gcp.sh`** | Clean GCP deployment automation for Frankfurt Compute Engine VM (Zero Firebase / Zero Firestore). |
+| **`AGENTS.md`** | Immutable institutional rules and architecture guidelines for AI agents and developers. |

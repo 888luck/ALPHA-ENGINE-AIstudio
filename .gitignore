@@ -53,3 +53,8 @@ scratch/
 models/
 reports/
 system_settings.json
+ha_leader_lock.json
+system_risk_state.json
+active_trades_sandbox.json
+tca_executions.json
+audit_history.json
