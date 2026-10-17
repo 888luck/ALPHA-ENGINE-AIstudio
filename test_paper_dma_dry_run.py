@@ -126,5 +126,54 @@ def run_dma_dry_run():
     print(f"• RTS-22 Exporter: RECORDED & WRITTEN TO DISK")
     print("=" * 65)
 
+def test_paper_dma_dry_run():
+    """
+    Automated Institutional Paper DMA Routing & RTS-22 Audit Verification
+    """
+    cm = ConnectionManager(trading_mode="PAPER")
+    assert cm.trading_mode == "PAPER"
+    
+    # 1. Verify contract construction
+    contract = Contract()
+    contract.symbol = "NVDA"
+    contract.secType = "STK"
+    contract.exchange = "SMART"
+    contract.currency = "USD"
+    assert contract.symbol == "NVDA"
+
+    # 2. Verify safe LMT order construction
+    order = Order()
+    order.orderId = 9999
+    order.action = "BUY"
+    order.orderType = "LMT"
+    order.totalQuantity = 1.0
+    order.lmtPrice = 10.00
+    order.tif = "DAY"
+    order.eTradeOnly = False
+    order.firmQuoteOnly = False
+    order.transmit = False # Safe simulation hold
+    assert order.action == "BUY"
+    assert order.lmtPrice == 10.00
+
+    # 3. Verify RTS-22 Exporter XML Generation
+    rts22 = RTS22Exporter(output_dir="reports/rts22")
+    class ExecTest:
+        def __init__(self):
+            self.execId = f"TEST_EXEC_{int(time.time())}"
+            self.symbol = "NVDA"
+            self.side = "BUY"
+            self.shares = 1.0
+            self.price = 10.00
+            self.exchange = "NASDAQ"
+            self.time = datetime.now(timezone.utc).strftime("%Y%m%d %H:%M:%S")
+
+    rts22.record_transaction(ExecTest(), "ALGO_DEC_992", "ALGO_EXE_554", symbol="NVDA")
+    xml_path = rts22.generate_daily_xml()
+    assert os.path.exists(xml_path), f"RTS-22 XML was not written to {xml_path}"
+
+    # 4. Verify Gateway Socket Handling (Graceful if offline, live if online)
+    res = cm.dispatch_tool_call("reqAccountSummary", {})
+    assert res["status"] in ["SUCCESS", "GATEWAY_OFFLINE"]
+
 if __name__ == "__main__":
     run_dma_dry_run()

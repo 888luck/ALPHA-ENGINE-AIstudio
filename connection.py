@@ -473,3 +473,83 @@ class ConnectionManager(EWrapper, EClient):
         print(f"[HISTORICAL END] ReqID: {reqId} | Completed download {start} to {end}")
         if self.on_historical_data_complete_callback:
             self.on_historical_data_complete_callback(reqId, self.historical_data_buffer.get(reqId, []))
+
+    def dispatch_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Official Tool Execution Dispatcher:
+        Directly executes reflected EClient methods or queries institutional caches.
+        Zero Synthetic Policy: Never returns mock or simulated confirmations.
+        """
+        name = tool_name.strip()
+        name_lower = name.lower()
+
+        # 1. State & Telemetry Inquiries
+        if name_lower in ["reqpositions", "get_positions", "reqpositionsmulti"]:
+            return {
+                "status": "SUCCESS",
+                "connected": self.is_connected,
+                "positions_count": len(self.active_positions),
+                "positions": self.active_positions,
+                "trading_mode": self.trading_mode
+            }
+
+        elif name_lower in ["reqaccountsummary", "get_account_summary", "reqaccountupdates"]:
+            if not self.is_connected:
+                return {
+                    "status": "GATEWAY_OFFLINE",
+                    "code": 504,
+                    "message": "IBKR Gateway connection inactive on socket 4001/4002.",
+                    "account_summary": self.account_summary
+                }
+            return {
+                "status": "SUCCESS",
+                "connected": True,
+                "account_summary": self.account_summary,
+                "accounts": self.accounts_list
+            }
+
+        elif name_lower in ["reqpnl", "get_pnl"]:
+            return {
+                "status": "SUCCESS",
+                "pnl": self.pnl_updates,
+                "connected": self.is_connected
+            }
+
+        elif name_lower in ["reqopenorders", "reqallopenorders", "reqautoopenorders"]:
+            return {
+                "status": "SUCCESS",
+                "connected": self.is_connected,
+                "open_orders": getattr(self, "open_orders", {})
+            }
+
+        # 2. Direct Callable Method Execution on official EClient surface
+        if hasattr(self, name) and callable(getattr(self, name)):
+            method = getattr(self, name)
+            if not self.is_connected:
+                return {
+                    "status": "GATEWAY_OFFLINE",
+                    "code": 504,
+                    "tool": name,
+                    "error": f"Cannot execute {name}: IBKR Gateway is not connected."
+                }
+            try:
+                res = method(**arguments)
+                return {
+                    "status": "TRANSMITTED",
+                    "tool": name,
+                    "args": arguments,
+                    "result": str(res) if res is not None else "Request transmitted to IBKR Gateway."
+                }
+            except Exception as e:
+                return {
+                    "status": "EXECUTION_ERROR",
+                    "tool": name,
+                    "error": str(e)
+                }
+
+        return {
+            "status": "UNKNOWN_METHOD",
+            "tool": name,
+            "error": f"Method {name} is not recognized on ConnectionManager or EClient."
+        }
+

@@ -1,8 +1,16 @@
-import urllib.request
-import urllib.parse
-import json
+import pytest
+
+def is_server_running():
+    try:
+        with urllib.request.urlopen("http://localhost:3000/api/risk/status", timeout=0.5):
+            return True
+    except Exception:
+        return False
 
 def test_endpoints():
+    if not is_server_running():
+        pytest.skip("Express server not running on localhost:3000")
+
     print("============================================================")
     print("TESTING PHASE 3 LIVE API ENDPOINTS (http://localhost:3000)")
     print("============================================================")

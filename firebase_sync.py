@@ -47,25 +47,12 @@ class FirebaseSyncTunnel:
 
             # Check if running on GCE with metadata permissions to do keyless auth
             has_gce_metadata = False
-            try:
-                req = urllib.request.Request("http://metadata.google.internal/computeMetadata/v1/instance", headers={"Metadata-Flavor": "Google"})
-                with urllib.request.urlopen(req, timeout=1.0) as response:
-                    has_gce_metadata = True
-            except Exception:
-                pass
-            
-            if self.project_id and (self.api_key or has_gce_metadata):
-                self.enabled = True
-                print("--------------------------------------------------")
-                print("[FIREBASE TUNNEL] Sync Tunnel Initialized Successfully.")
-                print(f"Project ID: {self.project_id}")
-                print(f"Database: {self.database_id}")
-                print(f"Authentication Mode: {'Secure Keyless GCE Metadata' if has_gce_metadata else 'Standard Web API Key API'}")
-                print("--------------------------------------------------")
-            else:
-                print("[FIREBASE TUNNEL] Missing credentials. Operating in virtual offline/in-memory mode.")
+            # Enforce Zero Cloud / Direct Socket Policy per Universal Institutional Principles
+            self.enabled = False
+            print("[STATE TUNNEL] Operating in high-performance zero-cloud local socket mode. Firestore network calls permanently disabled.")
         except Exception as e:
-            print(f"[FIREBASE TUNNEL] Initialization warning: {e}. Defaulting to offline simulation mode.")
+            self.enabled = False
+            print(f"[STATE TUNNEL] Operating in local memory mode: {e}")
 
     def _get_gce_project_id(self) -> str:
         """Attempts to retrieve the project ID from the local GCE Metadata Server."""

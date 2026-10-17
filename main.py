@@ -13,6 +13,7 @@ from risk_engine import DRMMiddleware
 from alpha_strategy import AlphaStrategy, ProactiveSimulator
 from firebase_sync import FirebaseSyncTunnel
 from ha_manager import HighAvailabilityManager
+from edge_bridge import EdgeTcpBridgeServer
 
 # Dynamic Multi-Agent Intelligence Modules
 from universe_models import NewsEvent, DynamicBasket
@@ -170,6 +171,58 @@ def main_loop():
     strategy = AlphaStrategy(cm, config["MIFID2_DECISION_MAKER_ID"], config["MIFID2_EXECUTION_TRADER_ID"])
     simulator = ProactiveSimulator()
     market_hours = MarketHoursResolver(default_observation_buffer_mins=15)
+
+    # 7.5 Initialize Direct TCP Bridge Server (Port 4005)
+    edge_bridge = EdgeTcpBridgeServer()
+
+    def handle_direct_order(order_dict):
+        sym = order_dict.get("symbol", "").upper()
+        direction = order_dict.get("direction", "").upper()
+        entry_p = float(order_dict.get("entryPrice", 0.0))
+        stop_p = float(order_dict.get("stopPrice", 0.0))
+        qty = float(order_dict.get("quantity", 1.0))
+        if drm.router_locked:
+            raise ValueError("Execution router locked by DRM circuit breaker.")
+        passed = drm.validate_trade_risk(sym, direction, entry_p, stop_p, qty)
+        if not passed:
+            raise ValueError(f"DRM risk gate rejected order for {sym}.")
+        is_mock = not getattr(cm, "is_connected", False)
+        strategy.submit_bracket_order(sym, direction, entry_p, stop_p, qty, is_mock=is_mock)
+        return {"executed": True, "symbol": sym, "direction": direction, "quantity": qty}
+
+    def handle_direct_flush():
+        drm.emergency_flush()
+        return {"flushed": True, "active_positions": len(cm.active_positions)}
+
+    def handle_direct_settings(settings_dict):
+        if "routerLocked" in settings_dict:
+            drm.router_locked = bool(settings_dict["routerLocked"])
+            print(f"[TCP BRIDGE] Updated router_locked = {drm.router_locked}")
+        if "dailyCapitalCeiling" in settings_dict:
+            drm.daily_capital_ceiling = float(settings_dict["dailyCapitalCeiling"])
+        cloud_mode = settings_dict.get("tradingMode")
+        if cloud_mode and cloud_mode.upper() in ["PAPER", "LIVE"]:
+            current_mode = "LIVE" if config.get("IBKR_PORT") == 4001 else "PAPER"
+            if cloud_mode.upper() != current_mode:
+                print(f"[TRADING MODE SWITCH] Switch requested via TCP Bridge: {current_mode} -> {cloud_mode.upper()}")
+                script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "switch_gateway_mode.py")
+                if os.path.exists(script_path):
+                    subprocess.Popen(["python3", script_path, "--mode", cloud_mode.upper()])
+        return {"acknowledged": True}
+
+    def handle_direct_telemetry():
+        return {
+            "connected": getattr(cm, "is_connected", False),
+            "router_locked": drm.router_locked,
+            "positions": getattr(cm, "active_positions", {}),
+            "timestamp": time.time(),
+        }
+
+    edge_bridge.order_handler = handle_direct_order
+    edge_bridge.flush_handler = handle_direct_flush
+    edge_bridge.settings_handler = handle_direct_settings
+    edge_bridge.telemetry_provider = handle_direct_telemetry
+    edge_bridge.start()
     
     # Run pre-flight calibration simulator
     print("[INIT] Initializing Proactive Sector Expectancy Calibration...")
@@ -229,65 +282,9 @@ def main_loop():
             iteration += 1
             continue
             
-        # Pull latest risk state overrides from Firestore
-        if iteration % 2 == 0:
-            remote_state = firebase_tunnel.get_system_risk_state()
-            if remote_state:
-                remote_lock = remote_state.get("routerLocked", False)
-                if remote_lock and not drm.router_locked:
-                    print("[FIREBASE OVERRIDE] EMERGENCY MANUAL KILL DETECTED FROM CLOUD PORTFOLIO PANEL!")
-                    drm.emergency_flush()
-                    for symbol in list(cm.active_positions.keys()):
-                        trade_id = f"TRD_{symbol}"
-                        firebase_tunnel.delete_active_trade(trade_id)
-                elif not remote_lock and drm.router_locked:
-                    print("[FIREBASE OVERRIDE] Cloud panel requested router unlocking. Resetting circuit breaker...")
-                    drm.router_locked = False
-
-                # Dynamic Paper / Live mode switch requested from Web Dashboard
-                cloud_mode = remote_state.get("tradingMode")
-                if cloud_mode and cloud_mode.upper() in ["PAPER", "LIVE"]:
-                    current_configured_mode = "LIVE" if config.get("IBKR_PORT") == 4001 else "PAPER"
-                    if cloud_mode.upper() != current_configured_mode:
-                        print(f"[TRADING MODE SWITCH] Dashboard requested switch: {current_configured_mode} -> {cloud_mode.upper()}")
-                        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "switch_gateway_mode.py")
-                        if os.path.exists(script_path):
-                            subprocess.Popen(["python3", script_path, "--mode", cloud_mode.upper()])
-
-            # Poll and dispatch commands from Cloud Run / Dashboard
-            try:
-                pending_cmds = firebase_tunnel.poll_system_commands()
-                for cmd in pending_cmds:
-                    c_id = cmd.get("cmdId", "UNKNOWN")
-                    c_type = cmd.get("type", "")
-                    print(f"[EDGE COMMAND INGEST] Processing command: {c_id} ({c_type})")
-                    
-                    if c_type == "EMERGENCY_FLUSH":
-                        drm.emergency_flush()
-                        for symbol in list(cm.active_positions.keys()):
-                            firebase_tunnel.delete_active_trade(f"TRD_{symbol}")
-                        firebase_tunnel.acknowledge_command(c_id, "EXECUTED", "Emergency flush completed on Edge node.")
-                    
-                    elif c_type == "SUBMIT_ORDER":
-                        sym = cmd.get("symbol", "").upper()
-                        direction = cmd.get("direction", "").upper()
-                        entry_p = float(cmd.get("entryPrice", 0.0))
-                        stop_p = float(cmd.get("stopPrice", 0.0))
-                        qty = float(cmd.get("quantity", 1.0)) if cmd.get("quantity") else 1.0
-                        
-                        if drm.router_locked:
-                            firebase_tunnel.acknowledge_command(c_id, "REJECTED", "Execution router locked by DRM circuit breaker.")
-                        else:
-                            # Submit order through DRM gatekeeper
-                            passed = drm.validate_trade_risk(sym, direction, entry_p, stop_p, qty)
-                            if passed:
-                                is_mock = not getattr(cm, "is_connected", False)
-                                strategy.submit_bracket_order(sym, direction, entry_p, stop_p, qty, is_mock=is_mock)
-                                firebase_tunnel.acknowledge_command(c_id, "EXECUTED", f"Order submitted to IBKR: {direction} {qty} {sym}")
-                            else:
-                                firebase_tunnel.acknowledge_command(c_id, "REJECTED", f"DRM risk gate rejected order for {sym}.")
-            except Exception as cmd_err:
-                print(f"[EDGE COMMAND ERROR] Failed processing system command: {cmd_err}")
+        # Real-Time Socket Architecture: Commands and settings are dispatched asynchronously
+        # directly via EdgeTcpBridgeServer without cloud database polling latency.
+        pass
 
         # Dynamic Per-Candidate Session Clock & Opening Reality Verification
         for cand in list(active_basket.candidates):

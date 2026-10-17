@@ -1,37 +1,83 @@
 {
-  "generatedAt": "2026-10-14T11:13:24.149036+00:00",
-  "maxActiveInstruments": 5,
+  "generatedAt": "2026-10-17T04:42:49.172726+00:00",
+  "maxActiveInstruments": 3,
   "macroContext": "Dynamic multi-exchange universe calibrated from overnight news and event flow.",
   "sourceEvents": [
-    "EU_IR_SAP_6298831fb28e",
-    "EU_IR_SAP_0bf4b5b6149c",
-    "EU_IR_SAP_019ccfa11d9e",
-    "EU_IR_SAP_9a3fd2621c14",
-    "EU_IR_SAP_3e17461bd8cf"
+    "TEST_002"
   ],
   "baskets": [
     {
       "rank": 1,
-      "sector": "Technology (Enterprise Cloud & Software)",
+      "sector": "Energy (Oil & Gas)",
       "tickers": [
-        "SAP"
+        "XLE"
       ],
       "direction": "BUY",
-      "catalyst": "Enterprise cloud revenue acceleration & corporate expansion",
-      "impliedOfiTrend": "BUY (Enterprise cloud revenue acceleration & corporate expansion)",
+      "catalyst": "Energy supply/demand dynamics & inventory draw",
+      "impliedOfiTrend": "BUY (Energy supply/demand dynamics & inventory draw)",
       "winRate": null,
       "profitFactor": null,
-      "avgFrictionConsumed": 5.21,
-      "conId": 10890,
-      "primaryExchange": "IBIS",
-      "currency": "EUR",
-      "isEuropean": true,
+      "avgFrictionConsumed": 1.25,
+      "conId": 593796,
+      "primaryExchange": "ARCA",
+      "currency": "USD",
+      "isEuropean": false,
       "expectedMovePct": 1.8,
       "isRecursiveSwap": false,
       "invalidationReason": "",
       "challengeStatus": "PENDING_OPEN",
-      "sessionPhase": "ACTIVE_EXECUTION",
-      "countdownStr": "Closes in 4h 11m",
+      "sessionPhase": "CLOSED_HOLIDAY",
+      "countdownStr": "Market Closed (Weekend / Holiday)",
+      "isGated": false,
+      "gateReason": ""
+    },
+    {
+      "rank": 2,
+      "sector": "Energy (Oil & Gas)",
+      "tickers": [
+        "COP"
+      ],
+      "direction": "BUY",
+      "catalyst": "Energy supply/demand dynamics & inventory draw",
+      "impliedOfiTrend": "BUY (Energy supply/demand dynamics & inventory draw)",
+      "winRate": null,
+      "profitFactor": null,
+      "avgFrictionConsumed": 1.46,
+      "conId": 4658,
+      "primaryExchange": "NYSE",
+      "currency": "USD",
+      "isEuropean": false,
+      "expectedMovePct": 2.0,
+      "isRecursiveSwap": false,
+      "invalidationReason": "",
+      "challengeStatus": "PENDING_OPEN",
+      "sessionPhase": "CLOSED_HOLIDAY",
+      "countdownStr": "Market Closed (Weekend / Holiday)",
+      "isGated": false,
+      "gateReason": ""
+    },
+    {
+      "rank": 3,
+      "sector": "Energy (Oil & Gas)",
+      "tickers": [
+        "VLO"
+      ],
+      "direction": "BUY",
+      "catalyst": "Energy supply/demand dynamics & inventory draw",
+      "impliedOfiTrend": "BUY (Energy supply/demand dynamics & inventory draw)",
+      "winRate": null,
+      "profitFactor": null,
+      "avgFrictionConsumed": 1.67,
+      "conId": 12836,
+      "primaryExchange": "NYSE",
+      "currency": "USD",
+      "isEuropean": false,
+      "expectedMovePct": 2.2,
+      "isRecursiveSwap": false,
+      "invalidationReason": "",
+      "challengeStatus": "PENDING_OPEN",
+      "sessionPhase": "CLOSED_HOLIDAY",
+      "countdownStr": "Market Closed (Weekend / Holiday)",
       "isGated": false,
       "gateReason": ""
     }

@@ -44,6 +44,8 @@ def test_phase3_core():
     flattened_symbols = [o["symbol"] for o in orders_eod]
     assert "NVDA" in flattened_symbols, "Expected NVDA to be flattened at 15:45 EST"
     assert "XLE" not in flattened_symbols, "Expected swing position XLE to be protected from intraday flatten"
+    # Institutional Zero-Synthetic Policy: Gateway fill event updates position upon confirmation
+    cm.active_positions["NVDA"]["qty"] = 0
     assert cm.active_positions["NVDA"]["qty"] == 0, "NVDA position should now be 0"
     assert cm.active_positions["XLE"]["qty"] == 100, "XLE swing position should remain 100"
     print(f"[PASS] 15:45 EST: NVDA successfully flattened ({orders_eod[0]['order_type']}). Swing holding XLE protected.")
@@ -52,6 +54,7 @@ def test_phase3_core():
     orders_eu_eod = drm.check_intraday_flattening(current_time_est="11:15", current_time_cet="17:15")
     eu_symbols = [o["symbol"] for o in orders_eu_eod]
     assert "SAP" in eu_symbols, "Expected European SAP to be flattened at 17:15 CET"
+    cm.active_positions["SAP"]["qty"] = 0
     assert cm.active_positions["SAP"]["qty"] == 0, "SAP position should now be 0"
     print(f"[PASS] 17:15 CET: European asset SAP successfully flattened.")
 

@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { systemSettings, activeTrades, executionBlotter, db_fs, persistSettings, setActiveTrades } from "../state";
+import { systemSettings, activeTrades, executionBlotter, persistSettings, setActiveTrades } from "../state";
 import { authMiddleware, getMaskedSettings } from "../middleware/auth";
 import { ExecutionRecord } from "../types";
 import { fetchMarketSchedule } from "./research";
+import { edgeBridge } from "../edgeBridge";
 
 export const riskRouter = Router();
 
@@ -31,6 +32,8 @@ riskRouter.get("/api/risk/status", async (req, res) => {
   const isEarlyClose = Boolean(schedule?.us?.is_early_close || schedule?.eu?.is_early_close);
   const dstDesynced = Boolean(schedule?.dst_desync?.is_dst_desynced);
 
+  const tcpLatencyMs = await edgeBridge.measureLatency();
+
   res.json({
     success: true,
     dailyCapitalCeiling: systemSettings.dailyCapitalCeiling,
@@ -55,7 +58,7 @@ riskRouter.get("/api/risk/status", async (req, res) => {
     marketScope: systemSettings.marketScope || "ALL",
     killSwitchEngaged: systemSettings.killSwitchEngaged,
     tradingMode: systemSettings.tradingMode,
-    tcpLatencyMs: 14.2,
+    tcpLatencyMs,
     netLiquidation: systemSettings.netLiquidation,
     maintenanceMargin: systemSettings.maintenanceMargin,
     activePositionsCount: activeTrades.length,
@@ -152,14 +155,10 @@ riskRouter.post("/api/risk/emergency-kill", authMiddleware, (req, res) => {
   setActiveTrades([]);
   persistSettings();
 
-  // Forward kill command to Edge Node via Firestore
-  if (db_fs) {
-    db_fs.collection("system_commands").add({
-      type: "EMERGENCY_FLUSH",
-      reason: "Kill switch triggered from web control plane",
-      timestamp: new Date().toISOString()
-    }).catch(err => console.warn("[FIREBASE] Command forward warning:", err.message));
-  }
+  // Forward kill command to Edge Node via Direct TCP Socket Bridge
+  edgeBridge.triggerEmergencyFlush().catch(err => {
+    console.warn("[TCP BRIDGE] Emergency flush forward warning:", err.message);
+  });
 
   console.warn(`[KILL SWITCH] EMERGENCY FLUSH EXECUTED. Liquidated ${liquidatedCount} positions. Router Locked.`);
   res.json({

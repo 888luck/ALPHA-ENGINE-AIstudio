@@ -324,34 +324,8 @@ class CopilotTools:
             except Exception as e:
                 logger.debug("Direct Frankfurt socket query error: %s", e)
         
-        if not positions_list:
-            baskets_path = os.path.join(STUDIO_DIR, "dynamic_baskets.json")
-            if os.path.exists(baskets_path):
-                try:
-                    with open(baskets_path, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                        for b in data.get("baskets", []):
-                            ticker = b.get("tickers", ["XLE"])[0]
-                            positions_list.append({
-                                "symbol": ticker,
-                                "qty": 150 if ticker == "XLE" else 80,
-                                "avgCost": 88.42 if ticker == "XLE" else 112.30,
-                                "currentPrice": 91.15 if ticker == "XLE" else 114.75,
-                                "unrealizedPnL": 409.50 if ticker == "XLE" else 196.00,
-                                "exchange": b.get("primaryExchange", "ARCA"),
-                                "currency": b.get("currency", "USD"),
-                                "account": "U8129384"
-                            })
-                except Exception:
-                    pass
-            
-            if not positions_list:
-                positions_list = [
-                    {"symbol": "XLE", "qty": 150, "avgCost": 88.42, "currentPrice": 91.15, "unrealizedPnL": 409.50, "exchange": "ARCA", "currency": "USD", "account": "U8129384"},
-                    {"symbol": "COP", "qty": 80, "avgCost": 112.30, "currentPrice": 114.75, "unrealizedPnL": 196.00, "exchange": "NYSE", "currency": "USD", "account": "U8129384"}
-                ]
-
-        total_unrealized = sum(p["unrealizedPnL"] for p in positions_list)
+        # Zero Synthetic Policy: Never synthesize mock positions when real book is empty
+        total_unrealized = sum(p.get("unrealizedPnL", 0.0) for p in positions_list)
         return {
             "status": "SUCCESS",
             "edge_node": f"{edge_host}:{edge_port} (Frankfurt GCE)",
@@ -365,22 +339,40 @@ class CopilotTools:
     @staticmethod
     def get_account_summary() -> Dict[str, Any]:
         """Queries Net Liquidation, available cash, buying power from IB Gateway."""
-        edge_host = os.environ.get("IBKR_HOST", "10.156.0.2")
+        edge_host = os.environ.get("IBKR_HOST", "127.0.0.1")
         edge_port = int(os.environ.get("IBKR_PORT", 4002))
+
+        try:
+            from connection import ConnectionManager
+            cm = ConnectionManager()
+            if getattr(cm, "is_connected", False) and getattr(cm, "account_summary", None):
+                summ = cm.account_summary
+                return {
+                    "status": "SUCCESS",
+                    "account": summ.get("account", "DUE263010"),
+                    "trading_mode": cm.trading_mode,
+                    "edge_node": f"{edge_host}:{edge_port} (Frankfurt GCE)",
+                    "socket_live": True,
+                    "net_liquidation_usd": float(summ.get("NetLiquidation", 0.0)),
+                    "available_cash_usd": float(summ.get("TotalCashValue", 0.0)),
+                    "buying_power_usd": float(summ.get("BuyingPower", 0.0)),
+                    "maintenance_margin_req_usd": float(summ.get("MaintMarginReq", 0.0)),
+                    "verified_at": datetime.now(timezone.utc).isoformat()
+                }
+        except Exception:
+            pass
+
         return {
-            "status": "SUCCESS",
-            "account": "U8129384",
-            "trading_mode": "LIVE_DMA",
-            "edge_node": f"{edge_host}:{edge_port} (Frankfurt GCE / europe-west3)",
-            "net_liquidation_usd": 154200.00,
-            "available_cash_usd": 118500.00,
-            "buying_power_usd": 308400.00,
-            "maintenance_margin_req_usd": 12400.00,
-            "realized_pnl_today_usd": 1240.50,
-            "unrealized_pnl_open_usd": 605.50,
-            "base_currency": "EUR",
-            "settlement_currency": "USD",
-            "cbi_mifir_status": "COMPLIANT (ALGO_DEC_992 / ALGO_EXE_554)",
+            "status": "OFFLINE_SIMULATION",
+            "account": "DUE263010",
+            "trading_mode": "PAPER",
+            "edge_node": f"{edge_host}:{edge_port} (Gateway Offline)",
+            "socket_live": False,
+            "net_liquidation_usd": 0.0,
+            "available_cash_usd": 0.0,
+            "buying_power_usd": 0.0,
+            "maintenance_margin_req_usd": 0.0,
+            "warning": "IBKR Gateway socket offline. Live balances unavailable under Zero Synthetic Policy.",
             "verified_at": datetime.now(timezone.utc).isoformat()
         }
 
@@ -525,15 +517,19 @@ def execute_tool_call(tool_name: str, tool_args: Dict[str, Any]) -> Dict[str, An
                 commodity=tool_args.get("commodity", "natural_gas")
             )
         else:
-            # IBKR general inquiry fallback
-            return {
-                "status": "DISPATCHED",
-                "tool": tool_name,
-                "args": tool_args,
-                "edge_node": "10.156.0.2:4002 (Frankfurt GCE)",
-                "note": f"Method {tool_name} successfully dispatched to IBKR edge daemon.",
-                "verified_at": datetime.now(timezone.utc).isoformat()
-            }
+            # Full Reflection Dispatcher: Route method directly through ConnectionManager
+            try:
+                from connection import ConnectionManager
+                cm = ConnectionManager()
+                return cm.dispatch_tool_call(tool_name, tool_args)
+            except Exception as ex:
+                return {
+                    "status": "GATEWAY_OFFLINE",
+                    "code": 504,
+                    "tool": tool_name,
+                    "args": tool_args,
+                    "error": f"Failed dispatching to IBKR Gateway: {ex}"
+                }
     except Exception as e:
         logger.error("Error executing tool %s: %s", tool_name, e)
         return {"status": "ERROR", "tool": tool_name, "error": str(e)}

@@ -163,10 +163,10 @@ Click any quick query below or type your request:`,
   const [input, setInput] = useState("");
   const [selectedModel, setSelectedModel] = useState<string>(() => {
     const saved = localStorage.getItem("alpha_copilot_model");
-    if (saved && !saved.includes("2.5")) {
+    if (saved) {
       return saved;
     }
-    return "google/gemini-2.0-flash";
+    return "local/finbert-int8";
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
@@ -223,8 +223,8 @@ Click any quick query below or type your request:`,
         });
 
         if (Array.isArray(data.models_catalog) && data.models_catalog.length > 0) {
-          // Filter out any retired 2.5 models
-          const cleanCatalog = data.models_catalog.filter((m: any) => !m.id.includes("2.5"));
+          // Zero Synthetic Policy: Render live discovered provider catalog directly without string masking
+          const cleanCatalog = data.models_catalog;
           setAvailableModels(cleanCatalog);
           // If online models were discovered, auto-select the best one if currently on offline fallback
           if (cleanCatalog.length > 1) {

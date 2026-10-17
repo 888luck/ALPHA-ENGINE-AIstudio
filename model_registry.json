@@ -1,52 +1,53 @@
 {
-  "version": "1.0.0",
-  "last_updated": "2026-09-27T00:00:00Z",
+  "version": "2.0.0",
+  "last_updated": "2026-10-17T00:00:00Z",
   "sentinel_auto_update": true,
+  "dynamic_discovery_enabled": true,
   "endpoints": {
     "generator": {
       "role": "generator",
-      "active_model": "nvidia/nemotron-3-ultra",
       "provider": "nvidia_nim",
       "base_url": "https://integrate.api.nvidia.com/v1",
       "api_key_env": "NVIDIA_API_KEY",
-      "fallback_model": "llama-3.1-70b-versatile",
+      "active_model": "dynamic_discovered",
       "fallback_provider": "groq",
+      "fallback_model": "dynamic_discovered",
       "temperature": 0.0,
       "max_tokens": 2048,
       "timeout_sec": 30.0
     },
     "verifier_1": {
       "role": "verifier_1",
-      "active_model": "llama-3.1-70b-versatile",
       "provider": "groq",
       "base_url": "https://api.groq.com/openai/v1",
       "api_key_env": "GROQ_API_KEY",
-      "fallback_model": "gemini-2.5-flash",
+      "active_model": "dynamic_discovered",
       "fallback_provider": "google_genai",
+      "fallback_model": "dynamic_discovered",
       "temperature": 0.0,
       "max_tokens": 1024,
       "timeout_sec": 20.0
     },
     "verifier_2": {
       "role": "verifier_2",
-      "active_model": "gemini-2.5-flash",
       "provider": "google_genai",
       "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
       "api_key_env": "GEMINI_API_KEY",
-      "fallback_model": "llama-3.1-70b-versatile",
+      "active_model": "dynamic_discovered",
       "fallback_provider": "groq",
+      "fallback_model": "dynamic_discovered",
       "temperature": 0.0,
       "max_tokens": 1024,
       "timeout_sec": 25.0
     },
     "judge": {
       "role": "judge",
-      "active_model": "gemini-2.5-pro",
       "provider": "google_genai",
       "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
       "api_key_env": "GEMINI_API_KEY",
-      "fallback_model": "llama-3.1-70b-versatile",
+      "active_model": "dynamic_discovered",
       "fallback_provider": "groq",
+      "fallback_model": "dynamic_discovered",
       "temperature": 0.0,
       "max_tokens": 2048,
       "timeout_sec": 35.0
@@ -67,4 +68,3 @@
     }
   }
 }
-

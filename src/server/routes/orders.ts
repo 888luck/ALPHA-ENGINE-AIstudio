@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { systemSettings, activeTrades, executionBlotter, db_fs, persistSettings, setActiveTrades } from "../state";
+import { systemSettings, activeTrades, executionBlotter, persistSettings, setActiveTrades } from "../state";
 import { authMiddleware, getMaskedSettings } from "../middleware/auth";
+import { edgeBridge } from "../edgeBridge";
 
 export const ordersRouter = Router();
 
@@ -8,7 +9,10 @@ ordersRouter.get("/api/execution/blotter", (req, res) => {
   res.json({ success: true, blotter: executionBlotter });
 });
 
-// Single Execution Authority: Order Relay to Frankfurt Python Edge Node via Firestore
+/**
+ * Single Execution Authority: Direct TCP Order Relay to Frankfurt Python Edge Node
+ * Replaces deprecated Firestore polling bus with direct TCP socket dispatch.
+ */
 ordersRouter.post("/api/place-trade", authMiddleware, async (req, res) => {
   if (systemSettings.routerLocked) {
     return res.status(403).json({ error: "EXECUTION ROUTER HARD-LOCKED: Risk circuit breaker or session termination in progress." });
@@ -20,53 +24,62 @@ ordersRouter.post("/api/place-trade", authMiddleware, async (req, res) => {
     return res.status(400).json({ error: "Missing required order parameters (symbol, direction, entry, stop)." });
   }
 
-  // Single Authority Policy: The Frankfurt Python Edge Node is the sole execution authority.
-  // Express relays the authenticated order command to Firestore for execution by the Edge Node.
-  if (db_fs) {
-    try {
-      const cmdId = `CMD_${Date.now()}_${symbol}`;
-      await db_fs.collection("system_commands").doc(cmdId).set({
-        type: "SUBMIT_ORDER",
-        symbol: symbol.toUpperCase(),
-        direction: direction.toUpperCase(),
-        entryPrice: Number(entryPrice),
-        stopPrice: Number(stopPrice),
-        quantity: quantity ? Number(quantity) : null,
-        status: "PENDING_EDGE_DISPATCH",
-        createdAt: new Date().toISOString()
+  try {
+    const edgeResponse = await edgeBridge.submitOrder({
+      symbol: symbol.toUpperCase(),
+      direction: direction.toUpperCase(),
+      entryPrice: Number(entryPrice),
+      stopPrice: Number(stopPrice),
+      quantity: quantity ? Number(quantity) : 1.0,
+    });
+
+    if (edgeResponse.status === "EXECUTED") {
+      return res.json({
+        success: true,
+        message: `Order dispatched directly to Frankfurt IBKR Edge Daemon via TCP Socket: ${direction} ${quantity || 1} ${symbol}`,
+        result: edgeResponse.result,
       });
-      return res.json({ 
-        success: true, 
-        message: `Order command queued for Frankfurt Python Edge Node execution (Ref: ${cmdId})`,
-        commandId: cmdId
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: edgeResponse.message || "Edge Node rejected order dispatch.",
+        details: edgeResponse,
       });
-    } catch (err: any) {
-      return res.status(500).json({ error: `Failed queuing order command to Edge Node: ${err.message}` });
     }
-  } else {
-    return res.status(503).json({ 
-      error: "Edge Node communication link offline (Firestore uninitialized). Simulated execution is disabled under Zero Synthetic Policy." 
+  } catch (err: any) {
+    return res.status(503).json({
+      success: false,
+      error: `Direct TCP Edge Node link failure: ${err.message}. Order was not transmitted to IBKR.`,
     });
   }
 });
 
-// Manual override emergency kill button endpoint
+/**
+ * Manual Emergency Flush Kill-Switch
+ * Instantly transmits emergency portfolio liquidation command directly to Frankfurt Edge Daemon via TCP.
+ */
 ordersRouter.post("/api/trigger-flush", authMiddleware, async (req, res) => {
   console.log(`[EMERGENCY FLUSH] MANUAL SYSTEMIC OVERRIDE KILL-SWITCH INITIATED VIA PORTFOLIO WEB PANEL`);
   setActiveTrades([]);
   systemSettings.routerLocked = true;
-  persistSettings();
+  await persistSettings();
 
-  if (db_fs) {
-    try {
-      await db_fs.collection("system_commands").add({
-        type: "EMERGENCY_FLUSH",
-        reason: "Manual flush initiated via web control plane",
-        timestamp: new Date().toISOString()
-      });
-    } catch (e: any) {
-      console.warn("[FIREBASE] Command forward warning:", e.message);
-    }
+  try {
+    const edgeResponse = await edgeBridge.triggerEmergencyFlush();
+    return res.json({
+      success: true,
+      message: "Emergency liquidation executed directly on Frankfurt Edge Node via TCP Socket.",
+      settings: getMaskedSettings(systemSettings),
+      activeTrades,
+      edgeResponse,
+    });
+  } catch (e: any) {
+    console.warn("[EDGE TCP BRIDGE WARN] Direct socket flush dispatch error:", e.message);
+    return res.json({
+      success: true,
+      warning: `Local router locked, but direct edge dispatch failed: ${e.message}`,
+      settings: getMaskedSettings(systemSettings),
+      activeTrades,
+    });
   }
-  res.json({ success: true, settings: getMaskedSettings(systemSettings), activeTrades });
 });

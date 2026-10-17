@@ -1,49 +1,16 @@
 import path from "path";
 import fs from "fs";
-import { initializeApp, getApps, applicationDefault } from "firebase-admin/app";
-import { getFirestore, Firestore } from "firebase-admin/firestore";
 import { SystemSettings, ActiveTrade, HistoricalLog, Level2Book, ExecutionRecord } from "./types";
+import { edgeBridge } from "./edgeBridge";
 
-let firebaseProjectId: string | undefined = undefined;
-let databaseId: string | undefined = undefined;
-try {
-  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-  if (fs.existsSync(configPath)) {
-    const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    if (config.firestoreDatabaseId) {
-      databaseId = config.firestoreDatabaseId;
-    }
-    if (config.projectId) {
-      firebaseProjectId = config.projectId;
-    }
-    console.log(`[FIREBASE] Using Firestore database ID: ${databaseId}, Project ID: ${firebaseProjectId}`);
-  }
-} catch (err: any) {
-  console.warn("[FIREBASE] Could not read firebase-applet-config.json:", err.message);
-}
+// Dedicated Local JSON Persistence for System Settings (Zero Firestore Dependency)
+const SETTINGS_FILE_PATH = path.join(process.cwd(), "system_settings.json");
 
-try {
-  if (getApps().length === 0) {
-    if (process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.K_SERVICE) {
-      initializeApp({
-        credential: applicationDefault(),
-        ...(firebaseProjectId ? { projectId: firebaseProjectId } : {})
-      });
-      console.log("[FIREBASE] Admin SDK initialized for settings persistence.");
-    } else {
-      console.log("[FIREBASE] Local environment detected (no ADC credentials). Running in high-performance local memory mode.");
-    }
-  }
-} catch (e: any) {
-  console.warn("[FIREBASE] Admin initialization skipped or failed. Error:", e.message);
-}
-
-export const db_fs: Firestore | null = getApps().length > 0 ? (databaseId ? getFirestore(getApps()[0], databaseId) : getFirestore()) : null;
-export const SETTINGS_DOC_PATH = "system_config/alpha_engine_v1";
+export const db_fs = null; // Deprecated and permanently disabled per Universal Institutional Principles
 
 export let systemSettings: SystemSettings = {
   ibkrAccountNumber: "DUE263010",
-  ibkrHost: process.env.EDGE_NODE_IP || "10.156.0.2",
+  ibkrHost: process.env.EDGE_NODE_IP || "127.0.0.1",
   ibkrPort: 4002,
   ibkrClientId: 10,
   mifid2DecisionMaker: "ALGO_DEC_992",
@@ -106,97 +73,40 @@ try {
 }
 
 // Zero Synthetic Policy: executionBlotter is populated exclusively from verified IBKR execDetails callbacks.
-// No mock, fixture, or test trades may be initialised here.
 export let executionBlotter: ExecutionRecord[] = [];
 
 export async function persistSettings() {
-  if (!db_fs) return;
   try {
-    await db_fs.doc(SETTINGS_DOC_PATH).set(systemSettings, { merge: true });
-    await db_fs.doc("system_risk_state/current_state").set({
-      routerLocked: systemSettings.routerLocked
-    }, { merge: true });
-    console.log("[FIREBASE] System settings & router lock status successfully persisted to Firestore.");
-  } catch (err) {
-    console.error("[FIREBASE] Failed to persist settings:", err);
+    fs.writeFileSync(SETTINGS_FILE_PATH, JSON.stringify(systemSettings, null, 2), "utf-8");
+    console.log("[SETTINGS] System settings successfully persisted to local storage.");
+    
+    // Proactively push updated settings directly to Edge Node via Direct TCP Bridge
+    edgeBridge.syncSettings(systemSettings).catch((err: any) => {
+      console.warn("[EDGE BRIDGE WARN] Async edge settings sync queued or offline:", err.message);
+    });
+  } catch (err: any) {
+    console.error("[SETTINGS] Failed to persist settings to disk:", err.message);
   }
 }
 
 export async function loadPersistentSettings() {
-  if (!db_fs) return;
   try {
-    const doc = await db_fs.doc(SETTINGS_DOC_PATH).get();
-    if (doc.exists) {
-      const data = doc.data();
+    if (fs.existsSync(SETTINGS_FILE_PATH)) {
+      const data = JSON.parse(fs.readFileSync(SETTINGS_FILE_PATH, "utf-8"));
       if (data) {
         systemSettings = { ...systemSettings, ...data };
-        console.log("[FIREBASE] System settings successfully restored from Firestore.");
+        console.log("[SETTINGS] System settings successfully restored from disk.");
       }
     } else {
-      console.log("[FIREBASE] No existing settings found in Firestore. Using defaults.");
+      console.log("[SETTINGS] No existing settings file found on disk. Initializing defaults.");
       await persistSettings();
     }
-
-    db_fs.collection("active_trades").onSnapshot(
-      snapshot => {
-        const trades: any[] = [];
-        snapshot.forEach(d => {
-          trades.push({ id: d.id, ...d.data() });
-        });
-        activeTrades = trades;
-      },
-      err => {
-        console.warn("[FIREBASE] active_trades snapshot listener offline:", err.message);
-      }
-    );
-
-    db_fs.collection("historical_logs").orderBy("timestamp", "desc").limit(50).onSnapshot(
-      snapshot => {
-        const logs: any[] = [];
-        snapshot.forEach(d => {
-          logs.push({ id: d.id, ...d.data() });
-        });
-        historicalLogs = logs;
-      },
-      err => {
-        console.warn("[FIREBASE] historical_logs snapshot listener offline:", err.message);
-      }
-    );
-
-    db_fs.doc("system_risk_state/current_state").onSnapshot(
-      snapshot => {
-        if (snapshot.exists) {
-          const data = snapshot.data();
-          if (data) {
-            systemSettings.netLiquidation = data.netLiquidation ?? systemSettings.netLiquidation;
-            systemSettings.maintenanceMargin = data.maintenanceMargin ?? systemSettings.maintenanceMargin;
-            if (data.routerLocked !== undefined) {
-              systemSettings.routerLocked = data.routerLocked;
-            }
-            if (data.gatewayConnected !== undefined) {
-              systemSettings.gatewayConnectionActive = Boolean(data.gatewayConnected);
-            }
-            if (data.accountNumber) {
-              systemSettings.ibkrAccountNumber = data.accountNumber;
-            }
-          }
-        }
-      },
-      err => {
-        console.warn("[FIREBASE] system_risk_state snapshot listener offline:", err.message);
-      }
-    );
-  } catch (err) {
-    console.error("[FIREBASE] Error loading persistent settings:", err);
+  } catch (err: any) {
+    console.warn("[SETTINGS] Error loading settings from disk:", err.message);
   }
 }
 
-export function calculateIBIECommission(symbol: string, primaryExchange: string, quantity: number, price: number): number {
-  const exch = (primaryExchange || "").toUpperCase();
-  const symb = (symbol || "").toUpperCase();
-  const isEuropean = ["SBF", "IBIS", "PARIS", "XETRA", "XETR", "AEB", "SB", "LSE"].includes(exch) ||
-                     ["SGO", "ENGI", "RWE", "SAP"].includes(symb);
-
+export function calculateEstimatedCommission(quantity: number, price: number, isEuropean: boolean = false): number {
   if (isEuropean) {
     const tradeValue = quantity * price;
     const baseComm = tradeValue * 0.0005;
@@ -207,9 +117,14 @@ export function calculateIBIECommission(symbol: string, primaryExchange: string,
   }
 }
 
+/**
+ * Zero Synthetic Policy Compliant Book Ingestion:
+ * Populates real market books without synthetic Math.random() mock data generation.
+ */
 export function ingestScannedInstrument(symbol: string, primaryExchange: string, lastPrice: number) {
   if (marketBooks[symbol]) {
     marketBooks[symbol].primaryExchange = primaryExchange;
+    marketBooks[symbol].lastPrice = lastPrice;
     return;
   }
   
@@ -217,17 +132,9 @@ export function ingestScannedInstrument(symbol: string, primaryExchange: string,
     symbol,
     primaryExchange,
     lastPrice,
-    lastOfi: Math.floor(Math.random() * 200) - 100,
-    bids: Array.from({ length: 5 }, (_, idx) => ({
-      price: Number((lastPrice - 0.01 - idx * 0.02 * (Math.random() * 0.5 + 0.8)).toFixed(2)),
-      size: Math.floor(Math.random() * 800) + 200,
-      impliedOfi: 0
-    })),
-    asks: Array.from({ length: 5 }, (_, idx) => ({
-      price: Number((lastPrice + 0.01 + idx * 0.02 * (Math.random() * 0.5 + 0.8)).toFixed(2)),
-      size: Math.floor(Math.random() * 800) + 200,
-      impliedOfi: 0
-    }))
+    lastOfi: 0,
+    bids: [], // Populated strictly via verified IBKR MktDepth callbacks
+    asks: []  // Populated strictly via verified IBKR MktDepth callbacks
   };
 }
 

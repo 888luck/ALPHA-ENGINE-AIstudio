@@ -1,7 +1,5 @@
 # AlphaEngine Institutional Trading Platform - Pinned Python Dependencies
-# NOTE: 'ibapi' is provided via official IBKR TWS API release bundle (source/pythonclient)
-# ibapi is installed via custom bundle if provided; official python client is in connection.py
-ib_insync>=0.9.86
+# NOTE: Official Interactive Brokers Python client is provided via official 'ibapi'
 exchange-calendars==4.13.2
 pydantic>=2.5.0
 fastapi>=0.100.0
@@ -9,11 +7,9 @@ numpy>=1.24.0
 pandas>=2.1.0
 python-dotenv>=1.0.0
 requests>=2.31.0
-firebase-admin>=6.2.0
 feedparser>=6.0.10
 google-genai>=0.1.1
 pytest>=7.4.0
-
 xmlschema>=3.0.0
 onnxruntime>=1.18.0
 tokenizers>=0.19.0

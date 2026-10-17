@@ -51,3 +51,4 @@ contract_spec_cache.json
 *.tar.gz
 scratch/
 models/
+reports/
