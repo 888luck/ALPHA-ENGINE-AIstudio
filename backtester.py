@@ -380,69 +380,93 @@ class AlphaBacktestingEngine:
 
     def generate_synthetic_history(self, symbol: str, timeframe: str, start_date_str: str, end_date_str: str) -> List[Dict[str, Any]]:
         '''
-        Fetches REAL historical OHLCV data from Yahoo Finance instead of generating synthetic data.
-        If Yahoo Finance fails, falls back to basic deterministic generation.
+        Fetches REAL historical OHLCV data from the Interactive Brokers Pro Tape via Direct TCP Bridge (port 4005)
+        or verified local historical cache.
+        Institutional Invariant: Zero synthetic generation, zero retail consumer scraping.
         '''
-        import urllib.request, json
+        import socket, json
         
         start_date = datetime.fromisoformat(start_date_str.replace("Z", "+00:00"))
         end_date = datetime.fromisoformat(end_date_str.replace("Z", "+00:00"))
+        days_diff = max(1, (end_date - start_date).days)
 
-        # Determine interval for YF
-        interval = "1d"
+        # Map timeframe to IBKR barSizeSetting
         tf_lower = timeframe.lower()
         if "1m" in tf_lower:
-            interval = "1m"
+            barsize = "1 min"
         elif "5m" in tf_lower:
-            interval = "5m"
+            barsize = "5 mins"
         elif "15m" in tf_lower:
-            interval = "15m"
+            barsize = "15 mins"
         elif "1h" in tf_lower:
-            interval = "60m"
-            
-        start_ts = int(start_date.timestamp())
-        end_ts = int(end_date.timestamp())
-        
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval={interval}&period1={start_ts}&period2={end_ts}"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            barsize = "1 hour"
+        else:
+            barsize = "1 day"
+
+        duration_str = f"{days_diff} D" if days_diff <= 365 else f"{max(1, days_diff // 365)} Y"
         
         bars = []
+        
+        # 1. Attempt query via Edge TCP Bridge (port 4005) to IBKR Pro Gateway
         try:
-            with urllib.request.urlopen(req, timeout=5) as response:
-                data = json.loads(response.read())
-                result = data.get("chart", {}).get("result", [])
-                if result:
-                    timestamps = result[0].get("timestamp", [])
-                    indicators = result[0].get("indicators", {}).get("quote", [{}])[0]
-                    opens = indicators.get("open", [])
-                    highs = indicators.get("high", [])
-                    lows = indicators.get("low", [])
-                    closes = indicators.get("close", [])
-                    volumes = indicators.get("volume", [])
-                    
-                    for i in range(len(timestamps)):
-                        if opens[i] is None:
-                            continue
-                        bars.append({
-                            "date": datetime.fromtimestamp(timestamps[i]).isoformat() + "Z",
-                            "open": round(float(opens[i]), 2),
-                            "high": round(float(highs[i]), 2),
-                            "low": round(float(lows[i]), 2),
-                            "close": round(float(closes[i]), 2),
-                            "volume": int(volumes[i])
-                        })
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5.0)
+            sock.connect(("127.0.0.1", 4005))
+            cmd = {
+                "action": "DISPATCH_IBKR",
+                "method": "reqHistoricalData",
+                "arguments": {
+                    "contract": symbol,
+                    "durationStr": duration_str,
+                    "barSizeSetting": barsize,
+                    "whatToShow": "TRADES",
+                    "useRTH": 1
+                }
+            }
+            sock.sendall((json.dumps(cmd) + "\n").encode("utf-8"))
+            raw = b""
+            while not raw.endswith(b"\n"):
+                chunk = sock.recv(4096)
+                if not chunk:
+                    break
+                raw += chunk
+            sock.close()
             
-            if len(bars) > 0:
-                print(f"[BACKTESTER] Fetched {len(bars)} real historical bars for {symbol} from Yahoo Finance.", file=sys.stderr)
-                return bars
+            if raw:
+                resp = json.loads(raw.decode("utf-8"))
+                if resp.get("status") == "SUCCESS" and "bars" in resp:
+                    bars = resp["bars"]
+                    if len(bars) > 0:
+                        print(f"[BACKTESTER] Successfully retrieved {len(bars)} verified historical bars for {symbol} from IBKR Pro Tape.", file=sys.stderr)
+                        return bars
         except Exception as e:
-            print(f"[BACKTESTER ERROR] Failed to fetch real historical data from market feed: {e}", file=sys.stderr)
-            raise RuntimeError(f"Zero Synthetic Policy Violation: Real market data unavailable for {symbol} ({start_date_str} to {end_date_str}). Refusing random-walk fabrication.") from e
-            
-        if not bars:
-            raise RuntimeError(f"Zero Synthetic Policy Violation: No bar data retrieved for {symbol} ({start_date_str} to {end_date_str}).")
+            print(f"[BACKTESTER] TCP Bridge to IBKR Pro currently unreachable on port 4005 ({e}). Checking local verified cache...", file=sys.stderr)
 
-        return bars
+        # 2. Check local verified historical cache if TCP bridge offline
+        cache_filename = f"historical_bars_{symbol.upper()}_{timeframe.lower()}.json"
+        cache_paths = [
+            os.path.join(os.path.dirname(__file__), cache_filename),
+            os.path.join(os.path.dirname(__file__), f"historical_bars_{symbol.upper()}.json"),
+            os.path.join(os.path.dirname(__file__), "data", cache_filename)
+        ]
+        for cp in cache_paths:
+            if os.path.exists(cp):
+                try:
+                    with open(cp, "r", encoding="utf-8") as f:
+                        cached_data = json.load(f)
+                    if isinstance(cached_data, list) and len(cached_data) > 0:
+                        print(f"[BACKTESTER] Loaded {len(cached_data)} historical bars from verified local cache {cp}", file=sys.stderr)
+                        return cached_data
+                except Exception:
+                    pass
+
+        # 3. Institutional Policy: Never fabricate random walks or scrape retail portals
+        raise RuntimeError(
+            f"Zero Synthetic Policy Violation: Live Interactive Brokers Pro Gateway on port 4005 is offline and "
+            f"no verified local market cache exists for {symbol} ({start_date_str} to {end_date_str}). "
+            f"Random-walk fabrication and retail web scraping are strictly prohibited. "
+            f"Connect IB Gateway or provide authentic broker historical bars."
+        )
 
 if __name__ == "__main__":
     # Command line runner fallback to dump results directly into JSON streams

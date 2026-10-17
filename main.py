@@ -11,9 +11,57 @@ from config_loader import load_config
 from connection import ConnectionManager
 from risk_engine import DRMMiddleware
 from alpha_strategy import AlphaStrategy, ProactiveSimulator
-from firebase_sync import FirebaseSyncTunnel
 from ha_manager import HighAvailabilityManager
 from edge_bridge import EdgeTcpBridgeServer
+
+def save_local_trade(trade_id: str, trade_data: dict, sandbox: bool = False):
+    fname = "active_trades_sandbox.json" if sandbox else "active_trades.json"
+    try:
+        trades = {}
+        if os.path.exists(fname):
+            with open(fname, "r", encoding="utf-8") as f:
+                trades = json.load(f)
+        trades[trade_id] = trade_data
+        with open(fname, "w", encoding="utf-8") as f:
+            json.dump(trades, f, indent=2)
+    except Exception as e:
+        print(f"[LOCAL STATE WARN] Failed saving trade: {e}")
+
+def remove_local_trade(trade_id: str):
+    for fname in ["active_trades.json", "active_trades_sandbox.json"]:
+        if os.path.exists(fname):
+            try:
+                with open(fname, "r", encoding="utf-8") as f:
+                    trades = json.load(f)
+                if trade_id in trades:
+                    del trades[trade_id]
+                    with open(fname, "w", encoding="utf-8") as f:
+                        json.dump(trades, f, indent=2)
+            except Exception:
+                pass
+
+def save_local_log(log_id: str, log_data: dict):
+    fname = "historical_logs.json"
+    try:
+        logs = []
+        if os.path.exists(fname):
+            with open(fname, "r", encoding="utf-8") as f:
+                logs = json.load(f)
+        logs.append(log_data)
+        if len(logs) > 500:
+            logs = logs[-500:]
+        with open(fname, "w", encoding="utf-8") as f:
+            json.dump(logs, f, indent=2)
+    except Exception as e:
+        print(f"[LOCAL STATE WARN] Failed saving log: {e}")
+
+def save_local_risk_state(state_dict: dict):
+    fname = "system_risk_state.json"
+    try:
+        with open(fname, "w", encoding="utf-8") as f:
+            json.dump(state_dict, f, indent=2)
+    except Exception as e:
+        print(f"[LOCAL STATE WARN] Failed saving risk state: {e}")
 
 # Dynamic Multi-Agent Intelligence Modules
 from universe_models import NewsEvent, DynamicBasket
@@ -109,17 +157,14 @@ def main_loop():
     config = load_config()
     basket_size = args.basket_size if args.basket_size > 0 else config.get("MAX_ACTIVE_INSTRUMENTS", 3)
     
-    # 2. Initialize Secure Firebase Sync Tunnel
-    firebase_tunnel = FirebaseSyncTunnel()
-    
-    # 3. Setup Connectivity Manager (IBKR IBIE Compliance Router)
+    # 2. Setup Connectivity Manager (IBKR IBIE Compliance Router)
     cm = ConnectionManager()
     
-    # 4. Initialize Multi-Agent Intelligence Layer
+    # 3. Initialize Multi-Agent Intelligence Layer
     news_ingestor = NewsIngestor(connection_manager=cm)
     ensemble = MultiModelEnsemble()
     universe_builder = UniverseBuilder()
-    auditor = ReasoningAuditor(firebase_tunnel=firebase_tunnel)
+    auditor = ReasoningAuditor()
     edge_node = LocalEdgeNode(
         mifid2_decision_maker=config.get("MIFID2_DECISION_MAKER_ID", "ALGO_DEC_992"),
         mifid2_execution_trader=config.get("MIFID2_EXECUTION_TRADER_ID", "ALGO_EXE_554")
@@ -128,8 +173,8 @@ def main_loop():
     # Wire incoming broker bulletins to ingestor
     cm.on_news_bulletin_callback = news_ingestor.ingest_ibkr_bulletin
     
-    # 4.6 Initialize TCA and RTS-22 Exporter
-    tca_engine = TCAEngine(firebase_tunnel=firebase_tunnel)
+    # 4. Initialize TCA and RTS-22 Exporter
+    tca_engine = TCAEngine()
     rts22_exporter = RTS22Exporter()
     
     def handle_execution(symbol, execution):
@@ -148,15 +193,15 @@ def main_loop():
     # 5. Bind DRM Protection Module
     drm = DRMMiddleware(cm, config["IBKR_ACCOUNT_NUMBER"])
     
-    # Initialize HA Leader Election (Phase 3.2)
+    # Initialize HA Leader Election (Phase 3.2 - Local Atomic Lease)
     def on_failover():
         print("[HA-MGR] ALERT: Secondary node adopting Primary Role! Initiating failover procedures...")
         drm.emergency_flush()
-        firebase_tunnel.push_historical_log(f"HA_FAILOVER_{int(time.time())}", {
+        save_local_log(f"HA_FAILOVER_{int(time.time())}", {
             "event": "LEADER_FAILOVER",
             "message": "Primary edge node timeout. Warm standby has taken over execution and flushed state."
         })
-    ha_manager = HighAvailabilityManager(firebase_tunnel, failover_callback=on_failover)
+    ha_manager = HighAvailabilityManager(failover_callback=on_failover)
     ha_manager.start()
     
     # 6. Execute Pre-Market Calibration Pipeline
@@ -222,18 +267,28 @@ def main_loop():
     edge_bridge.flush_handler = handle_direct_flush
     edge_bridge.settings_handler = handle_direct_settings
     edge_bridge.telemetry_provider = handle_direct_telemetry
+    edge_bridge.ibkr_dispatcher = cm.execute_synchronous_request
     edge_bridge.start()
     
     # Run pre-flight calibration simulator
     print("[INIT] Initializing Proactive Sector Expectancy Calibration...")
     sim_data = simulator.run_expectancy_simulation()
     
-    # Load initial risk settings from Firestore if available to sync active locks and settings overrides
-    remote_state = firebase_tunnel.get_system_risk_state()
+    # Load initial risk settings from local disk configuration (settings_vault.json / system_risk_state.json)
+    remote_state = {}
+    for cfg_path in ["settings_vault.json", "system_risk_state.json"]:
+        if os.path.exists(cfg_path):
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    remote_state = json.load(f)
+                    break
+            except Exception:
+                pass
+
     if remote_state:
         if "routerLocked" in remote_state:
-            drm.router_locked = remote_state["routerLocked"]
-            print(f"[INIT SYNC] Successfully loaded lock state from Firestore: LOCKED={drm.router_locked}")
+            drm.router_locked = bool(remote_state["routerLocked"])
+            print(f"[INIT SYNC] Loaded lock state from disk vault: LOCKED={drm.router_locked}")
         if "ibkrPort" in remote_state:
             config["IBKR_PORT"] = int(remote_state["ibkrPort"])
         if "ibkrClientId" in remote_state:
@@ -377,7 +432,7 @@ def main_loop():
                             "mifidExecutionTrader": config["MIFID2_EXECUTION_TRADER_ID"],
                             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
                         }
-                        firebase_tunnel.push_active_trade(trade_id, live_trade)
+                        save_local_trade(trade_id, live_trade, sandbox=False)
                 else:
                     # Simulation sandbox mode: evaluate candidate setup with dynamic ATR bands
                     # Zero Synthetic Policy: simulation trades route to active_trades_sandbox ONLY
@@ -408,8 +463,8 @@ def main_loop():
                         "environment": "SANDBOX",
                         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
                     }
-                    # SANDBOX ONLY — never writes to production active_trades collection
-                    firebase_tunnel.push_sandbox_trade(trade_id, sim_trade)
+                    # SANDBOX ONLY — writes to local sandbox state
+                    save_local_trade(trade_id, sim_trade, sandbox=True)
                     cm.active_positions[sym] = {"qty": (pos_qty or 50) if direction == "BUY" else -(pos_qty or 50), "avgCost": sim_entry}
 
 
@@ -434,8 +489,8 @@ def main_loop():
                         "efficiencyRatio": 4.5,
                         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
                     }
-                    firebase_tunnel.push_historical_log(log_id, log_data)
-                    firebase_tunnel.delete_active_trade(f"TRD_{symbol}_EDGE")
+                    save_local_log(log_id, log_data)
+                    remove_local_trade(f"TRD_{symbol}_EDGE")
             drm.emergency_flush()
             
         # Scenario D: Post-Market Audit & Attribution Window (20:00 NY / 02:00 CET close of PEAD)
@@ -444,29 +499,28 @@ def main_loop():
             if last_audit_date != today_str:
                 print("[PHASE - POST-SESSION REPORT & REASONING AUDIT]")
                 auditor.audit_daily_predictions(dynamic_basket_path="dynamic_baskets.json")
-                print("[SYNC] Transferring session logs and performance reports to secure Firebase server...")
+                print("[SYNC] Post-session attribution and empirical audit updated in memory bank.")
                 last_audit_date = today_str
             
-        # Synchronize risk state to Firestore in real-time
+        # Synchronize risk state to local disk for TCP bridge & control plane
         net_liq = float(cm.account_summary.get("NetLiquidation", drm.start_day_equity))
         if not cm.is_connected:
             net_liq = float(drm.start_day_equity + cm.pnl_updates["total"])
         maint_margin = float(cm.account_summary.get("MaintMarginReq", 0.0)) if cm.is_connected else float(len(cm.active_positions) * 12400.00)
-        firebase_tunnel.push_system_risk_state(
-            net_liq=net_liq,
-            maint_margin=maint_margin,
-            realized_pnl=float(cm.pnl_updates["realized"]),
-            unrealized_pnl=float(cm.pnl_updates["unrealized"]),
-            router_locked=bool(drm.router_locked),
-            extra_metrics={
-                "availableFunds": float(cm.account_summary.get("AvailableFunds", 0.0)),
-                "excessLiquidity": float(cm.account_summary.get("ExcessLiquidity", 0.0)),
-                "buyingPower": float(cm.account_summary.get("BuyingPower", 0.0)),
-                "totalCashValue": float(cm.account_summary.get("TotalCashValue", 0.0)),
-                "accountNumber": cm.accounts_list[0] if cm.accounts_list else "DUE263010",
-                "gatewayConnected": bool(cm.is_connected)
-            }
-        )
+        save_local_risk_state({
+            "net_liquidation": net_liq,
+            "maint_margin": maint_margin,
+            "realized_pnl": float(cm.pnl_updates["realized"]),
+            "unrealized_pnl": float(cm.pnl_updates["unrealized"]),
+            "router_locked": bool(drm.router_locked),
+            "availableFunds": float(cm.account_summary.get("AvailableFunds", 0.0)),
+            "excessLiquidity": float(cm.account_summary.get("ExcessLiquidity", 0.0)),
+            "buyingPower": float(cm.account_summary.get("BuyingPower", 0.0)),
+            "totalCashValue": float(cm.account_summary.get("TotalCashValue", 0.0)),
+            "accountNumber": cm.accounts_list[0] if cm.accounts_list else "DUE263010",
+            "gatewayConnected": bool(cm.is_connected),
+            "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
+        })
             
         time.sleep(12)
         iteration += 1

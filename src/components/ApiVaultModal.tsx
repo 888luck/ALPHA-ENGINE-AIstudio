@@ -42,7 +42,7 @@ interface ApiVaultModalProps {
   onSaveMultipleSettings?: (updates: Record<string, any>) => Promise<void>;
   customGeminiApiKey: string;
   onSaveGeminiKey: (key: string) => void;
-  firebaseStatus: string;
+  firebaseStatus?: string;
 }
 
 export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({

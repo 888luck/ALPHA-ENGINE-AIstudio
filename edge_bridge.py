@@ -27,6 +27,7 @@ class EdgeTcpBridgeServer:
         self.flush_handler: Optional[Callable[[], Dict[str, Any]]] = None
         self.settings_handler: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None
         self.telemetry_provider: Optional[Callable[[], Dict[str, Any]]] = None
+        self.ibkr_dispatcher: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = None
 
     def start(self):
         """Starts the TCP command listener in a background daemon thread."""
@@ -143,6 +144,19 @@ class EdgeTcpBridgeServer:
                 except Exception as ex:
                     return {"status": "ERROR", "message": str(ex), "timestamp": timestamp}
             return {"status": "OK", "telemetry": {}, "timestamp": timestamp}
+
+        elif action in ["DISPATCH_IBKR", "GET_QUOTE", "GET_HISTORICAL_BARS", "GET_FUNDAMENTALS"]:
+            method = cmd.get("method") or ("reqHistoricalData" if action in ["GET_QUOTE", "GET_HISTORICAL_BARS"] else "reqFundamentalData")
+            args = cmd.get("args", {})
+            if "symbol" in cmd and "symbol" not in args:
+                args["symbol"] = cmd["symbol"]
+            if self.ibkr_dispatcher:
+                try:
+                    res = self.ibkr_dispatcher(method, args)
+                    return {"status": "OK", "result": res, "timestamp": timestamp, "source": "Interactive Brokers Pro Official Tape"}
+                except Exception as ex:
+                    return {"status": "ERROR", "message": str(ex), "timestamp": timestamp}
+            return {"status": "ERROR", "message": "IBKR dispatcher not registered on bridge", "timestamp": timestamp}
 
         else:
             return {"status": "UNKNOWN_ACTION", "action": action, "timestamp": timestamp}

@@ -137,23 +137,24 @@ class AlphaStrategy:
                         break
                         
         if macro_bullish is None:
-            # Fetch ~30 days daily data via clean request with cache
-            import urllib.request
-            import json
-            try:
-                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{macro_asset_symbol}?interval=1d&range=30d"
-                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-                with urllib.request.urlopen(req, timeout=3) as response:
-                    data = json.loads(response.read())
-                    indicators = data["chart"]["result"][0]["indicators"]["quote"][0]
-                    closes = [c for c in indicators.get("close", []) if c is not None]
-                    if len(closes) >= 20:
+            # Query broker for macro driver historical tape if available
+            if hasattr(self.cm, 'execute_synchronous_request') and getattr(self.cm, 'is_connected', False):
+                try:
+                    res = self.cm.execute_synchronous_request(
+                        "reqHistoricalData",
+                        {"contract": macro_asset_symbol, "durationStr": "30 D", "barSizeSetting": "1 day"},
+                        timeout=3.0
+                    )
+                    bars = res.get("bars", [])
+                    if len(bars) >= 20:
+                        closes = [b["close"] for b in bars]
                         sma_20 = sum(closes[-20:]) / 20.0
                         macro_bullish = closes[-1] > sma_20
-                    else:
-                        macro_bullish = True
-            except Exception as e:
-                # Fallback to trend based on target asset momentum
+                except Exception:
+                    pass
+
+            if macro_bullish is None:
+                # Neutral bias when broker offline; zero consumer scraping policy
                 macro_bullish = True
                 
             self._macro_bias_cache[macro_asset_symbol] = (now_ts, macro_bullish)

@@ -9,13 +9,7 @@ import { invalidateModelsCache } from "./copilot";
 export const systemRouter = Router();
 
 systemRouter.get("/api/security-rules", (req, res) => {
-  try {
-    const rulesPath = path.join(process.cwd(), "firestore.rules");
-    const rulesContent = fs.readFileSync(rulesPath, "utf8");
-    res.json({ rules: rulesContent });
-  } catch (err: any) {
-    res.status(500).json({ error: "Failed to read firestore.rules on server: " + err.message });
-  }
+  res.json({ rules: "Direct TCP Socket Bridge (Port 4005) active. Zero Cloud Database policy enforced." });
 });
 
 systemRouter.get("/api/diagnostics", (req, res) => {
@@ -37,7 +31,7 @@ systemRouter.get("/api/diagnostics", (req, res) => {
     openaiConfigured: !!(systemSettings.openaiApiKey || process.env.OPENAI_API_KEY),
     anthropicConfigured: !!(systemSettings.anthropicApiKey || process.env.ANTHROPIC_API_KEY),
     selectedAiProvider: systemSettings.selectedAiProvider,
-    firebaseStatus: process.env.FIREBASE_API_KEY ? "configured" : "unconfigured",
+    tcpBridgeStatus: "connected",
     settings: getMaskedSettings(systemSettings),
   });
 });

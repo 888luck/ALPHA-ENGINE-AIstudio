@@ -1,14 +1,15 @@
 {
   "version": "1.0.0",
-  "generated_at": "2026-10-15T13:28:40.859113+00:00",
+  "generated_at": "2026-10-17T12:43:01.574835+00:00",
   "ttl_seconds": 86400,
-  "total_tools": 57,
+  "total_tools": 78,
   "categories": [
     "biomedical_regulatory",
     "broker_account",
     "broker_contract",
     "broker_market_data",
     "broker_news",
+    "broker_operations",
     "broker_orders",
     "broker_scanner",
     "commodity_energy",
@@ -18,32 +19,87 @@
     {
       "type": "function",
       "function": {
-        "name": "reqAccountSummary",
-        "description": "Call this method to request and keep up to date the data that appears\non the TWS Account Window Summary tab. The data is returned by\naccountSummary().\n\nNote:   This request is designed for an FA managed account but can be\nused for any multi-account structure.\n\nreqId:int - The ID of the data request. Ensures that responses are matched\n    to requests If several requests are in process.\ngroupName:str - Set to All to returnrn account summary data for all\n    accounts, or set to a specific Advisor Account Group name that has\n    already been created in TWS Global Configuration.\ntags:str - A comma-separated list of account tags.  Available tags are:\n    accountountType\n    NetLiquidation,\n    TotalCashValue - Total cash including futures pnl\n    SettledCash - For cash accounts, this is the same as\n    TotalCashValue\n    AccruedCash - Net accrued interest\n    BuyingPower - The maximum amount of marginable US stocks the\n        account can buy\n    EquityWithLoanValue - Cash + stocks + bonds + mutual funds\n    PreviousDayEquityWithLoanValue,\n    GrossPositionValue - The sum of the absolute value of all stock\n        and equity option positions\n    RegTEquity,\n    RegTMargin,\n    SMA - Special Memorandum Account\n    InitMarginReq,\n    MaintMarginReq,\n    AvailableFunds,\n    ExcessLiquidity,\n    Cushion - Excess liquidity as a percentage of net liquidation value\n    FullInitMarginReq,\n    FullMaintMarginReq,\n    FullAvailableFunds,\n    FullExcessLiquidity,\n    LookAheadNextChange - Time when look-ahead values take effect\n    LookAheadInitMarginReq,\n    LookAheadMaintMarginReq,\n    LookAheadAvailableFunds,\n    LookAheadExcessLiquidity,\n    HighestSeverity - A measure of how close the account is to liquidation\n    DayTradesRemaining - The Number of Open/Close trades a user\n        could put on before Pattern Day Trading is detected. A value of \"-1\"\n        means that the user can put on unlimited day trades.\n    Leverage - GrossPositionValue / NetLiquidation\n    $LEDGER - Single flag to relay all cash balance tags*, only in base\n        currency.\n    $LEDGER:CURRENCY - Single flag to relay all cash balance tags*, only in\n        the specified currency.\n    $LEDGER:ALL - Single flag to relay all cash balance tags* in all\n    currencies.",
+        "name": "calculateImpliedVolatility",
+        "description": "Call this function to calculate volatility for a supplied\noption price and underlying price. Result will be delivered\nvia EWrapper.tickOptionComputation()\n\nreqId:TickerId -  The request id.\ncontract:Contract -  Describes the contract.\noptionPrice:double - The price of the option.\nunderPrice:double - Price of the underlying.",
         "parameters": {
           "type": "object",
           "properties": {
             "reqId": {
               "type": "integer",
-              "description": "int - The ID of the data request. Ensures that responses are matched"
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
             },
-            "groupName": {
+            "contract": {
               "type": "string",
-              "description": "str - Set to All to returnrn account summary data for all"
+              "description": "Stock symbol (e.g. 'NVDA', 'AAPL', 'EUR') or IBKR Contract specification dictionary."
             },
-            "tags": {
-              "type": "string",
-              "description": "str - A comma-separated list of account tags.  Available tags are:"
+            "optionPrice": {
+              "type": "number",
+              "description": "double - The price of the option."
+            },
+            "underPrice": {
+              "type": "number",
+              "description": "double - Price of the underlying."
+            },
+            "implVolOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "description": "Optional broker implVolOptions array (defaults to empty list)."
             }
           },
           "required": [
-            "reqId",
-            "groupName",
-            "tags"
+            "contract",
+            "optionPrice",
+            "underPrice"
           ]
         }
       },
-      "category": "broker_account",
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "calculateOptionPrice",
+        "description": "Call this function to calculate option price and greek values\nfor a supplied volatility and underlying price.\n\nreqId:TickerId -    The ticker ID.\ncontract:Contract - Describes the contract.\nvolatility:double - The volatility.\nunderPrice:double - Price of the underlying.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "contract": {
+              "type": "string",
+              "description": "Stock symbol (e.g. 'NVDA', 'AAPL', 'EUR') or IBKR Contract specification dictionary."
+            },
+            "volatility": {
+              "type": "number",
+              "description": "double - The volatility."
+            },
+            "underPrice": {
+              "type": "number",
+              "description": "double - Price of the underlying."
+            },
+            "optPrcOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "description": "Optional broker optPrcOptions array (defaults to empty list)."
+            }
+          },
+          "required": [
+            "contract",
+            "volatility",
+            "underPrice"
+          ]
+        }
+      },
+      "category": "broker_market_data",
       "source": "Interactive Brokers Official API (ibapi.client.EClient)"
     },
     {
@@ -56,11 +112,504 @@
           "properties": {
             "reqId": {
               "type": "integer",
-              "description": "int - The ID of the data request being canceled."
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelAccountUpdatesMulti",
+        "description": "Interactive Brokers API method: cancelAccountUpdatesMulti",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelCalculateImpliedVolatility",
+        "description": "Call this function to cancel a request to calculate\nvolatility for a supplied option price and underlying price.\n\nreqId:TickerId - The request ID.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelCalculateOptionPrice",
+        "description": "Call this function to cancel a request to calculate the option\nprice and greek values for a supplied volatility and underlying price.\n\nreqId:TickerId - The request ID.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelFundamentalData",
+        "description": "Call this function to stop receiving fundamental data.\n\nreqId:TickerId - The ID of the data request.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_news",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelHeadTimeStamp",
+        "description": "Interactive Brokers API method: cancelHeadTimeStamp",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelHistogramData",
+        "description": "Interactive Brokers API method: cancelHistogramData",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "tickerId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelHistoricalData",
+        "description": "Used if an internet disconnect has occurred or the results of a query\nare otherwise delayed and the application is no longer interested in receiving\nthe data.\n\nreqId:TickerId - The ticker ID. Must be a unique value.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelMktData",
+        "description": "After calling this function, market data for the specified id\nwill stop flowing.\n\nreqId: TickerId - The ID that was specified in the call to\n    reqMktData().",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelMktDepth",
+        "description": "After calling this function, market depth data for the specified id\nwill stop flowing.\n\nreqId:TickerId - The ID that was specified in the call to\n    reqMktDepth().\nisSmartDepth:bool - specifies SMART depth request",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "isSmartDepth": {
+              "type": "boolean",
+              "description": "bool - specifies SMART depth request"
             }
           },
           "required": [
-            "reqId"
+            "isSmartDepth"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelNewsBulletins",
+        "description": "Call this function to stop receiving news bulletins.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "category": "broker_news",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelOrder",
+        "description": "Call this function to cancel an order.\n\norderId:OrderId - The order ID that was specified previously in the call\n    to placeOrder()",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "orderId": {
+              "type": "integer",
+              "description": "OrderId - The order ID that was specified previously in the call"
+            }
+          },
+          "required": [
+            "orderId"
+          ]
+        }
+      },
+      "category": "broker_orders",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelPnL",
+        "description": "Interactive Brokers API method: cancelPnL",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelPnLSingle",
+        "description": "Interactive Brokers API method: cancelPnLSingle",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelPositions",
+        "description": "Cancels real-time position updates.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelPositionsMulti",
+        "description": "Interactive Brokers API method: cancelPositionsMulti",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelRealTimeBars",
+        "description": "Call the cancelRealTimeBars() function to stop receiving real time bar results.\n\nreqId:TickerId - The Id that was specified in the call to reqRealTimeBars().",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelScannerSubscription",
+        "description": "reqId:int - The ticker ID. Must be a unique value.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_scanner",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancelTickByTickData",
+        "description": "Interactive Brokers API method: cancelTickByTickData",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "exerciseOptions",
+        "description": "reqId:TickerId - The ticker id. multipleust be a unique value.\ncontract:Contract - This structure contains a description of the\n    contract to be exercised\nexerciseAction:int - Specifies whether you want the option to lapse\n    or be exercised.\n    Values are 1 = exercise, 2 = lapse.\nexerciseQuantity:int - The quantity you want to exercise.\naccount:str - destination account\noverride:int - Specifies whether your setting will override the system's\n    natural action. For example, if your action is \"exercise\" and the\n    option is not in-the-money, by natural action the option would not\n    exercise. If you have override set to \"yes\" the natural action would\n     be overridden and the out-of-the money option would be exercised.\n    Values are: 0 = no, 1 = yes.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "contract": {
+              "type": "string",
+              "description": "Stock symbol (e.g. 'NVDA', 'AAPL', 'EUR') or IBKR Contract specification dictionary."
+            },
+            "exerciseAction": {
+              "type": "integer",
+              "description": "int - Specifies whether you want the option to lapse"
+            },
+            "exerciseQuantity": {
+              "type": "integer",
+              "description": "int - The quantity you want to exercise."
+            },
+            "account": {
+              "type": "string",
+              "description": "str - destination account"
+            },
+            "override": {
+              "type": "integer",
+              "description": "int - Specifies whether your setting will override the system's"
+            }
+          },
+          "required": [
+            "contract",
+            "exerciseAction",
+            "exerciseQuantity",
+            "account",
+            "override"
+          ]
+        }
+      },
+      "category": "broker_operations",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "placeOrder",
+        "description": "Call this function to place an order. The order status will\nbe returned by the orderStatus event.\n\norderId:OrderId - The order id. You must specify a unique value. When the\n    order START_APItus returns, it will be identified by this tag.\n    This tag is also used when canceling the order.\ncontract:Contract - This structure contains a description of the\n    contract which is being traded.\norder:Order - This structure contains the details of tradedhe order.\n    Note: Each client MUST connect with a unique clientId.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "orderId": {
+              "type": "integer",
+              "description": "OrderId - The order id. You must specify a unique value. When the"
+            },
+            "contract": {
+              "type": "string",
+              "description": "Stock symbol (e.g. 'NVDA', 'AAPL', 'EUR') or IBKR Contract specification dictionary."
+            },
+            "order": {
+              "type": "string",
+              "description": "Order - This structure contains the details of tradedhe order."
+            }
+          },
+          "required": [
+            "orderId",
+            "contract",
+            "order"
+          ]
+        }
+      },
+      "category": "broker_orders",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "queryDisplayGroups",
+        "description": "API requests used to integrate with TWS color-grouped windows (display groups).\nTWS color-grouped windows are identified by an integer number. Currently that number ranges from 1 to 7 and are mapped to specific colors, as indicated in TWS.\n\nreqId:int - The unique number that will be associated with the\n    response",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_operations",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "replaceFA",
+        "description": "Call this function to modify FA configuration information from the\nAPI. Note that this can also be done manually in TWS itself.\n\nreqId:TickerId - request id\nfaData:FaDataType - Specifies the type of Financial Advisor\n    configuration data beingingg requested. Valid values include:\n    1 = GROUPS\n    2 = PROFILE\n    3 = ACCOUNT ALIASES\ncxml: str - The XML string containing the new FA configuration\n    information.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "faData": {
+              "type": "integer",
+              "description": "FaDataType - Specifies the type of Financial Advisor"
+            },
+            "cxml": {
+              "type": "string",
+              "description": "str - The XML string containing the new FA configuration"
+            }
+          },
+          "required": [
+            "faData",
+            "cxml"
+          ]
+        }
+      },
+      "category": "broker_orders",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqAccountSummary",
+        "description": "Call this method to request and keep up to date the data that appears\non the TWS Account Window Summary tab. The data is returned by\naccountSummary().\n\nNote:   This request is designed for an FA managed account but can be\nused for any multi-account structure.\n\nreqId:int - The ID of the data request. Ensures that responses are matched\n    to requests If several requests are in process.\ngroupName:str - Set to All to returnrn account summary data for all\n    accounts, or set to a specific Advisor Account Group name that has\n    already been created in TWS Global Configuration.\ntags:str - A comma-separated list of account tags.  Available tags are:\n    accountountType\n    NetLiquidation,\n    TotalCashValue - Total cash including futures pnl\n    SettledCash - For cash accounts, this is the same as\n    TotalCashValue\n    AccruedCash - Net accrued interest\n    BuyingPower - The maximum amount of marginable US stocks the\n        account can buy\n    EquityWithLoanValue - Cash + stocks + bonds + mutual funds\n    PreviousDayEquityWithLoanValue,\n    GrossPositionValue - The sum of the absolute value of all stock\n        and equity option positions\n    RegTEquity,\n    RegTMargin,\n    SMA - Special Memorandum Account\n    InitMarginReq,\n    MaintMarginReq,\n    AvailableFunds,\n    ExcessLiquidity,\n    Cushion - Excess liquidity as a percentage of net liquidation value\n    FullInitMarginReq,\n    FullMaintMarginReq,\n    FullAvailableFunds,\n    FullExcessLiquidity,\n    LookAheadNextChange - Time when look-ahead values take effect\n    LookAheadInitMarginReq,\n    LookAheadMaintMarginReq,\n    LookAheadAvailableFunds,\n    LookAheadExcessLiquidity,\n    HighestSeverity - A measure of how close the account is to liquidation\n    DayTradesRemaining - The Number of Open/Close trades a user\n        could put on before Pattern Day Trading is detected. A value of \"-1\"\n        means that the user can put on unlimited day trades.\n    Leverage - GrossPositionValue / NetLiquidation\n    $LEDGER - Single flag to relay all cash balance tags*, only in base\n        currency.\n    $LEDGER:CURRENCY - Single flag to relay all cash balance tags*, only in\n        the specified currency.\n    $LEDGER:ALL - Single flag to relay all cash balance tags* in all\n    currencies.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "groupName": {
+              "type": "string",
+              "description": "str - Set to All to returnrn account summary data for all"
+            },
+            "tags": {
+              "type": "string",
+              "description": "str - A comma-separated list of account tags.  Available tags are:"
+            }
+          },
+          "required": [
+            "groupName",
+            "tags"
           ]
         }
       },
@@ -96,811 +645,36 @@
     {
       "type": "function",
       "function": {
-        "name": "reqPositions",
-        "description": "Requests real-time position data for all accounts.",
-        "parameters": {
-          "type": "object",
-          "properties": {},
-          "required": []
-        }
-      },
-      "category": "broker_account",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "cancelPositions",
-        "description": "Cancels real-time position updates.",
-        "parameters": {
-          "type": "object",
-          "properties": {},
-          "required": []
-        }
-      },
-      "category": "broker_account",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "reqPositionsMulti",
-        "description": "Requests positions for account and/or model.\nResults are delivered via EWrapper.positionMulti() and\nEWrapper.positionMultiEnd()",
+        "name": "reqAccountUpdatesMulti",
+        "description": "Requests account updates for account and/or model.",
         "parameters": {
           "type": "object",
           "properties": {
             "reqId": {
               "type": "integer",
-              "description": "Parameter reqId for reqPositionsMulti"
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
             },
             "account": {
               "type": "string",
-              "description": "Parameter account for reqPositionsMulti"
+              "description": "Parameter account for reqAccountUpdatesMulti"
             },
             "modelCode": {
               "type": "string",
-              "description": "Parameter modelCode for reqPositionsMulti"
+              "description": "Parameter modelCode for reqAccountUpdatesMulti"
+            },
+            "ledgerAndNLV": {
+              "type": "boolean",
+              "description": "Parameter ledgerAndNLV for reqAccountUpdatesMulti"
             }
           },
           "required": [
-            "reqId",
-            "account",
-            "modelCode"
-          ]
-        }
-      },
-      "category": "broker_account",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "cancelPositionsMulti",
-        "description": "Interactive Brokers API method: cancelPositionsMulti",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "Parameter reqId for cancelPositionsMulti"
-            }
-          },
-          "required": [
-            "reqId"
-          ]
-        }
-      },
-      "category": "broker_account",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "reqPnL",
-        "description": "Interactive Brokers API method: reqPnL",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "Parameter reqId for reqPnL"
-            },
-            "account": {
-              "type": "string",
-              "description": "Parameter account for reqPnL"
-            },
-            "modelCode": {
-              "type": "string",
-              "description": "Parameter modelCode for reqPnL"
-            }
-          },
-          "required": [
-            "reqId",
-            "account",
-            "modelCode"
-          ]
-        }
-      },
-      "category": "broker_account",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "cancelPnL",
-        "description": "Interactive Brokers API method: cancelPnL",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "Parameter reqId for cancelPnL"
-            }
-          },
-          "required": [
-            "reqId"
-          ]
-        }
-      },
-      "category": "broker_account",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "reqPnLSingle",
-        "description": "Interactive Brokers API method: reqPnLSingle",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "Parameter reqId for reqPnLSingle"
-            },
-            "account": {
-              "type": "string",
-              "description": "Parameter account for reqPnLSingle"
-            },
-            "modelCode": {
-              "type": "string",
-              "description": "Parameter modelCode for reqPnLSingle"
-            },
-            "conid": {
-              "type": "integer",
-              "description": "Parameter conid for reqPnLSingle"
-            }
-          },
-          "required": [
-            "reqId",
             "account",
             "modelCode",
-            "conid"
+            "ledgerAndNLV"
           ]
         }
       },
       "category": "broker_account",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "cancelPnLSingle",
-        "description": "Interactive Brokers API method: cancelPnLSingle",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "Parameter reqId for cancelPnLSingle"
-            }
-          },
-          "required": [
-            "reqId"
-          ]
-        }
-      },
-      "category": "broker_account",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "reqManagedAccts",
-        "description": "Call this function to request the list of managed accounts. The list\nwill be returned by the managedAccounts() function on the EWrapper.\n\nNote:  This request can only be made when connected to a FA managed account.",
-        "parameters": {
-          "type": "object",
-          "properties": {},
-          "required": []
-        }
-      },
-      "category": "broker_account",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "reqContractDetails",
-        "description": "Call this function to download all details for a particular\nunderlying. The contract details will be received via the contractDetails()\nfunction on the EWrapper.\n\nreqId:int - The ID of the data request. Ensures that responses are\n    make_fieldatched to requests if several requests are in process.\ncontract:Contract - The summary description of the contract being looked\n    up.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "int - The ID of the data request. Ensures that responses are"
-            },
-            "contract": {
-              "type": "string",
-              "description": "Contract - The summary description of the contract being looked"
-            }
-          },
-          "required": [
-            "reqId",
-            "contract"
-          ]
-        }
-      },
-      "category": "broker_contract",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "reqMatchingSymbols",
-        "description": "Interactive Brokers API method: reqMatchingSymbols",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "Parameter reqId for reqMatchingSymbols"
-            },
-            "pattern": {
-              "type": "string",
-              "description": "Parameter pattern for reqMatchingSymbols"
-            }
-          },
-          "required": [
-            "reqId",
-            "pattern"
-          ]
-        }
-      },
-      "category": "broker_contract",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "reqSecDefOptParams",
-        "description": "Requests security definition option parameters for viewing a\ncontract's option chain reqId the ID chosen for the request\nunderlyingSymbol futFopExchange The exchange on which the returned\noptions are trading. Can be set to the empty string \"\" for all\nexchanges. underlyingSecType The type of the underlying security,\ni.e. STK underlyingConId the contract ID of the underlying security.\nResponse comes via EWrapper.securityDefinitionOptionParameter()",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "Parameter reqId for reqSecDefOptParams"
-            },
-            "underlyingSymbol": {
-              "type": "string",
-              "description": "Parameter underlyingSymbol for reqSecDefOptParams"
-            },
-            "futFopExchange": {
-              "type": "string",
-              "description": "Parameter futFopExchange for reqSecDefOptParams"
-            },
-            "underlyingSecType": {
-              "type": "string",
-              "description": "Parameter underlyingSecType for reqSecDefOptParams"
-            },
-            "underlyingConId": {
-              "type": "integer",
-              "description": "Parameter underlyingConId for reqSecDefOptParams"
-            }
-          },
-          "required": [
-            "reqId",
-            "underlyingSymbol",
-            "futFopExchange",
-            "underlyingSecType",
-            "underlyingConId"
-          ]
-        }
-      },
-      "category": "broker_contract",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "reqMktData",
-        "description": "Call this function to request market data. The market data\nwill be returned by the tickPrice and tickSize events.\n\nreqId: TickerId - The ticker id. Must be a unique value. When the\n    market data returns, it will be identified by this tag. This is\n    also used when canceling the market data.\ncontract:Contract - This structure contains a description of the\n    Contractt for which market data is being requested.\ngenericTickList:str - A commma delimited list of generic tick types.\n    Tick types can be found in the Generic Tick Types page.\n    Prefixing w/ 'mdoff' indicates that top mkt data shouldn't tick.\n    You can specify the news source by postfixing w/ ':<source>.\n    Example: \"mdoff,292:FLY+BRF\"\nsnapshot:bool - Check to return a single snapshot of Market data and\n    have the market data subscription cancel. Do not enter any\n    genericTicklist values if you use snapshots.\nregulatorySnapshot: bool - With the US Value Snapshot Bundle for stocks,\n    regulatory snapshots are available for 0.01 USD each.\nmktDataOptions:TagValueList - For internal use only.\n    Use default value XYZ.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "TickerId - The ticker id. Must be a unique value. When the"
-            },
-            "contract": {
-              "type": "string",
-              "description": "Contract - This structure contains a description of the"
-            },
-            "genericTickList": {
-              "type": "string",
-              "description": "str - A commma delimited list of generic tick types."
-            },
-            "snapshot": {
-              "type": "boolean",
-              "description": "bool - Check to return a single snapshot of Market data and"
-            },
-            "regulatorySnapshot": {
-              "type": "boolean",
-              "description": "bool - With the US Value Snapshot Bundle for stocks,"
-            },
-            "mktDataOptions": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "TagValueList - For internal use only."
-            }
-          },
-          "required": [
-            "reqId",
-            "contract",
-            "genericTickList",
-            "snapshot",
-            "regulatorySnapshot",
-            "mktDataOptions"
-          ]
-        }
-      },
-      "category": "broker_market_data",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "cancelMktData",
-        "description": "After calling this function, market data for the specified id\nwill stop flowing.\n\nreqId: TickerId - The ID that was specified in the call to\n    reqMktData().",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "TickerId - The ID that was specified in the call to"
-            }
-          },
-          "required": [
-            "reqId"
-          ]
-        }
-      },
-      "category": "broker_market_data",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "reqMarketDataType",
-        "description": "The API can receive frozen market data from Trader\nWorkstation. Frozen market data is the last data recorded in our system.\nDuring normal trading hours, the API receives real-time market data. If\nyou use this function, you are telling TWS to automatically switch to\nfrozen market data after the close. Then, before the opening of the next\ntrading day, market data will automatically switch back to real-time\nmarket data.\n\nmarketDataType:int - 1 for real-time streaming market data or 2 for\n    frozen market data",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "marketDataType": {
-              "type": "integer",
-              "description": "int - 1 for real-time streaming market data or 2 for"
-            }
-          },
-          "required": [
-            "marketDataType"
-          ]
-        }
-      },
-      "category": "broker_account",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "reqMktDepth",
-        "description": "Call this function to request market depth for a specific\ncontract. The market depth will be returned by the updateMktDepth() and\nupdateMktDepthL2() events.\n\nRequests the contract's market depth (order book). Note this request must be\ndirect-routed to an exchange and not smart-routed. The number of simultaneous\nmarket depth requests allowed in an account is calculated based on a formula\nthat looks at an accounts equity, commissions, and quote booster packs.\n\nreqId:TickerId - The ticker id. Must be a unique value. When the market\n    depth data returns, it will be identified by this tag. This is\n    also used when canceling the market depth\ncontract:Contact - This structure contains a description of the contract\n    for which market depth data is being requested.\nnumRows:int - Specifies the numRowsumber of market depth rows to display.\nisSmartDepth:bool - specifies SMART depth request\nmktDepthOptions:TagValueList - For internal use only. Use default value\n    XYZ.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "TickerId - The ticker id. Must be a unique value. When the market"
-            },
-            "contract": {
-              "type": "string",
-              "description": "Contact - This structure contains a description of the contract"
-            },
-            "numRows": {
-              "type": "integer",
-              "description": "int - Specifies the numRowsumber of market depth rows to display."
-            },
-            "isSmartDepth": {
-              "type": "boolean",
-              "description": "bool - specifies SMART depth request"
-            },
-            "mktDepthOptions": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "TagValueList - For internal use only. Use default value"
-            }
-          },
-          "required": [
-            "reqId",
-            "contract",
-            "numRows",
-            "isSmartDepth",
-            "mktDepthOptions"
-          ]
-        }
-      },
-      "category": "broker_market_data",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "cancelMktDepth",
-        "description": "After calling this function, market depth data for the specified id\nwill stop flowing.\n\nreqId:TickerId - The ID that was specified in the call to\n    reqMktDepth().\nisSmartDepth:bool - specifies SMART depth request",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "TickerId - The ID that was specified in the call to"
-            },
-            "isSmartDepth": {
-              "type": "boolean",
-              "description": "bool - specifies SMART depth request"
-            }
-          },
-          "required": [
-            "reqId",
-            "isSmartDepth"
-          ]
-        }
-      },
-      "category": "broker_market_data",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "reqHistogramData",
-        "description": "Interactive Brokers API method: reqHistogramData",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "tickerId": {
-              "type": "integer",
-              "description": "Parameter tickerId for reqHistogramData"
-            },
-            "contract": {
-              "type": "string",
-              "description": "Parameter contract for reqHistogramData"
-            },
-            "useRTH": {
-              "type": "boolean",
-              "description": "Parameter useRTH for reqHistogramData"
-            },
-            "timePeriod": {
-              "type": "string",
-              "description": "Parameter timePeriod for reqHistogramData"
-            }
-          },
-          "required": [
-            "tickerId",
-            "contract",
-            "useRTH",
-            "timePeriod"
-          ]
-        }
-      },
-      "category": "broker_market_data",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "cancelHistogramData",
-        "description": "Interactive Brokers API method: cancelHistogramData",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "tickerId": {
-              "type": "integer",
-              "description": "Parameter tickerId for cancelHistogramData"
-            }
-          },
-          "required": [
-            "tickerId"
-          ]
-        }
-      },
-      "category": "broker_market_data",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "reqHistoricalData",
-        "description": "Requests contracts' historical data. When requesting historical data, a\nfinishing time and date is required along with a duration string. The\nresulting bars will be returned in EWrapper.historicalData()\n\nreqId:TickerId - The id of the request. Must be a unique value. When the\n    market data returns, it whatToShowill be identified by this tag. This is also\n    used when canceling the market data.\ncontract:Contract - This object contains a description of the contract for which\n    market data is being requested.\nendDateTime:str - Defines a query end date and time at any point during the past 6 mos.\n    Valid values include any date/time within the past six months in the format:\n    yyyymmdd HH:mm:ss ttt\n\n    where \"ttt\" is the optional time zone.\ndurationStr:str - Set the query duration up to one week, using a time unit\n    of seconds, days or weeks. Valid values include any integer followed by a space\n    and then S (seconds), D (days) or W (week). If no unit is specified, seconds is used.\nbarSizeSetting:str - Specifies the size of the bars that will be returned (within IB/TWS listimits).\n    Valid values include:\n    1 sec\n    5 secs\n    15 secs\n    30 secs\n    1 min\n    2 mins\n    3 mins\n    5 mins\n    15 mins\n    30 mins\n    1 hour\n    1 day\nwhatToShow:str - Determines the nature of data beinging extracted. Valid values include:\n\n    TRADES\n    MIDPOINT\n    BID\n    ASK\n    BID_ASK\n    HISTORICAL_VOLATILITY\n    OPTION_IMPLIED_VOLATILITY\nuseRTH:int - Determines whether to return all data available during the requested time span,\n    or only data that falls within regular trading hours. Valid values include:\n\n    0 - all data is returned even where the market in question was outside of its\n    regular trading hours.\n    1 - only data within the regular trading hours is returned, even if the\n    requested time span falls partially or completely outside of the RTH.\nformatDate: int - Determines the date format applied to returned bars. validd values include:\n\n    1 - dates applying to bars returned in the format: yyyymmdd{space}{space}hh:mm:dd\n    2 - dates are returned as a long integer specifying the number of seconds since\n        1/1/1970 GMT.\nchartOptions:TagValueList - For internal use only. Use default value XYZ.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "TickerId - The id of the request. Must be a unique value. When the"
-            },
-            "contract": {
-              "type": "string",
-              "description": "Contract - This object contains a description of the contract for which"
-            },
-            "endDateTime": {
-              "type": "string",
-              "description": "str - Defines a query end date and time at any point during the past 6 mos."
-            },
-            "durationStr": {
-              "type": "string",
-              "description": "str - Set the query duration up to one week, using a time unit"
-            },
-            "barSizeSetting": {
-              "type": "string",
-              "description": "str - Specifies the size of the bars that will be returned (within IB/TWS listimits)."
-            },
-            "whatToShow": {
-              "type": "string",
-              "description": "str - Determines the nature of data beinging extracted. Valid values include:"
-            },
-            "useRTH": {
-              "type": "integer",
-              "description": "int - Determines whether to return all data available during the requested time span,"
-            },
-            "formatDate": {
-              "type": "integer",
-              "description": "int - Determines the date format applied to returned bars. validd values include:"
-            },
-            "keepUpToDate": {
-              "type": "boolean",
-              "description": "Parameter keepUpToDate for reqHistoricalData"
-            },
-            "chartOptions": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "TagValueList - For internal use only. Use default value XYZ."
-            }
-          },
-          "required": [
-            "reqId",
-            "contract",
-            "endDateTime",
-            "durationStr",
-            "barSizeSetting",
-            "whatToShow",
-            "useRTH",
-            "formatDate",
-            "keepUpToDate",
-            "chartOptions"
-          ]
-        }
-      },
-      "category": "broker_market_data",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "cancelHistoricalData",
-        "description": "Used if an internet disconnect has occurred or the results of a query\nare otherwise delayed and the application is no longer interested in receiving\nthe data.\n\nreqId:TickerId - The ticker ID. Must be a unique value.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "TickerId - The ticker ID. Must be a unique value."
-            }
-          },
-          "required": [
-            "reqId"
-          ]
-        }
-      },
-      "category": "broker_market_data",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "reqHeadTimeStamp",
-        "description": "Interactive Brokers API method: reqHeadTimeStamp",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "Parameter reqId for reqHeadTimeStamp"
-            },
-            "contract": {
-              "type": "string",
-              "description": "Parameter contract for reqHeadTimeStamp"
-            },
-            "whatToShow": {
-              "type": "string",
-              "description": "Parameter whatToShow for reqHeadTimeStamp"
-            },
-            "useRTH": {
-              "type": "integer",
-              "description": "Parameter useRTH for reqHeadTimeStamp"
-            },
-            "formatDate": {
-              "type": "integer",
-              "description": "Parameter formatDate for reqHeadTimeStamp"
-            }
-          },
-          "required": [
-            "reqId",
-            "contract",
-            "whatToShow",
-            "useRTH",
-            "formatDate"
-          ]
-        }
-      },
-      "category": "broker_account",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "cancelHeadTimeStamp",
-        "description": "Interactive Brokers API method: cancelHeadTimeStamp",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "Parameter reqId for cancelHeadTimeStamp"
-            }
-          },
-          "required": [
-            "reqId"
-          ]
-        }
-      },
-      "category": "broker_account",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "calculateImpliedVolatility",
-        "description": "Call this function to calculate volatility for a supplied\noption price and underlying price. Result will be delivered\nvia EWrapper.tickOptionComputation()\n\nreqId:TickerId -  The request id.\ncontract:Contract -  Describes the contract.\noptionPrice:double - The price of the option.\nunderPrice:double - Price of the underlying.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "TickerId -  The request id."
-            },
-            "contract": {
-              "type": "string",
-              "description": "Contract -  Describes the contract."
-            },
-            "optionPrice": {
-              "type": "number",
-              "description": "double - The price of the option."
-            },
-            "underPrice": {
-              "type": "number",
-              "description": "double - Price of the underlying."
-            },
-            "implVolOptions": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Parameter implVolOptions for calculateImpliedVolatility"
-            }
-          },
-          "required": [
-            "reqId",
-            "contract",
-            "optionPrice",
-            "underPrice",
-            "implVolOptions"
-          ]
-        }
-      },
-      "category": "broker_market_data",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "calculateOptionPrice",
-        "description": "Call this function to calculate option price and greek values\nfor a supplied volatility and underlying price.\n\nreqId:TickerId -    The ticker ID.\ncontract:Contract - Describes the contract.\nvolatility:double - The volatility.\nunderPrice:double - Price of the underlying.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "TickerId -    The ticker ID."
-            },
-            "contract": {
-              "type": "string",
-              "description": "Contract - Describes the contract."
-            },
-            "volatility": {
-              "type": "number",
-              "description": "double - The volatility."
-            },
-            "underPrice": {
-              "type": "number",
-              "description": "double - Price of the underlying."
-            },
-            "optPrcOptions": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Parameter optPrcOptions for calculateOptionPrice"
-            }
-          },
-          "required": [
-            "reqId",
-            "contract",
-            "volatility",
-            "underPrice",
-            "optPrcOptions"
-          ]
-        }
-      },
-      "category": "broker_account",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "cancelCalculateImpliedVolatility",
-        "description": "Call this function to cancel a request to calculate\nvolatility for a supplied option price and underlying price.\n\nreqId:TickerId - The request ID.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "TickerId - The request ID."
-            }
-          },
-          "required": [
-            "reqId"
-          ]
-        }
-      },
-      "category": "broker_market_data",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "cancelCalculateOptionPrice",
-        "description": "Call this function to cancel a request to calculate the option\nprice and greek values for a supplied volatility and underlying price.\n\nreqId:TickerId - The request ID.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "TickerId - The request ID."
-            }
-          },
-          "required": [
-            "reqId"
-          ]
-        }
-      },
-      "category": "broker_account",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "reqOpenOrders",
-        "description": "Call this function to request the open orders that were\nplaced from this client. Each open order will be fed back through the\nopenOrder() and orderStatus() functions on the EWrapper.\n\nNote:  The client with a clientId of 0 will also receive the TWS-owned\nopen orders. These orders will be associated with the client and a new\norderId will be generated. This association will persist over multiple\nAPI and TWS sessions.",
-        "parameters": {
-          "type": "object",
-          "properties": {},
-          "required": []
-        }
-      },
-      "category": "broker_orders",
       "source": "Interactive Brokers Official API (ibapi.client.EClient)"
     },
     {
@@ -941,28 +715,18 @@
     {
       "type": "function",
       "function": {
-        "name": "placeOrder",
-        "description": "Call this function to place an order. The order status will\nbe returned by the orderStatus event.\n\norderId:OrderId - The order id. You must specify a unique value. When the\n    order START_APItus returns, it will be identified by this tag.\n    This tag is also used when canceling the order.\ncontract:Contract - This structure contains a description of the\n    contract which is being traded.\norder:Order - This structure contains the details of tradedhe order.\n    Note: Each client MUST connect with a unique clientId.",
+        "name": "reqCompletedOrders",
+        "description": "Call this function to request the completed orders. If apiOnly parameter \nis true, then only completed orders placed from API are requested. \nEach completed order will be fed back through the\ncompletedOrder() function on the EWrapper.",
         "parameters": {
           "type": "object",
           "properties": {
-            "orderId": {
-              "type": "integer",
-              "description": "OrderId - The order id. You must specify a unique value. When the"
-            },
-            "contract": {
-              "type": "string",
-              "description": "Contract - This structure contains a description of the"
-            },
-            "order": {
-              "type": "string",
-              "description": "Order - This structure contains the details of tradedhe order."
+            "apiOnly": {
+              "type": "boolean",
+              "description": "Parameter apiOnly for reqCompletedOrders"
             }
           },
           "required": [
-            "orderId",
-            "contract",
-            "order"
+            "apiOnly"
           ]
         }
       },
@@ -972,22 +736,117 @@
     {
       "type": "function",
       "function": {
-        "name": "cancelOrder",
-        "description": "Call this function to cancel an order.\n\norderId:OrderId - The order ID that was specified previously in the call\n    to placeOrder()",
+        "name": "reqContractDetails",
+        "description": "Call this function to download all details for a particular\nunderlying. The contract details will be received via the contractDetails()\nfunction on the EWrapper.\n\nreqId:int - The ID of the data request. Ensures that responses are\n    make_fieldatched to requests if several requests are in process.\ncontract:Contract - The summary description of the contract being looked\n    up.",
         "parameters": {
           "type": "object",
           "properties": {
-            "orderId": {
+            "reqId": {
               "type": "integer",
-              "description": "OrderId - The order ID that was specified previously in the call"
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "contract": {
+              "type": "string",
+              "description": "Stock symbol (e.g. 'NVDA', 'AAPL', 'EUR') or IBKR Contract specification dictionary."
             }
           },
           "required": [
-            "orderId"
+            "contract"
+          ]
+        }
+      },
+      "category": "broker_contract",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqCurrentTime",
+        "description": "Asks the current system time on the server side.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "category": "broker_operations",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqExecutions",
+        "description": "When this function is called, the execution reports that meet the\nfilter criteria are downloaded to the client via the execDetails()\nfunction. To view executions beyond the past 24 hours, open the\nTrade Log in TWS and, while the Trade Log is displayed, request\nthe executions again from the API.\n\nreqId:int - The ID of the data request. Ensures that responses are\n    matched to requests if several requests are in process.\nexecFilter:ExecutionFilter - This object contains attributes that\n    describe the filter criteria used to determine which execution\n    reports are returned.\n\nNOTE: Time format must be 'yyyymmdd-hh:mm:ss' Eg: '20030702-14:55'",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "execFilter": {
+              "type": "string",
+              "description": "ExecutionFilter - This object contains attributes that"
+            }
+          },
+          "required": [
+            "execFilter"
           ]
         }
       },
       "category": "broker_orders",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqFamilyCodes",
+        "description": "Interactive Brokers API method: reqFamilyCodes",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqFundamentalData",
+        "description": "Call this function to receive fundamental data for\nstocks. The appropriate market data subscription must be set up in\nAccount Management before you can receive this data.\nFundamental data will be returned at EWrapper.fundamentalData().\n\nreqFundamentalData() can handle conid specified in the Contract object,\nbut not tradingClass or multiplier. This is because reqFundamentalData()\nis used only for stocks and stocks do not have a multiplier and\ntrading class.\n\nreqId:tickerId - The ID of the data request. Ensures that responses are\n     matched to requests if several requests are in process.\ncontract:Contract - This structure contains a description of the\n    contract for which fundamental data is being requested.\nreportType:str - One of the following XML reports:\n    ReportSnapshot (company overview)\n    ReportsFinSummary (financial summary)\n    ReportRatios (financial ratios)\n    ReportsFinStatements (financial statements)\n    RESC (analyst estimates)",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "contract": {
+              "type": "string",
+              "description": "Stock symbol (e.g. 'NVDA', 'AAPL', 'EUR') or IBKR Contract specification dictionary."
+            },
+            "reportType": {
+              "type": "string",
+              "description": "str - One of the following XML reports:"
+            },
+            "fundamentalDataOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "description": "Optional broker fundamentalDataOptions array (defaults to empty list)."
+            }
+          },
+          "required": [
+            "contract",
+            "reportType"
+          ]
+        }
+      },
+      "category": "broker_news",
       "source": "Interactive Brokers Official API (ibapi.client.EClient)"
     },
     {
@@ -1001,7 +860,266 @@
           "required": []
         }
       },
-      "category": "broker_account",
+      "category": "broker_operations",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqHeadTimeStamp",
+        "description": "Interactive Brokers API method: reqHeadTimeStamp",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "contract": {
+              "type": "string",
+              "description": "Stock symbol (e.g. 'NVDA', 'AAPL', 'EUR') or IBKR Contract specification dictionary."
+            },
+            "whatToShow": {
+              "type": "string",
+              "description": "Parameter whatToShow for reqHeadTimeStamp",
+              "default": "TRADES"
+            },
+            "useRTH": {
+              "type": "integer",
+              "description": "Parameter useRTH for reqHeadTimeStamp",
+              "default": 1
+            },
+            "formatDate": {
+              "type": "integer",
+              "description": "Parameter formatDate for reqHeadTimeStamp",
+              "default": 1
+            }
+          },
+          "required": [
+            "contract"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqHistogramData",
+        "description": "Interactive Brokers API method: reqHistogramData",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "tickerId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "contract": {
+              "type": "string",
+              "description": "Stock symbol (e.g. 'NVDA', 'AAPL', 'EUR') or IBKR Contract specification dictionary."
+            },
+            "useRTH": {
+              "type": "boolean",
+              "description": "Parameter useRTH for reqHistogramData",
+              "default": 1
+            },
+            "timePeriod": {
+              "type": "string",
+              "description": "Parameter timePeriod for reqHistogramData"
+            }
+          },
+          "required": [
+            "contract",
+            "timePeriod"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqHistoricalData",
+        "description": "Requests contracts' historical data. When requesting historical data, a\nfinishing time and date is required along with a duration string. The\nresulting bars will be returned in EWrapper.historicalData()\n\nreqId:TickerId - The id of the request. Must be a unique value. When the\n    market data returns, it whatToShowill be identified by this tag. This is also\n    used when canceling the market data.\ncontract:Contract - This object contains a description of the contract for which\n    market data is being requested.\nendDateTime:str - Defines a query end date and time at any point during the past 6 mos.\n    Valid values include any date/time within the past six months in the format:\n    yyyymmdd HH:mm:ss ttt\n\n    where \"ttt\" is the optional time zone.\ndurationStr:str - Set the query duration up to one week, using a time unit\n    of seconds, days or weeks. Valid values include any integer followed by a space\n    and then S (seconds), D (days) or W (week). If no unit is specified, seconds is used.\nbarSizeSetting:str - Specifies the size of the bars that will be returned (within IB/TWS listimits).\n    Valid values include:\n    1 sec\n    5 secs\n    15 secs\n    30 secs\n    1 min\n    2 mins\n    3 mins\n    5 mins\n    15 mins\n    30 mins\n    1 hour\n    1 day\nwhatToShow:str - Determines the nature of data beinging extracted. Valid values include:\n\n    TRADES\n    MIDPOINT\n    BID\n    ASK\n    BID_ASK\n    HISTORICAL_VOLATILITY\n    OPTION_IMPLIED_VOLATILITY\nuseRTH:int - Determines whether to return all data available during the requested time span,\n    or only data that falls within regular trading hours. Valid values include:\n\n    0 - all data is returned even where the market in question was outside of its\n    regular trading hours.\n    1 - only data within the regular trading hours is returned, even if the\n    requested time span falls partially or completely outside of the RTH.\nformatDate: int - Determines the date format applied to returned bars. validd values include:\n\n    1 - dates applying to bars returned in the format: yyyymmdd{space}{space}hh:mm:dd\n    2 - dates are returned as a long integer specifying the number of seconds since\n        1/1/1970 GMT.\nchartOptions:TagValueList - For internal use only. Use default value XYZ.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "contract": {
+              "type": "string",
+              "description": "Stock symbol (e.g. 'NVDA', 'AAPL', 'EUR') or IBKR Contract specification dictionary."
+            },
+            "endDateTime": {
+              "type": "string",
+              "description": "str - Defines a query end date and time at any point during the past 6 mos.",
+              "default": ""
+            },
+            "durationStr": {
+              "type": "string",
+              "description": "str - Set the query duration up to one week, using a time unit"
+            },
+            "barSizeSetting": {
+              "type": "string",
+              "description": "str - Specifies the size of the bars that will be returned (within IB/TWS listimits)."
+            },
+            "whatToShow": {
+              "type": "string",
+              "description": "str - Determines the nature of data beinging extracted. Valid values include:",
+              "default": "TRADES"
+            },
+            "useRTH": {
+              "type": "integer",
+              "description": "int - Determines whether to return all data available during the requested time span,",
+              "default": 1
+            },
+            "formatDate": {
+              "type": "integer",
+              "description": "int - Determines the date format applied to returned bars. validd values include:",
+              "default": 1
+            },
+            "keepUpToDate": {
+              "type": "boolean",
+              "description": "Parameter keepUpToDate for reqHistoricalData",
+              "default": false
+            },
+            "chartOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "description": "Optional broker chartOptions array (defaults to empty list)."
+            }
+          },
+          "required": [
+            "contract",
+            "durationStr",
+            "barSizeSetting"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqHistoricalNews",
+        "description": "Interactive Brokers API method: reqHistoricalNews",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "conId": {
+              "type": "integer",
+              "description": "Parameter conId for reqHistoricalNews"
+            },
+            "providerCodes": {
+              "type": "string",
+              "description": "Parameter providerCodes for reqHistoricalNews"
+            },
+            "startDateTime": {
+              "type": "string",
+              "description": "Parameter startDateTime for reqHistoricalNews"
+            },
+            "endDateTime": {
+              "type": "string",
+              "description": "Parameter endDateTime for reqHistoricalNews",
+              "default": ""
+            },
+            "totalResults": {
+              "type": "integer",
+              "description": "Parameter totalResults for reqHistoricalNews"
+            },
+            "historicalNewsOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "description": "Optional broker historicalNewsOptions array (defaults to empty list)."
+            }
+          },
+          "required": [
+            "conId",
+            "providerCodes",
+            "startDateTime",
+            "totalResults"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqHistoricalTicks",
+        "description": "Interactive Brokers API method: reqHistoricalTicks",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "contract": {
+              "type": "string",
+              "description": "Stock symbol (e.g. 'NVDA', 'AAPL', 'EUR') or IBKR Contract specification dictionary."
+            },
+            "startDateTime": {
+              "type": "string",
+              "description": "Parameter startDateTime for reqHistoricalTicks"
+            },
+            "endDateTime": {
+              "type": "string",
+              "description": "Parameter endDateTime for reqHistoricalTicks",
+              "default": ""
+            },
+            "numberOfTicks": {
+              "type": "integer",
+              "description": "Parameter numberOfTicks for reqHistoricalTicks"
+            },
+            "whatToShow": {
+              "type": "string",
+              "description": "Parameter whatToShow for reqHistoricalTicks",
+              "default": "TRADES"
+            },
+            "useRth": {
+              "type": "integer",
+              "description": "Parameter useRth for reqHistoricalTicks"
+            },
+            "ignoreSize": {
+              "type": "boolean",
+              "description": "Parameter ignoreSize for reqHistoricalTicks"
+            },
+            "miscOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "description": "Optional broker miscOptions array (defaults to empty list)."
+            }
+          },
+          "required": [
+            "contract",
+            "startDateTime",
+            "numberOfTicks",
+            "useRth",
+            "ignoreSize"
+          ]
+        }
+      },
+      "category": "broker_market_data",
       "source": "Interactive Brokers Official API (ibapi.client.EClient)"
     },
     {
@@ -1022,33 +1140,234 @@
           ]
         }
       },
+      "category": "broker_orders",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqManagedAccts",
+        "description": "Call this function to request the list of managed accounts. The list\nwill be returned by the managedAccounts() function on the EWrapper.\n\nNote:  This request can only be made when connected to a FA managed account.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
       "category": "broker_account",
       "source": "Interactive Brokers Official API (ibapi.client.EClient)"
     },
     {
       "type": "function",
       "function": {
-        "name": "reqExecutions",
-        "description": "When this function is called, the execution reports that meet the\nfilter criteria are downloaded to the client via the execDetails()\nfunction. To view executions beyond the past 24 hours, open the\nTrade Log in TWS and, while the Trade Log is displayed, request\nthe executions again from the API.\n\nreqId:int - The ID of the data request. Ensures that responses are\n    matched to requests if several requests are in process.\nexecFilter:ExecutionFilter - This object contains attributes that\n    describe the filter criteria used to determine which execution\n    reports are returned.\n\nNOTE: Time format must be 'yyyymmdd-hh:mm:ss' Eg: '20030702-14:55'",
+        "name": "reqMarketDataType",
+        "description": "The API can receive frozen market data from Trader\nWorkstation. Frozen market data is the last data recorded in our system.\nDuring normal trading hours, the API receives real-time market data. If\nyou use this function, you are telling TWS to automatically switch to\nfrozen market data after the close. Then, before the opening of the next\ntrading day, market data will automatically switch back to real-time\nmarket data.\n\nmarketDataType:int - 1 for real-time streaming market data or 2 for\n    frozen market data",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "marketDataType": {
+              "type": "integer",
+              "description": "int - 1 for real-time streaming market data or 2 for"
+            }
+          },
+          "required": [
+            "marketDataType"
+          ]
+        }
+      },
+      "category": "broker_operations",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqMarketRule",
+        "description": "Interactive Brokers API method: reqMarketRule",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "marketRuleId": {
+              "type": "integer",
+              "description": "Parameter marketRuleId for reqMarketRule"
+            }
+          },
+          "required": [
+            "marketRuleId"
+          ]
+        }
+      },
+      "category": "broker_contract",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqMatchingSymbols",
+        "description": "Interactive Brokers API method: reqMatchingSymbols",
         "parameters": {
           "type": "object",
           "properties": {
             "reqId": {
               "type": "integer",
-              "description": "int - The ID of the data request. Ensures that responses are"
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
             },
-            "execFilter": {
+            "pattern": {
               "type": "string",
-              "description": "ExecutionFilter - This object contains attributes that"
+              "description": "Parameter pattern for reqMatchingSymbols"
             }
           },
           "required": [
-            "reqId",
-            "execFilter"
+            "pattern"
           ]
         }
       },
-      "category": "broker_orders",
+      "category": "broker_contract",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqMktData",
+        "description": "Call this function to request market data. The market data\nwill be returned by the tickPrice and tickSize events.\n\nreqId: TickerId - The ticker id. Must be a unique value. When the\n    market data returns, it will be identified by this tag. This is\n    also used when canceling the market data.\ncontract:Contract - This structure contains a description of the\n    Contractt for which market data is being requested.\ngenericTickList:str - A commma delimited list of generic tick types.\n    Tick types can be found in the Generic Tick Types page.\n    Prefixing w/ 'mdoff' indicates that top mkt data shouldn't tick.\n    You can specify the news source by postfixing w/ ':<source>.\n    Example: \"mdoff,292:FLY+BRF\"\nsnapshot:bool - Check to return a single snapshot of Market data and\n    have the market data subscription cancel. Do not enter any\n    genericTicklist values if you use snapshots.\nregulatorySnapshot: bool - With the US Value Snapshot Bundle for stocks,\n    regulatory snapshots are available for 0.01 USD each.\nmktDataOptions:TagValueList - For internal use only.\n    Use default value XYZ.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "contract": {
+              "type": "string",
+              "description": "Stock symbol (e.g. 'NVDA', 'AAPL', 'EUR') or IBKR Contract specification dictionary."
+            },
+            "genericTickList": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": "",
+              "description": "Optional broker genericTickList array (defaults to empty list)."
+            },
+            "snapshot": {
+              "type": "boolean",
+              "description": "bool - Check to return a single snapshot of Market data and",
+              "default": true
+            },
+            "regulatorySnapshot": {
+              "type": "boolean",
+              "description": "bool - With the US Value Snapshot Bundle for stocks,",
+              "default": false
+            },
+            "mktDataOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "description": "Optional broker mktDataOptions array (defaults to empty list)."
+            }
+          },
+          "required": [
+            "contract"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqMktDepth",
+        "description": "Call this function to request market depth for a specific\ncontract. The market depth will be returned by the updateMktDepth() and\nupdateMktDepthL2() events.\n\nRequests the contract's market depth (order book). Note this request must be\ndirect-routed to an exchange and not smart-routed. The number of simultaneous\nmarket depth requests allowed in an account is calculated based on a formula\nthat looks at an accounts equity, commissions, and quote booster packs.\n\nreqId:TickerId - The ticker id. Must be a unique value. When the market\n    depth data returns, it will be identified by this tag. This is\n    also used when canceling the market depth\ncontract:Contact - This structure contains a description of the contract\n    for which market depth data is being requested.\nnumRows:int - Specifies the numRowsumber of market depth rows to display.\nisSmartDepth:bool - specifies SMART depth request\nmktDepthOptions:TagValueList - For internal use only. Use default value\n    XYZ.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "contract": {
+              "type": "string",
+              "description": "Stock symbol (e.g. 'NVDA', 'AAPL', 'EUR') or IBKR Contract specification dictionary."
+            },
+            "numRows": {
+              "type": "integer",
+              "description": "int - Specifies the numRowsumber of market depth rows to display."
+            },
+            "isSmartDepth": {
+              "type": "boolean",
+              "description": "bool - specifies SMART depth request"
+            },
+            "mktDepthOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "description": "Optional broker mktDepthOptions array (defaults to empty list)."
+            }
+          },
+          "required": [
+            "contract",
+            "numRows",
+            "isSmartDepth"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqMktDepthExchanges",
+        "description": "Interactive Brokers API method: reqMktDepthExchanges",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqNewsArticle",
+        "description": "Interactive Brokers API method: reqNewsArticle",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "providerCode": {
+              "type": "string",
+              "description": "Parameter providerCode for reqNewsArticle"
+            },
+            "articleId": {
+              "type": "string",
+              "description": "Parameter articleId for reqNewsArticle"
+            },
+            "newsArticleOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "description": "Optional broker newsArticleOptions array (defaults to empty list)."
+            }
+          },
+          "required": [
+            "providerCode",
+            "articleId"
+          ]
+        }
+      },
+      "category": "broker_news",
       "source": "Interactive Brokers Official API (ibapi.client.EClient)"
     },
     {
@@ -1075,20 +1394,6 @@
     {
       "type": "function",
       "function": {
-        "name": "cancelNewsBulletins",
-        "description": "Call this function to stop receiving news bulletins.",
-        "parameters": {
-          "type": "object",
-          "properties": {},
-          "required": []
-        }
-      },
-      "category": "broker_news",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
         "name": "reqNewsProviders",
         "description": "Interactive Brokers API method: reqNewsProviders",
         "parameters": {
@@ -1103,161 +1408,87 @@
     {
       "type": "function",
       "function": {
-        "name": "reqHistoricalNews",
-        "description": "Interactive Brokers API method: reqHistoricalNews",
+        "name": "reqOpenOrders",
+        "description": "Call this function to request the open orders that were\nplaced from this client. Each open order will be fed back through the\nopenOrder() and orderStatus() functions on the EWrapper.\n\nNote:  The client with a clientId of 0 will also receive the TWS-owned\nopen orders. These orders will be associated with the client and a new\norderId will be generated. This association will persist over multiple\nAPI and TWS sessions.",
         "parameters": {
           "type": "object",
-          "properties": {
-            "reqId": {
-              "type": "integer",
-              "description": "Parameter reqId for reqHistoricalNews"
-            },
-            "conId": {
-              "type": "integer",
-              "description": "Parameter conId for reqHistoricalNews"
-            },
-            "providerCodes": {
-              "type": "string",
-              "description": "Parameter providerCodes for reqHistoricalNews"
-            },
-            "startDateTime": {
-              "type": "string",
-              "description": "Parameter startDateTime for reqHistoricalNews"
-            },
-            "endDateTime": {
-              "type": "string",
-              "description": "Parameter endDateTime for reqHistoricalNews"
-            },
-            "totalResults": {
-              "type": "integer",
-              "description": "Parameter totalResults for reqHistoricalNews"
-            },
-            "historicalNewsOptions": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Parameter historicalNewsOptions for reqHistoricalNews"
-            }
-          },
-          "required": [
-            "reqId",
-            "conId",
-            "providerCodes",
-            "startDateTime",
-            "endDateTime",
-            "totalResults",
-            "historicalNewsOptions"
-          ]
+          "properties": {},
+          "required": []
         }
       },
-      "category": "broker_market_data",
+      "category": "broker_orders",
       "source": "Interactive Brokers Official API (ibapi.client.EClient)"
     },
     {
       "type": "function",
       "function": {
-        "name": "reqNewsArticle",
-        "description": "Interactive Brokers API method: reqNewsArticle",
+        "name": "reqPnL",
+        "description": "Interactive Brokers API method: reqPnL",
         "parameters": {
           "type": "object",
           "properties": {
             "reqId": {
               "type": "integer",
-              "description": "Parameter reqId for reqNewsArticle"
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
             },
-            "providerCode": {
+            "account": {
               "type": "string",
-              "description": "Parameter providerCode for reqNewsArticle"
+              "description": "Parameter account for reqPnL"
             },
-            "articleId": {
+            "modelCode": {
               "type": "string",
-              "description": "Parameter articleId for reqNewsArticle"
-            },
-            "newsArticleOptions": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Parameter newsArticleOptions for reqNewsArticle"
+              "description": "Parameter modelCode for reqPnL"
             }
           },
           "required": [
-            "reqId",
-            "providerCode",
-            "articleId",
-            "newsArticleOptions"
+            "account",
+            "modelCode"
           ]
         }
       },
-      "category": "broker_news",
+      "category": "broker_account",
       "source": "Interactive Brokers Official API (ibapi.client.EClient)"
     },
     {
       "type": "function",
       "function": {
-        "name": "reqFundamentalData",
-        "description": "Call this function to receive fundamental data for\nstocks. The appropriate market data subscription must be set up in\nAccount Management before you can receive this data.\nFundamental data will be returned at EWrapper.fundamentalData().\n\nreqFundamentalData() can handle conid specified in the Contract object,\nbut not tradingClass or multiplier. This is because reqFundamentalData()\nis used only for stocks and stocks do not have a multiplier and\ntrading class.\n\nreqId:tickerId - The ID of the data request. Ensures that responses are\n     matched to requests if several requests are in process.\ncontract:Contract - This structure contains a description of the\n    contract for which fundamental data is being requested.\nreportType:str - One of the following XML reports:\n    ReportSnapshot (company overview)\n    ReportsFinSummary (financial summary)\n    ReportRatios (financial ratios)\n    ReportsFinStatements (financial statements)\n    RESC (analyst estimates)",
+        "name": "reqPnLSingle",
+        "description": "Interactive Brokers API method: reqPnLSingle",
         "parameters": {
           "type": "object",
           "properties": {
             "reqId": {
               "type": "integer",
-              "description": "tickerId - The ID of the data request. Ensures that responses are"
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
             },
-            "contract": {
+            "account": {
               "type": "string",
-              "description": "Contract - This structure contains a description of the"
+              "description": "Parameter account for reqPnLSingle"
             },
-            "reportType": {
+            "modelCode": {
               "type": "string",
-              "description": "str - One of the following XML reports:"
+              "description": "Parameter modelCode for reqPnLSingle"
             },
-            "fundamentalDataOptions": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Parameter fundamentalDataOptions for reqFundamentalData"
-            }
-          },
-          "required": [
-            "reqId",
-            "contract",
-            "reportType",
-            "fundamentalDataOptions"
-          ]
-        }
-      },
-      "category": "broker_news",
-      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "cancelFundamentalData",
-        "description": "Call this function to stop receiving fundamental data.\n\nreqId:TickerId - The ID of the data request.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "reqId": {
+            "conid": {
               "type": "integer",
-              "description": "TickerId - The ID of the data request."
+              "description": "Parameter conid for reqPnLSingle"
             }
           },
           "required": [
-            "reqId"
+            "account",
+            "modelCode",
+            "conid"
           ]
         }
       },
-      "category": "broker_news",
+      "category": "broker_account",
       "source": "Interactive Brokers Official API (ibapi.client.EClient)"
     },
     {
       "type": "function",
       "function": {
-        "name": "reqCurrentTime",
-        "description": "Asks the current system time on the server side.",
+        "name": "reqPositions",
+        "description": "Requests real-time position data for all accounts.",
         "parameters": {
           "type": "object",
           "properties": {},
@@ -1265,6 +1496,84 @@
         }
       },
       "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqPositionsMulti",
+        "description": "Requests positions for account and/or model.\nResults are delivered via EWrapper.positionMulti() and\nEWrapper.positionMultiEnd()",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "account": {
+              "type": "string",
+              "description": "Parameter account for reqPositionsMulti"
+            },
+            "modelCode": {
+              "type": "string",
+              "description": "Parameter modelCode for reqPositionsMulti"
+            }
+          },
+          "required": [
+            "account",
+            "modelCode"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqRealTimeBars",
+        "description": "Call the reqRealTimeBars() function to start receiving real time bar\nresults through the realtimeBar() EWrapper function.\n\nreqId:TickerId - The Id for the request. Must be a unique value. When the\n    data is received, it will be identified by this Id. This is also\n    used when canceling the request.\ncontract:Contract - This object contains a description of the contract\n    for which real time bars are being requested\nbarSize:int - Currently only 5 second bars are supported, if any other\n    value is used, an exception will be thrown.\nwhatToShow:str - Determines the nature of the data extracted. Valid\n    values include:\n    TRADES\n    BID\n    ASK\n    MIDPOINT\nuseRTH:bool - Regular Trading Hours only. Valid values include:\n    0 = all data available during the time span requested is returned,\n        including time intervals when the market in question was\n        outside of regular trading hours.\n    1 = only data within the regular trading hours for the product\n        requested is returned, even if the time time span falls\n        partially or completely outside.\nrealTimeBarOptions:TagValueList - For internal use only. Use default value XYZ.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "contract": {
+              "type": "string",
+              "description": "Stock symbol (e.g. 'NVDA', 'AAPL', 'EUR') or IBKR Contract specification dictionary."
+            },
+            "barSize": {
+              "type": "integer",
+              "description": "int - Currently only 5 second bars are supported, if any other"
+            },
+            "whatToShow": {
+              "type": "string",
+              "description": "str - Determines the nature of the data extracted. Valid",
+              "default": "TRADES"
+            },
+            "useRTH": {
+              "type": "boolean",
+              "description": "bool - Regular Trading Hours only. Valid values include:",
+              "default": 1
+            },
+            "realTimeBarsOptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "description": "Optional broker realTimeBarsOptions array (defaults to empty list)."
+            }
+          },
+          "required": [
+            "contract",
+            "barSize"
+          ]
+        }
+      },
+      "category": "broker_market_data",
       "source": "Interactive Brokers Official API (ibapi.client.EClient)"
     },
     {
@@ -1291,7 +1600,7 @@
           "properties": {
             "reqId": {
               "type": "integer",
-              "description": "int - The ticker ID. Must be a unique value."
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
             },
             "subscription": {
               "type": "string",
@@ -1302,21 +1611,20 @@
               "items": {
                 "type": "string"
               },
-              "description": "TagValueList - For internal use only."
+              "default": [],
+              "description": "Optional broker scannerSubscriptionOptions array (defaults to empty list)."
             },
             "scannerSubscriptionFilterOptions": {
               "type": "array",
               "items": {
                 "type": "string"
               },
-              "description": "Parameter scannerSubscriptionFilterOptions for reqScannerSubscription"
+              "default": [],
+              "description": "Optional broker scannerSubscriptionFilterOptions array (defaults to empty list)."
             }
           },
           "required": [
-            "reqId",
-            "subscription",
-            "scannerSubscriptionOptions",
-            "scannerSubscriptionFilterOptions"
+            "subscription"
           ]
         }
       },
@@ -1326,22 +1634,236 @@
     {
       "type": "function",
       "function": {
-        "name": "cancelScannerSubscription",
-        "description": "reqId:int - The ticker ID. Must be a unique value.",
+        "name": "reqSecDefOptParams",
+        "description": "Requests security definition option parameters for viewing a\ncontract's option chain reqId the ID chosen for the request\nunderlyingSymbol futFopExchange The exchange on which the returned\noptions are trading. Can be set to the empty string \"\" for all\nexchanges. underlyingSecType The type of the underlying security,\ni.e. STK underlyingConId the contract ID of the underlying security.\nResponse comes via EWrapper.securityDefinitionOptionParameter()",
         "parameters": {
           "type": "object",
           "properties": {
             "reqId": {
               "type": "integer",
-              "description": "int - The ticker ID. Must be a unique value."
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "underlyingSymbol": {
+              "type": "string",
+              "description": "Parameter underlyingSymbol for reqSecDefOptParams"
+            },
+            "futFopExchange": {
+              "type": "string",
+              "description": "Parameter futFopExchange for reqSecDefOptParams"
+            },
+            "underlyingSecType": {
+              "type": "string",
+              "description": "Parameter underlyingSecType for reqSecDefOptParams"
+            },
+            "underlyingConId": {
+              "type": "integer",
+              "description": "Parameter underlyingConId for reqSecDefOptParams"
             }
           },
           "required": [
-            "reqId"
+            "underlyingSymbol",
+            "futFopExchange",
+            "underlyingSecType",
+            "underlyingConId"
           ]
         }
       },
-      "category": "broker_scanner",
+      "category": "broker_contract",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqSmartComponents",
+        "description": "Interactive Brokers API method: reqSmartComponents",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "bboExchange": {
+              "type": "string",
+              "description": "Parameter bboExchange for reqSmartComponents"
+            }
+          },
+          "required": [
+            "bboExchange"
+          ]
+        }
+      },
+      "category": "broker_operations",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqSoftDollarTiers",
+        "description": "Requests pre-defined Soft Dollar Tiers. This is only supported for\nregistered professional advisors and hedge and mutual funds who have\nconfigured Soft Dollar Tiers in Account Management.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_operations",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "reqTickByTickData",
+        "description": "Interactive Brokers API method: reqTickByTickData",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "contract": {
+              "type": "string",
+              "description": "Stock symbol (e.g. 'NVDA', 'AAPL', 'EUR') or IBKR Contract specification dictionary."
+            },
+            "tickType": {
+              "type": "string",
+              "description": "Parameter tickType for reqTickByTickData"
+            },
+            "numberOfTicks": {
+              "type": "integer",
+              "description": "Parameter numberOfTicks for reqTickByTickData"
+            },
+            "ignoreSize": {
+              "type": "boolean",
+              "description": "Parameter ignoreSize for reqTickByTickData"
+            }
+          },
+          "required": [
+            "contract",
+            "tickType",
+            "numberOfTicks",
+            "ignoreSize"
+          ]
+        }
+      },
+      "category": "broker_market_data",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "requestFA",
+        "description": "Call this function to request FA configuration information from TWS.\nThe data returns in an XML string via a \"receiveFA\" ActiveX event.\n\nfaData:FaDataType - Specifies the type of Financial Advisor\n    configuration data beingingg requested. Valid values include:\n    1 = GROUPS\n    2 = PROFILE\n    3 = ACCOUNT ALIASES",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "faData": {
+              "type": "integer",
+              "description": "FaDataType - Specifies the type of Financial Advisor"
+            }
+          },
+          "required": [
+            "faData"
+          ]
+        }
+      },
+      "category": "broker_account",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "setServerLogLevel",
+        "description": "The default detail level is ERROR. For more details, see API\nLogging.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "logLevel": {
+              "type": "integer",
+              "description": "Parameter logLevel for setServerLogLevel"
+            }
+          },
+          "required": [
+            "logLevel"
+          ]
+        }
+      },
+      "category": "broker_operations",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "subscribeToGroupEvents",
+        "description": "reqId:int - The unique number associated with the notification.\ngroupId:int - The ID of the group, currently it is a number from 1 to 7.\n    This is the display group subscription request sent by the API to TWS.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "groupId": {
+              "type": "integer",
+              "description": "int - The ID of the group, currently it is a number from 1 to 7."
+            }
+          },
+          "required": [
+            "groupId"
+          ]
+        }
+      },
+      "category": "broker_operations",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "unsubscribeFromGroupEvents",
+        "description": "reqId:int - The requestId specified in subscribeToGroupEvents().",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            }
+          },
+          "required": []
+        }
+      },
+      "category": "broker_operations",
+      "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "updateDisplayGroup",
+        "description": "reqId:int - The requestId specified in subscribeToGroupEvents().\ncontractInfo:str - The encoded value that uniquely represents the\n    contract in IB. Possible values include:\n\n    none = empty selection\n    contractID@exchange - any non-combination contract.\n        Examples: 8314@SMART for IBM SMART; 8314@ARCA for IBM @ARCA.\n    combo = if any combo is selected.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reqId": {
+              "type": "integer",
+              "description": "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            },
+            "contractInfo": {
+              "type": "string",
+              "description": "str - The encoded value that uniquely represents the"
+            }
+          },
+          "required": [
+            "contractInfo"
+          ]
+        }
+      },
+      "category": "broker_operations",
       "source": "Interactive Brokers Official API (ibapi.client.EClient)"
     },
     {
@@ -1354,7 +1876,7 @@
           "properties": {
             "contract": {
               "type": "string",
-              "description": "Parameter contract for resolve_contract_details_blocking"
+              "description": "Stock symbol (e.g. 'NVDA', 'AAPL', 'EUR') or IBKR Contract specification dictionary."
             },
             "timeout": {
               "type": "number",

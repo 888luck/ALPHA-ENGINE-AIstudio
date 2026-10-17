@@ -1133,7 +1133,6 @@ Click any quick query below or type your request:`,
         onSaveMultipleSettings={handleSaveMultipleSettings}
         customGeminiApiKey={vaultSettings.geminiApiKey || ""}
         onSaveGeminiKey={(k) => handleSaveSetting("geminiApiKey", k)}
-        firebaseStatus="CONNECTED"
       />
     </div>
   );

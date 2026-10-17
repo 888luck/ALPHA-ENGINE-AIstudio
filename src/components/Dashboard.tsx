@@ -894,7 +894,6 @@ export default function Dashboard({ onNavigate, navTarget, activeTabOverride }: 
         onSaveMultipleSettings={handleSaveMultipleSettings}
         customGeminiApiKey={(settings as any)?.geminiApiKey || ""}
         onSaveGeminiKey={(k) => handleSaveSingleSetting("geminiApiKey", k)}
-        firebaseStatus="configured"
       />
     </div>
   );

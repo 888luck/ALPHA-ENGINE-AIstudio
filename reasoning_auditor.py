@@ -24,10 +24,9 @@ class ReasoningAuditor:
     Measures prediction quality, tracks model calibration, and maintains memory banks.
     """
     
-    def __init__(self, memory_bank_path: str = "lessons_learned.json", performance_path: str = "model_performance.json", firebase_tunnel: Any = None):
+    def __init__(self, memory_bank_path: str = "lessons_learned.json", performance_path: str = "model_performance.json"):
         self.memory_bank_path = memory_bank_path
         self.performance_path = performance_path
-        self.firebase_tunnel = firebase_tunnel
         self.memory_bank = self._load_json(self.memory_bank_path, default={"lessons": []})
         self.performance_data = self._load_json(self.performance_path, default={"categories": {}, "overall_accuracy": 0.0})
 
@@ -51,7 +50,7 @@ class ReasoningAuditor:
         """
         Audits the active dynamic basket against realized market moves and execution fills.
         Calculates win rate, Maximum Favorable Excursion (MFE), and friction efficiency.
-        Syncs summary metrics and lessons learned to Firebase if available.
+        Persists summary metrics and lessons learned to local audit history.
         """
         if not os.path.exists(dynamic_basket_path):
             logger.warning(f"No dynamic basket found at {dynamic_basket_path} for audit.")
@@ -116,22 +115,12 @@ class ReasoningAuditor:
             "results": session_results
         }
         
-        # Sync with Firestore if tunnel provided
-        if self.firebase_tunnel:
-            try:
-                log_id = f"AUDIT_{int(datetime.now(timezone.utc).timestamp())}"
-                self.firebase_tunnel.push_historical_log(log_id, {
-                    "symbol": "AI_ENSEMBLE",
-                    "catalyst": f"EOD Model Audit: {accuracy:.1f}% accuracy across {total_predictions} instruments",
-                    "accuracyPct": round(accuracy, 1),
-                    "totalCandidates": total_predictions,
-                    "correctPredictions": correct_predictions,
-                    "efficiencyRatio": round(accuracy / 100.0 * 5.0, 2),
-                    "timestamp": audit_summary["timestamp"]
-                })
-                logger.info(f"[FIREBASE AUDIT SYNC] Pushed audit log {log_id} to Firestore.")
-            except Exception as e:
-                logger.warning(f"[FIREBASE AUDIT SYNC ERROR] Could not push to Firestore: {e}")
+        # Persist summary to local audit history
+        audit_history_path = "audit_history.json"
+        audit_history = self._load_json(audit_history_path, default=[])
+        audit_history.append(audit_summary)
+        # Keep last 100 audit entries
+        self._save_json(audit_history_path, audit_history[-100:])
 
         logger.info(f"[EOD AUDIT] Session complete. Accuracy: {accuracy:.1f}% ({correct_predictions}/{total_predictions})")
         return audit_summary

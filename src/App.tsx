@@ -492,7 +492,7 @@ export default function App() {
                   <div>
                     <span className="text-xs text-slate-200 block font-bold font-mono uppercase">🎯 Tier 1: Cloud Run Control Plane</span>
                     <p className="text-slate-400">
-                      Your Gemini API key and Firebase credentials remain strictly server-side inside Cloud Run or authenticated via IAM Service Accounts.
+                      Your API keys and broker credentials remain strictly server-side inside Cloud Run or authenticated via IAM Service Accounts.
                     </p>
                   </div>
                   <div>

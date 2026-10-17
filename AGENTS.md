@@ -1,6 +1,6 @@
 # Alpha Engine Coding & Architecture Rules
 
-This file documents the engineering guidelines, architectural constraints, and development standards for the **Alpha Engine Hybrid Framework**. Adhere strictly to these rules code-wide to maintain system integrity, compile safety, and performance.
+This file documents the engineering guidelines, architectural constraints, and institutional development standards for the **Alpha Engine Hybrid Framework**. Adhere strictly to these rules code-wide to maintain system integrity, compile safety, low-latency execution, and regulatory compliance.
 
 ---
 
@@ -15,17 +15,18 @@ The Alpha Engine operates as a **two-tier hybrid trading platform**:
 2.  **Edge Execution Daemon (Python Edge Node):**
     *   Deployed on a preemptible/Spot **GCP Compute Engine e2-micro** in Frankfurt `europe-west3` (co-located adjacent to the IBKR Europe Hub).
     *   Runs the continuous TCP execution pipeline (`main.py` + `local_edge_node.py`).
-    *   Bridges real-time market risk, balances, and telemetry back into the system using a direct **Firestore Secure Tunnel**.
+    *   Bridges real-time market risk, balances, order telemetry, and market data back into the system using a direct **Direct TCP Bridge (`edge_bridge.py` on port 4005)** with sub-5ms socket latency.
 
 ---
 
 ## 🔌 2. Port & Execution Pipeline Constraints
 
-*   **Port 3000 Limit (Vite/Node):** Port `3000` is the ONLY externally mapped port. Never attempt to configure public exposure on other ports.
+*   **Port 3000 Limit (Vite/Node):** Port `3000` is the ONLY externally mapped HTTP/WebSocket port. Never attempt to configure public exposure on other ports.
 *   **Gateway Local Sockets:**
     *   **Port 4001 (LIVE Production):** Active connection endpoint for live execution.
     *   **Port 4002 (PAPER Simulation):** Active connection endpoint for simulation.
-    *   The user must be able to click and toggle these execution lanes instantly from the dashboard. This updates the settings state on `server.ts` and pushes a structural update directly to the Firestore collection `system_risk_state/current_state`.
+    *   **Port 4005 (Edge TCP Bridge):** Low-latency binary/JSON socket bridge connecting the Cloud Run web plane and edge daemons.
+    *   The user must be able to click and toggle execution lanes instantly from the dashboard. This updates the settings state on `server.ts` and pushes a synchronized atomic update to local risk state storage.
 
 ---
 
@@ -97,12 +98,38 @@ To support autonomous, high-depth conversational reasoning across current and fu
 1. **Root-Level Shared Catalog (`tools_registry.json`)**:
    - The tool schema registry must be stored at the root level (`tools_registry.json`) and mounted/copied into `/app/` across all container images so all current and future modules (Copilot, Trading Engine, Risk Guard, Daemons) share a unified source of truth.
    - Containers may also query `GET /api/v1/tools/registry` on the edge/control plane for cross-pod discovery.
-2. **Full-Surface Reflection (No Artificial Capping)**:
+2. **Full-Surface Dynamic Reflection (No Static Capping)**:
    - Tool schemas must be extracted dynamically by reflecting the entire official Interactive Brokers API surface (`ibapi.client.EClient` / `ConnectionManager`) and data feed adapters using Python's `inspect` module.
-   - Never restrict or hardcode tool exposure to an arbitrary subset (e.g. 5 or 15 methods). The full callable surface of inquiries, account data, contract specs, and order telemetry must be exposed.
-3. **Official Built-in Docstrings**:
+   - Never restrict or hardcode tool exposure to an arbitrary subset. The full callable surface of inquiries, account data, contract specs, and order telemetry must be exposed.
+3. **Official Vendor Docstrings & Parameter Normalization**:
    - Schema descriptions and parameter definitions must be populated directly from official IBKR docstrings and type annotations to guarantee vendor-accurate semantics.
+   - Parameters must be normalized to prevent schema validation crashes on LLM runtimes (e.g., options lists default to `[]`, symbol strings map to `Contract`, `reqId` is auto-assigned).
 4. **24-Hour Persistence & Invalidation**:
    - The reflected catalog must be cached on disk with a 24-hour TTL to ensure microsecond lookup latency during agent turns.
-   - The cache must support forced invalidation and on-demand refresh via the 4-Pillar Vault test probe.
+   - The cache must support forced invalidation and on-demand refresh via `python tools_reflector.py --force` or the 4-Pillar Vault test probe.
 
+---
+
+## 🏛️ 8. Institutional Market Data Invariant (Single Source of Truth)
+
+1. **Strictly Funded IBKR Pro Single Source of Truth**:
+   - The primary and definitive market data source for all quotes, historical bars, order book depth, news bulletins, and fundamental ratios is the funded **Interactive Brokers Pro account (`ibapi`)** accessed via the Direct TCP Bridge (`edge_bridge.py` on port 4005).
+2. **Total Ban on Retail Scrapers & Consumer APIs**:
+   - Web scraping of retail/consumer finance portals (including Yahoo Finance, Google Finance scrapers, unofficial html scraping) is strictly prohibited across all services.
+   - External institutional data feeds are permitted only for domain-specific orthogonal data not provided by IBKR (e.g. SEC EDGAR primary filings, ClinicalTrials.gov API v2, OpenFDA, and EIA energy telemetry).
+3. **Zero Synthetic / Real-State Policy**:
+   - If the Interactive Brokers Gateway or edge node is disconnected or offline, the platform MUST report the official disconnected status transparently to the user and LLM.
+   - It is strictly forbidden to invent synthetic prices, simulate fake executions, or silently fallback to consumer scrapers when live broker connectivity is interrupted.
+
+---
+
+## 🚫 9. Zero Cloud Database / Zero Firebase Invariant
+
+1. **Complete Elimination of Firebase / Firestore / Datastore**:
+   - No Firebase dependencies (`firebase`, `firebase-admin`, `firebase-tools`), configuration files (`firebase.json`, `.firebaserc`, `firestore.rules`), or remote database tunnels may exist anywhere in the codebase.
+2. **Deterministic Local Atomic Persistence**:
+   - High-Availability leader elections use atomic local file locks (`ha_leader_lock.json`) and OS PID liveliness checks.
+   - Execution transaction analysis (TCA) records into atomic local audit logs (`tca_executions.json`).
+   - Risk management parameters and open trade state persist to local atomic JSON files with direct atomic write-and-replace patterns (`.tmp` write followed by `os.replace`), eliminating race conditions, network lock contention, and cloud database billing overhead.
+3. **Direct TCP Socket Telemetry**:
+   - High-frequency communication between Cloud Run and the Frankfurt Edge VM uses direct, encrypted TCP streaming (`edge_bridge.py` port 4005) with microsecond serialization and zero cloud database middleware.

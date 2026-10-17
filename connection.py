@@ -1,5 +1,8 @@
 import threading
 import time
+import inspect
+import datetime
+from datetime import timezone
 from typing import Dict, Any, Callable, List, Optional
 # In a local system, ibapi must be installed: 'pip install ibapi'
 # We implement the exact structural blueprint required for production setup.
@@ -42,6 +45,13 @@ class ConnectionManager(EWrapper, EClient):
         self.historical_data_buffer: Dict[int, List[Dict[str, Any]]] = {}
         self.req_id_to_symbol: Dict[int, str] = {}
         self.accounts_list: List[str] = []
+        
+        # Synchronous Request-Response Handlers & Dynamic Dispatch Tracking
+        self._request_events: Dict[int, threading.Event] = {}
+        self._request_results: Dict[int, Any] = {}
+        self._tick_data: Dict[int, Dict[str, Any]] = {}
+        self.news_bulletins: List[Dict[str, Any]] = []
+        self._contract_events: Dict[int, threading.Event] = {}
         
         # Event callbacks mapped to strategic risk router
         self.on_quote_callback: Optional[Callable] = None
@@ -217,6 +227,15 @@ class ConnectionManager(EWrapper, EClient):
     def error(self, reqId: int, errorCode: int, errorString: str, advancedOrderRejectJson: str = ""):
         print(f"[GATEWAY ERROR] ReqID: {reqId} | Code: {errorCode} | Message: {errorString}")
         
+        # Signal any synchronous request waiting on this reqId
+        if hasattr(self, '_request_events') and reqId in self._request_events:
+            self._request_results[reqId] = {
+                "status": "ERROR",
+                "code": errorCode,
+                "message": errorString
+            }
+            self._request_events[reqId].set()
+        
         # IBKR Connectivity Code Handling
         if errorCode == 1100: # Connectivity between IB and TWS lost
             print("[GATEWAY ALERT] IBKR Connectivity Lost (Code 1100). Socket marked offline.")
@@ -342,16 +361,58 @@ class ConnectionManager(EWrapper, EClient):
             self.short_availability_cache[symbol]["borrow_fee_pct"] = float(value)
             print(f"[BORROW MONITOR] {symbol} Borrow Fee Rate: {value:.2f}%")
 
+    # --- REAL-TIME MARKET QUOTE & TICK CALLBACKS ---
+    def tickPrice(self, reqId: int, tickType: int, price: float, attrib: Any):
+        """Processes real-time market data ticks from IBKR NBBO tape."""
+        if reqId not in self._tick_data:
+            self._tick_data[reqId] = {}
+        type_names = {1: "bid", 2: "ask", 4: "last", 6: "high", 7: "low", 9: "close"}
+        tname = type_names.get(tickType, f"tick_{tickType}")
+        self._tick_data[reqId][tname] = float(price)
+        if self.on_quote_callback:
+            sym = self.req_id_to_symbol.get(reqId, "UNKNOWN")
+            self.on_quote_callback(sym, tickType, price)
+
+    def tickSize(self, reqId: int, tickType: int, size: Any):
+        """Processes real-time market size ticks from IBKR."""
+        if reqId not in self._tick_data:
+            self._tick_data[reqId] = {}
+        type_names = {0: "bid_size", 3: "ask_size", 5: "last_size", 8: "volume"}
+        tname = type_names.get(tickType, f"size_{tickType}")
+        try:
+            self._tick_data[reqId][tname] = float(size)
+        except (ValueError, TypeError):
+            pass
+
+    def tickSnapshotEnd(self, reqId: int):
+        """Fires when snapshot market data collection is finalized."""
+        if hasattr(self, '_request_events') and reqId in self._request_events:
+            self._request_results[reqId] = self._tick_data.get(reqId, {})
+            self._request_events[reqId].set()
+
     # --- FUNDAMENTAL CORPORATE & EARNINGS CALENDAR CALLBACKS ---
     def fundamentalData(self, reqId: int, data: str):
         """Ingests institutional Reuters corporate event/earnings calendar XML from IBKR."""
         symbol = self.req_id_to_symbol.get(reqId, "UNKNOWN")
         self.fundamental_data_cache[symbol] = data
+        if hasattr(self, '_request_events') and reqId in self._request_events:
+            self._request_results[reqId] = data
+            self._request_events[reqId].set()
         print(f"[EARNINGS/EVENT CALENDAR RECEIVED] {symbol}: Received {len(data)} bytes of structured event disclosures.")
 
     # --- NEWS & REGULATORY BULLETINS CALLBACKS ---
     def newsBulletin(self, msgId: int, msgType: int, message: str, origExchange: str):
         """Receives live broker news bulletins, regulatory notices, and exchange alerts."""
+        bulletin = {
+            "msgId": msgId,
+            "msgType": msgType,
+            "message": message,
+            "origExchange": origExchange,
+            "timestamp": time.time()
+        }
+        self.news_bulletins.append(bulletin)
+        if len(self.news_bulletins) > 100:
+            self.news_bulletins = self.news_bulletins[-100:]
         print(f"[IBKR NEWS BULLETIN] ID:{msgId} Type:{msgType} Exch:{origExchange} Msg:{message[:80]}...")
         if hasattr(self, 'on_news_bulletin_callback') and self.on_news_bulletin_callback:
             self.on_news_bulletin_callback(msgId, msgType, message, origExchange)
@@ -471,8 +532,199 @@ class ConnectionManager(EWrapper, EClient):
 
     def historicalDataEnd(self, reqId: int, start: str, end: str):
         print(f"[HISTORICAL END] ReqID: {reqId} | Completed download {start} to {end}")
+        if hasattr(self, '_request_events') and reqId in self._request_events:
+            self._request_results[reqId] = self.historical_data_buffer.get(reqId, [])
+            self._request_events[reqId].set()
         if self.on_historical_data_complete_callback:
             self.on_historical_data_complete_callback(reqId, self.historical_data_buffer.get(reqId, []))
+
+    def execute_synchronous_request(self, method_name: str, arguments: Dict[str, Any], timeout: float = 4.0) -> Dict[str, Any]:
+        """
+        Universal Synchronous Dispatcher for Interactive Brokers Pro API.
+        Enables synchronous request/response across asynchronous EWrapper callbacks.
+        Zero Synthetic Policy: strictly reports actual broker responses or clear offline status.
+        """
+        if not self.is_connected:
+            return {
+                "status": "GATEWAY_OFFLINE",
+                "connected": False,
+                "message": f"Interactive Brokers Gateway on port {self._port} is offline. Live market data and quotes are unavailable until gateway socket is connected.",
+                "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+            }
+
+        # Auto-allocate thread-safe unique reqId
+        import random
+        req_id = arguments.get("reqId") or arguments.get("tickerId") or random.randint(20000, 89999)
+        arguments["reqId"] = req_id
+
+        # Normalize symbol / contract
+        symbol = arguments.get("symbol")
+        contract = arguments.get("contract")
+        if isinstance(contract, str):
+            symbol = contract
+            contract = self.create_contract(contract)
+            arguments["contract"] = contract
+        elif not contract and symbol:
+            contract = self.create_contract(symbol)
+            arguments["contract"] = contract
+
+        if symbol:
+            self.req_id_to_symbol[req_id] = symbol.upper().strip()
+
+        event = threading.Event()
+        self._request_events[req_id] = event
+        self._request_results.pop(req_id, None)
+
+        try:
+            # 1. Historical Candlesticks / Official Closes
+            if method_name in ["reqHistoricalData", "get_market_quote", "get_historical_bars"]:
+                dur = arguments.get("durationStr", "5 D")
+                barsize = arguments.get("barSizeSetting", "1 day")
+                what = arguments.get("whatToShow", "TRADES")
+                use_rth = int(arguments.get("useRTH", 1))
+                fmt_date = int(arguments.get("formatDate", 1))
+                keep_up = bool(arguments.get("keepUpToDate", False))
+                chart_opts = arguments.get("chartOptions", [])
+
+                self.historical_data_buffer[req_id] = []
+                self.reqHistoricalData(req_id, contract, "", dur, barsize, what, use_rth, fmt_date, keep_up, chart_opts)
+                event.wait(timeout)
+
+                res = self._request_results.get(req_id)
+                if isinstance(res, dict) and res.get("status") == "ERROR":
+                    return res
+
+                bars = self.historical_data_buffer.get(req_id, [])
+                if bars:
+                    latest = bars[-1]
+                    prior = bars[-2] if len(bars) > 1 else latest
+                    l_close = latest.get("close", 0.0)
+                    p_close = prior.get("close", 0.0)
+                    chg = round(l_close - p_close, 2)
+                    chg_pct = round((chg / p_close) * 100, 2) if p_close else 0.0
+                    return {
+                        "status": "SUCCESS",
+                        "symbol": symbol or getattr(contract, "symbol", "UNKNOWN"),
+                        "latest_closing_price": l_close,
+                        "previous_close": p_close,
+                        "change": chg,
+                        "change_percent": f"{chg_pct:+.2f}%",
+                        "recent_5day_closes": [b.get("close") for b in bars[-5:]],
+                        "bars": bars[-5:],
+                        "source": "Interactive Brokers Pro Official Tape",
+                        "verified_at": datetime.datetime.now(timezone.utc).isoformat()
+                    }
+                else:
+                    return {
+                        "status": "NO_DATA",
+                        "symbol": symbol,
+                        "message": "IBKR returned empty historical bars for requested symbol/exchange.",
+                        "source": "Interactive Brokers Pro Official Tape"
+                    }
+
+            # 2. Real-Time Snapshot Quotes (NBBO Tape)
+            elif method_name in ["reqMktData", "get_quote_snapshot"]:
+                self._tick_data[req_id] = {}
+                self.reqMktData(req_id, contract, "", True, False, [])
+                event.wait(timeout)
+                ticks = self._tick_data.get(req_id, {})
+                last_p = ticks.get("last") or ticks.get("close")
+                return {
+                    "status": "SUCCESS",
+                    "symbol": symbol,
+                    "ticks": ticks,
+                    "last_price": last_p,
+                    "bid": ticks.get("bid"),
+                    "ask": ticks.get("ask"),
+                    "source": "Interactive Brokers Pro Official NBBO Tape",
+                    "verified_at": datetime.datetime.now(timezone.utc).isoformat()
+                }
+
+            # 3. Fundamental Corporate & Reuters Financial Disclosures
+            elif method_name == "reqFundamentalData":
+                report_type = arguments.get("reportType", "ReportSnapshot")
+                self.reqFundamentalData(req_id, contract, report_type, [])
+                event.wait(timeout)
+                data = self._request_results.get(req_id)
+                return {
+                    "status": "SUCCESS" if data else "TIMEOUT",
+                    "symbol": symbol,
+                    "report_type": report_type,
+                    "data": data or "",
+                    "source": "Interactive Brokers Pro Reuters/FactSet Data"
+                }
+
+            # 4. News Bulletins
+            elif method_name == "reqNewsBulletins":
+                return {
+                    "status": "SUCCESS",
+                    "bulletins": self.news_bulletins,
+                    "source": "Interactive Brokers Broker Bulletins"
+                }
+
+            # 5. Contract Resolution
+            elif method_name == "reqContractDetails":
+                details = self.resolve_contract_details_blocking(contract, timeout=timeout)
+                return {
+                    "status": "SUCCESS" if details else "NOT_FOUND",
+                    "contract_details": details,
+                    "source": "Interactive Brokers Contract Directory"
+                }
+
+            # 6. Positions & Account
+            elif method_name in ["reqPositions", "get_positions"]:
+                return {
+                    "status": "SUCCESS",
+                    "connected": True,
+                    "positions_count": len(self.active_positions),
+                    "positions": self.active_positions,
+                    "source": "Interactive Brokers Live Portfolio"
+                }
+
+            elif method_name in ["reqAccountSummary", "get_account_summary"]:
+                return {
+                    "status": "SUCCESS",
+                    "connected": True,
+                    "account_summary": self.account_summary,
+                    "accounts": self.accounts_list,
+                    "source": "Interactive Brokers Account Registry"
+                }
+
+            # Generic method execution on EClient
+            else:
+                method = getattr(self, method_name, None)
+                if not method or not callable(method):
+                    return {
+                        "status": "UNKNOWN_METHOD",
+                        "message": f"Method {method_name} is not available on ConnectionManager or EClient."
+                    }
+                sig = inspect.signature(method)
+                call_args = {}
+                for p_name, param in sig.parameters.items():
+                    if p_name in ("self", "args", "kwargs"):
+                        continue
+                    if p_name in arguments:
+                        call_args[p_name] = arguments[p_name]
+                    elif p_name in ["chartOptions", "mktDataOptions", "scannerSubscriptionFilterOptions"]:
+                        call_args[p_name] = []
+                    elif p_name == "contract" and "symbol" in arguments:
+                        call_args["contract"] = self.create_contract(arguments["symbol"])
+                res = method(**call_args)
+                return {
+                    "status": "SUCCESS",
+                    "method": method_name,
+                    "result": str(res) if res is not None else "Dispatched to IBKR EClient.",
+                    "source": "Interactive Brokers Official API"
+                }
+
+        except Exception as e:
+            return {
+                "status": "EXECUTION_ERROR",
+                "method": method_name,
+                "error": str(e)
+            }
+        finally:
+            self._request_events.pop(req_id, None)
 
     def dispatch_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -480,76 +732,5 @@ class ConnectionManager(EWrapper, EClient):
         Directly executes reflected EClient methods or queries institutional caches.
         Zero Synthetic Policy: Never returns mock or simulated confirmations.
         """
-        name = tool_name.strip()
-        name_lower = name.lower()
-
-        # 1. State & Telemetry Inquiries
-        if name_lower in ["reqpositions", "get_positions", "reqpositionsmulti"]:
-            return {
-                "status": "SUCCESS",
-                "connected": self.is_connected,
-                "positions_count": len(self.active_positions),
-                "positions": self.active_positions,
-                "trading_mode": self.trading_mode
-            }
-
-        elif name_lower in ["reqaccountsummary", "get_account_summary", "reqaccountupdates"]:
-            if not self.is_connected:
-                return {
-                    "status": "GATEWAY_OFFLINE",
-                    "code": 504,
-                    "message": "IBKR Gateway connection inactive on socket 4001/4002.",
-                    "account_summary": self.account_summary
-                }
-            return {
-                "status": "SUCCESS",
-                "connected": True,
-                "account_summary": self.account_summary,
-                "accounts": self.accounts_list
-            }
-
-        elif name_lower in ["reqpnl", "get_pnl"]:
-            return {
-                "status": "SUCCESS",
-                "pnl": self.pnl_updates,
-                "connected": self.is_connected
-            }
-
-        elif name_lower in ["reqopenorders", "reqallopenorders", "reqautoopenorders"]:
-            return {
-                "status": "SUCCESS",
-                "connected": self.is_connected,
-                "open_orders": getattr(self, "open_orders", {})
-            }
-
-        # 2. Direct Callable Method Execution on official EClient surface
-        if hasattr(self, name) and callable(getattr(self, name)):
-            method = getattr(self, name)
-            if not self.is_connected:
-                return {
-                    "status": "GATEWAY_OFFLINE",
-                    "code": 504,
-                    "tool": name,
-                    "error": f"Cannot execute {name}: IBKR Gateway is not connected."
-                }
-            try:
-                res = method(**arguments)
-                return {
-                    "status": "TRANSMITTED",
-                    "tool": name,
-                    "args": arguments,
-                    "result": str(res) if res is not None else "Request transmitted to IBKR Gateway."
-                }
-            except Exception as e:
-                return {
-                    "status": "EXECUTION_ERROR",
-                    "tool": name,
-                    "error": str(e)
-                }
-
-        return {
-            "status": "UNKNOWN_METHOD",
-            "tool": name,
-            "error": f"Method {name} is not recognized on ConnectionManager or EClient."
-        }
+        return self.execute_synchronous_request(tool_name, arguments)
 

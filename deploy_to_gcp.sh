@@ -15,42 +15,18 @@ echo "======================================================================"
 echo "          ALPHA ENGINE SYSTEM PROVIONER - GOOGLE CLOUD PLATFORM  "
 echo "======================================================================"
 
-# 1. Look for Firebase Credentials to feed the edge tunnel automatically
-CONFIG_FILE="firebase-applet-config.json"
-FIREBASE_PROJECT=""
-FIREBASE_KEY=""
-
-if [ -f "$CONFIG_FILE" ]; then
-    echo "[SYNC] Found local workspace Firebase config file."
-    # Use python to extract values safely
-    FIREBASE_PROJECT=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('projectId', ''))" 2>/dev/null || true)
-    FIREBASE_KEY=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('apiKey', ''))" 2>/dev/null || true)
+# 1. Project Context Resolution
+GCP_PROJECT=$(gcloud config get-value project 2>/dev/null || true)
+if [ -z "$GCP_PROJECT" ]; then
+    read -p "Enter Google Cloud Project ID: " GCP_PROJECT
 fi
 
-# Fallback prompts if blank
-if [ -z "$FIREBASE_PROJECT" ]; then
-    # Parse project ID from .firebaserc natively if it exists
-    if [ -f ".firebaserc" ]; then
-        FIREBASE_PROJECT=$(grep '"default"' .firebaserc | cut -d '"' -f 4)
-        echo "[SYNC] Extracted GCP project from .firebaserc: $FIREBASE_PROJECT"
-    else
-        ACTIVE_PROJECT=$(gcloud config get-value project 2>/dev/null || true)
-        if [ -n "$ACTIVE_PROJECT" ]; then
-            echo "[GCLOUD] Auto-detected active GCP project from environment: $ACTIVE_PROJECT"
-            FIREBASE_PROJECT="$ACTIVE_PROJECT"
-        else
-            read -p "Enter Google Cloud Project ID: " FIREBASE_PROJECT
-        fi
-    fi
-fi
+echo "[GCLOUD] Registering context to target project: $GCP_PROJECT"
+gcloud config set project "$GCP_PROJECT" --quiet
 
-# Verify active project registration
-echo "[GCLOUD] Registering context to target project: $FIREBASE_PROJECT"
-gcloud config set project "$FIREBASE_PROJECT" --quiet
-
-# Enable required Google Cloud services automatically
-echo "[GCLOUD] Ensuring necessary Cloud APIs are fully enabled (Firestore & Vertex AI & Secret Manager)..."
-gcloud services enable firestore.googleapis.com aiplatform.googleapis.com secretmanager.googleapis.com --quiet
+# Enable required Google Cloud services automatically (Zero Firestore Architecture)
+echo "[GCLOUD] Ensuring necessary Cloud APIs are enabled (Vertex AI, Secret Manager, Compute)..."
+gcloud services enable aiplatform.googleapis.com secretmanager.googleapis.com compute.googleapis.com --quiet
 
 # 2. Spin up the Standard VM Instance in europe-west3 (Frankfurt, nearest to IBKR Europe)
 ZONE="europe-west3-a"
@@ -85,8 +61,6 @@ MAX_ACTIVE_INSTRUMENTS=3
 ALLOW_LIVE_TRADING=false
 MIFID2_DECISION_MAKER_ID="ALGO_DEC_992"
 MIFID2_EXECUTION_TRADER_ID="ALGO_EXE_554"
-FIREBASE_PROJECT_ID="$FIREBASE_PROJECT"
-FIREBASE_API_KEY="$FIREBASE_KEY"
 ENV
 
 if gcloud secrets describe alpha-engine-env >/dev/null 2>&1; then
@@ -170,7 +144,7 @@ sudo systemctl restart alpha-engine.service
 
 echo "--------------------------------------------------------"
 echo "VM EDGE NODE SUCCESSFULLY DEPLOYED AND DAEMONIZED!"
-echo "Status: Active & monitoring Firestore queues in Frankfurt"
+echo "Status: Active & executing via Direct TCP Bridge in Frankfurt"
 echo "--------------------------------------------------------"
 EOF
 

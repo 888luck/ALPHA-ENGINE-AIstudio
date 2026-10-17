@@ -24,9 +24,6 @@ def load_config():
         "MIFID2_DECISION_MAKER_ID": os.getenv("MIFID2_DECISION_MAKER_ID", "ALGO_DEC_992"),
         "MIFID2_EXECUTION_TRADER_ID": os.getenv("MIFID2_EXECUTION_TRADER_ID", "ALGO_EXE_554"),
         
-        # FireStore Database Credentials when run in hybrid/prod mode
-        "FIREBASE_PROJECT_ID": os.getenv("FIREBASE_PROJECT_ID", ""),
-        
         # Dynamic Multi-Agent & Instrument Focus Pool Controls
         "MAX_ACTIVE_INSTRUMENTS": int(os.getenv("MAX_ACTIVE_INSTRUMENTS", "3")),
         "ALLOW_LIVE_TRADING": os.getenv("ALLOW_LIVE_TRADING", "false").lower() in ["true", "1", "yes"],

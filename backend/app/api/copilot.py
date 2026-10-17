@@ -296,53 +296,104 @@ def load_tools_registry() -> List[Dict[str, Any]]:
 # =============================================================================
 # TOOL REGISTRY IMPLEMENTATION & DISPATCHER
 # =============================================================================
+def query_edge_tcp_bridge(payload: Dict[str, Any], timeout: float = 3.0) -> Dict[str, Any]:
+    """Sends command over direct TCP socket (port 4005) to the Frankfurt GCE / local edge node."""
+    edge_host = os.environ.get("EDGE_NODE_IP") or os.environ.get("IBKR_HOST", "127.0.0.1")
+    edge_port = int(os.environ.get("EDGE_TCP_PORT", 4005))
+    auth_token = os.environ.get("EDGE_AUTH_TOKEN", "ALPHA_EDGE_SECRET_2026")
+    
+    full_payload = {**payload, "token": auth_token, "timestamp": time.time()}
+    try:
+        import socket
+        with socket.create_connection((edge_host, edge_port), timeout=timeout) as s:
+            s.settimeout(timeout)
+            s.sendall((json.dumps(full_payload) + "\n").encode("utf-8"))
+            buffer = ""
+            while "\n" not in buffer:
+                chunk = s.recv(4096)
+                if not chunk:
+                    break
+                buffer += chunk.decode("utf-8")
+            if "\n" in buffer:
+                line = buffer.split("\n", 1)[0].strip()
+                res = json.loads(line)
+                if res.get("status") == "OK" and "result" in res:
+                    return res["result"]
+                return res
+    except Exception as e:
+        logger.debug("Edge TCP Bridge query notice (%s:%s): %s", edge_host, edge_port, e)
+    return {"status": "OFFLINE", "message": f"Edge TCP Bridge at {edge_host}:{edge_port} offline."}
+
 class CopilotTools:
     """Institutional execution adapters providing broker & regulatory intelligence."""
     
     @staticmethod
     def get_market_quote(symbol: str = "EMR") -> Dict[str, Any]:
-        """Queries real-time market quote, latest closing price, and historical bars."""
+        """Queries official market quote and closing prices directly through funded IBKR Pro."""
         sym = (symbol or "EMR").upper().strip()
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?interval=1d&range=5d"
+        
+        # 1. Query live IBKR Pro socket via Direct TCP Bridge (Port 4005)
+        bridge_res = query_edge_tcp_bridge({
+            "action": "GET_QUOTE",
+            "symbol": sym,
+            "args": {"symbol": sym, "durationStr": "5 D", "barSizeSetting": "1 day"}
+        })
+        if isinstance(bridge_res, dict) and bridge_res.get("status") == "SUCCESS":
+            return bridge_res
+            
+        # 2. In-process ConnectionManager fallback if running on the edge node host
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                res = data.get("chart", {}).get("result", [{}])[0]
-                meta = res.get("meta", {})
-                regular_price = meta.get("regularMarketPrice")
-                prev_close = meta.get("chartPreviousClose") or meta.get("previousClose")
-                quotes = res.get("indicators", {}).get("quote", [{}])[0]
-                closes = [round(c, 2) for c in quotes.get("close", []) if c is not None]
-                latest_close = closes[-1] if closes else regular_price
-                prior_close = closes[-2] if len(closes) > 1 else prev_close
-                change = round(latest_close - prior_close, 2) if (latest_close and prior_close) else 0.0
-                change_pct = round((change / prior_close) * 100, 2) if (change and prior_close) else 0.0
-                return {
-                    "status": "SUCCESS",
-                    "symbol": sym,
-                    "company_name": meta.get("shortName") or meta.get("longName") or sym,
-                    "latest_closing_price": latest_close,
-                    "previous_close": prior_close,
-                    "regular_market_price": regular_price,
-                    "change": change,
-                    "change_percent": f"{change_pct:+.2f}%",
-                    "currency": meta.get("currency", "USD"),
-                    "exchange": meta.get("exchangeName", "NYSE"),
-                    "recent_5day_closes": closes[-5:],
-                    "source": "Institutional Market Data Feed",
-                    "verified_at": datetime.now(timezone.utc).isoformat()
-                }
-        except Exception as e:
-            return {
-                "status": "SUCCESS",
-                "symbol": sym,
-                "latest_closing_price": 161.47 if sym == "EMR" else 100.0,
-                "previous_close": 162.15 if sym == "EMR" else 100.0,
-                "currency": "USD",
-                "notice": f"Primary market feed fallback active ({e})",
-                "verified_at": datetime.now(timezone.utc).isoformat()
-            }
+            from connection import ConnectionManager
+            cm = ConnectionManager()
+            if getattr(cm, "is_connected", False):
+                return cm.execute_synchronous_request("reqHistoricalData", {"symbol": sym, "durationStr": "5 D", "barSizeSetting": "1 day"})
+        except Exception:
+            pass
+
+        # 3. Report verified broker status under Zero Synthetic Policy
+        return {
+            "status": "GATEWAY_OFFLINE",
+            "symbol": sym,
+            "notice": "Interactive Brokers Gateway on port 4001/4002 is offline. Under the Zero Synthetic Policy, synthetic retail prices are prohibited. Please start the edge node or connect the IB Gateway.",
+            "source": "Interactive Brokers Official API (ibapi.client.EClient)",
+            "verified_at": datetime.now(timezone.utc).isoformat()
+        }
+
+    @staticmethod
+    def get_company_fundamentals(symbol: str = "EMR", report_type: str = "ReportSnapshot") -> Dict[str, Any]:
+        """Queries official Reuters / FactSet corporate fundamentals directly through funded IBKR Pro."""
+        sym = (symbol or "EMR").upper().strip()
+        bridge_res = query_edge_tcp_bridge({
+            "action": "DISPATCH_IBKR",
+            "method": "reqFundamentalData",
+            "args": {"symbol": sym, "reportType": report_type}
+        })
+        if isinstance(bridge_res, dict) and bridge_res.get("status") == "SUCCESS":
+            return bridge_res
+        return {
+            "status": "GATEWAY_OFFLINE",
+            "symbol": sym,
+            "notice": "IBKR Gateway is offline. Reuters fundamentals are available when gateway is connected.",
+            "source": "Interactive Brokers Official API (reqFundamentalData)",
+            "verified_at": datetime.now(timezone.utc).isoformat()
+        }
+
+    @staticmethod
+    def get_broker_news() -> Dict[str, Any]:
+        """Queries official IBKR broker bulletins and regulatory trading halts."""
+        bridge_res = query_edge_tcp_bridge({
+            "action": "DISPATCH_IBKR",
+            "method": "reqNewsBulletins",
+            "args": {}
+        })
+        if isinstance(bridge_res, dict) and bridge_res.get("status") == "SUCCESS":
+            return bridge_res
+        return {
+            "status": "GATEWAY_OFFLINE",
+            "notice": "IBKR Gateway is offline. Live bulletins require connected gateway socket.",
+            "source": "Interactive Brokers Official API (reqNewsBulletins)",
+            "verified_at": datetime.now(timezone.utc).isoformat()
+        }
 
     @staticmethod
     def get_positions() -> Dict[str, Any]:
@@ -578,24 +629,43 @@ def execute_tool_call(tool_name: str, tool_args: Dict[str, Any]) -> Dict[str, An
                 drug_name=tool_args.get("drug_name", ""),
                 limit=tool_args.get("limit", 5)
             )
+        elif name in ["get_company_fundamentals", "reqfundamentaldata"]:
+            sym = tool_args.get("symbol") or tool_args.get("ticker") or "EMR"
+            rtype = tool_args.get("report_type") or tool_args.get("reportType") or "ReportSnapshot"
+            return CopilotTools.get_company_fundamentals(str(sym), str(rtype))
+        elif name in ["get_broker_news", "reqnewsbulletins"]:
+            return CopilotTools.get_broker_news()
         elif name in ["get_energy_telemetry"]:
             return CopilotTools.get_energy_telemetry(
                 commodity=tool_args.get("commodity", "natural_gas")
             )
         else:
-            # Full Reflection Dispatcher: Route method directly through ConnectionManager
+            # Full Reflection Dispatcher: Query Edge TCP Bridge on port 4005
+            bridge_resp = query_edge_tcp_bridge({
+                "action": "DISPATCH_IBKR",
+                "method": tool_name,
+                "args": tool_args
+            })
+            if isinstance(bridge_resp, dict) and bridge_resp.get("status") in ["SUCCESS", "OK"]:
+                return bridge_resp
+                
+            # Fallback to local in-process ConnectionManager if running locally
             try:
                 from connection import ConnectionManager
                 cm = ConnectionManager()
-                return cm.dispatch_tool_call(tool_name, tool_args)
-            except Exception as ex:
-                return {
-                    "status": "GATEWAY_OFFLINE",
-                    "code": 504,
-                    "tool": tool_name,
-                    "args": tool_args,
-                    "error": f"Failed dispatching to IBKR Gateway: {ex}"
-                }
+                if getattr(cm, "is_connected", False):
+                    return cm.dispatch_tool_call(tool_name, tool_args)
+            except Exception:
+                pass
+
+            return {
+                "status": "GATEWAY_OFFLINE",
+                "code": 504,
+                "tool": tool_name,
+                "args": tool_args,
+                "notice": "Interactive Brokers Gateway is offline or unreachable on port 4001/4002. Under the Zero Synthetic Policy, simulated fills and mock pricing are strictly prohibited.",
+                "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+            }
     except Exception as e:
         logger.error("Error executing tool %s: %s", tool_name, e)
         return {"status": "ERROR", "tool": tool_name, "error": str(e)}

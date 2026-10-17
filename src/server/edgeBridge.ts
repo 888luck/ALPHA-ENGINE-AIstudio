@@ -7,9 +7,12 @@ import net from "net";
  */
 
 export interface EdgeCommandPayload {
-  action: "PING" | "SUBMIT_ORDER" | "EMERGENCY_FLUSH" | "UPDATE_SETTINGS" | "GET_TELEMETRY";
+  action: "PING" | "SUBMIT_ORDER" | "EMERGENCY_FLUSH" | "UPDATE_SETTINGS" | "GET_TELEMETRY" | "DISPATCH_IBKR" | "GET_QUOTE" | "GET_HISTORICAL_BARS" | "GET_FUNDAMENTALS";
   token?: string;
   timestamp?: number;
+  method?: string;
+  args?: Record<string, any>;
+  symbol?: string;
   [key: string]: any;
 }
 
@@ -144,12 +147,25 @@ export class EdgeBridgeClient {
   }
 
   /**
-   * Queries real-time positions, telemetry, and execution state from the Frankfurt edge node.
+   * Dispatches any official IBKR inquiry or command directly to the edge daemon.
    */
-  public async getTelemetry(): Promise<any> {
+  public async dispatchIbkr(method: string, args: Record<string, any> = {}, timeoutMs: number = 4000): Promise<any> {
     return this.sendCommand({
-      action: "GET_TELEMETRY",
-    });
+      action: "DISPATCH_IBKR",
+      method,
+      args
+    }, timeoutMs);
+  }
+
+  /**
+   * Queries official closing price, NBBO, and 5-day candlestick history from IBKR.
+   */
+  public async getMarketQuote(symbol: string, timeoutMs: number = 4000): Promise<any> {
+    return this.sendCommand({
+      action: "GET_QUOTE",
+      symbol,
+      args: { symbol, durationStr: "5 D", barSizeSetting: "1 day" }
+    }, timeoutMs);
   }
 }
 

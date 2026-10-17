@@ -1,8 +1,9 @@
 """
 AlphaEngine Cross-Container Tool Catalog & Full API Reflection Engine.
-Reflects the unconstrained official Interactive Brokers API surface (ibapi.client.EClient / ConnectionManager)
+Dynamically reflects the official Interactive Brokers API surface (ibapi.client.EClient / ConnectionManager)
 and institutional data feed adapters using Python's inspect module.
 Outputs standardized JSON Schemas with official vendor docstrings into tools_registry.json with 24h TTL.
+Institutional Invariant: Zero hardcoded method names; full-surface reflection.
 """
 
 import os
@@ -24,75 +25,37 @@ if BASE_DIR not in sys.path:
 REGISTRY_PATH_ROOT = os.path.join(BASE_DIR, "tools_registry.json")
 REGISTRY_PATH_STUDIO = os.path.join(STUDIO_DIR, "tools_registry.json")
 
-# Core IBKR EClient inquiry & operational methods to reflect
-IBKR_CALLABLE_METHODS = [
-    # Account & Portfolio Inquiries
-    "reqAccountSummary",
-    "cancelAccountSummary",
-    "reqAccountUpdates",
-    "reqPositions",
-    "cancelPositions",
-    "reqPositionsMulti",
-    "cancelPositionsMulti",
-    "reqPnL",
-    "cancelPnL",
-    "reqPnLSingle",
-    "cancelPnLSingle",
-    "reqManagedAccts",
-    
-    # Contract Resolution & Specs
-    "reqContractDetails",
-    "reqMatchingSymbols",
-    "reqSecDefOptParams",
-    
-    # Market Data & Depth
-    "reqMktData",
-    "cancelMktData",
-    "reqMarketDataType",
-    "reqMktDepth",
-    "cancelMktDepth",
-    "reqHistogramData",
-    "cancelHistogramData",
-    "reqHistoricalData",
-    "cancelHistoricalData",
-    "reqHeadTimeStamp",
-    "cancelHeadTimeStamp",
-    "calculateImpliedVolatility",
-    "calculateOptionPrice",
-    "cancelCalculateImpliedVolatility",
-    "cancelCalculateOptionPrice",
-    
-    # Orders, Trades & Executions
-    "reqOpenOrders",
-    "reqAllOpenOrders",
-    "reqAutoOpenOrders",
-    "placeOrder",
-    "cancelOrder",
-    "reqGlobalCancel",
-    "reqIds",
-    "reqExecutions",
-    
-    # News, Bulletins & Fundamentals
-    "reqNewsBulletins",
-    "cancelNewsBulletins",
-    "reqNewsProviders",
-    "reqHistoricalNews",
-    "reqNewsArticle",
-    "reqFundamentalData",
-    "cancelFundamentalData",
-    "reqCurrentTime",
-    
-    # Market Scanners
-    "reqScannerParameters",
-    "reqScannerSubscription",
-    "cancelScannerSubscription"
-]
+# Transport / loop internals not exposed as callable trading or inquiry tools
+IGNORED_METHODS = {
+    "connect", "disconnect", "isConnected", "run", "reset", "sendMsg", 
+    "startApi", "msgLoopRec", "msgLoopTmo", "keyboardInterrupt", 
+    "keyboardInterruptHard", "logRequest", "setConnState", 
+    "verifyAndAuthMessage", "verifyAndAuthRequest", "verifyMessage", 
+    "verifyRequest", "twsConnectionTime", "serverVersion", "setConnectionOptions",
+    "decoder", "wrapper"
+}
+
+def categorize_method(m_name: str) -> str:
+    """Categorize broker API methods dynamically based on function semantics."""
+    m_lower = m_name.lower()
+    if any(k in m_lower for k in ["mkt", "historical", "histogram", "volatility", "tick", "bar", "price", "headtimestamp"]):
+        return "broker_market_data"
+    elif any(k in m_lower for k in ["order", "execution", "ids", "place"]):
+        return "broker_orders"
+    elif any(k in m_lower for k in ["account", "position", "pnl", "managed", "family", "fa"]):
+        return "broker_account"
+    elif any(k in m_lower for k in ["news", "fundamental", "bulletin", "article"]):
+        return "broker_news"
+    elif any(k in m_lower for k in ["contract", "secdef", "matching", "rule"]):
+        return "broker_contract"
+    elif "scanner" in m_lower:
+        return "broker_scanner"
+    return "broker_operations"
 
 def map_python_type_to_json_schema(annotation: Any, param_name: str) -> Dict[str, Any]:
-    """Map python type annotations or name conventions to JSON schema types."""
+    """Map python type annotations or name conventions to standardized JSON schema types."""
     name_lower = param_name.lower()
     
-    # Name-based heuristic fallbacks if annotation is empty
     if annotation == inspect.Parameter.empty or annotation is None:
         if any(k in name_lower for k in ["id", "num", "rows", "time", "date_format", "rth", "snapshot"]):
             return {"type": "integer"}
@@ -103,7 +66,7 @@ def map_python_type_to_json_schema(annotation: Any, param_name: str) -> Dict[str
         elif any(k in name_lower for k in ["list", "tags", "options", "array"]):
             return {"type": "array", "items": {"type": "string"}}
         elif any(k in name_lower for k in ["contract", "order", "filter", "subscription"]):
-            return {"type": "object"}
+            return {"type": "string"}
         return {"type": "string"}
         
     if annotation in (int,):
@@ -121,7 +84,7 @@ def map_python_type_to_json_schema(annotation: Any, param_name: str) -> Dict[str
     return {"type": "string"}
 
 def extract_method_schema(cls_obj: Any, method_name: str, category: str, default_desc: str = "") -> Optional[Dict[str, Any]]:
-    """Reflect method signature, official docstring, and argument schemas."""
+    """Reflect method signature, official vendor docstring, and normalized argument schemas."""
     if not hasattr(cls_obj, method_name):
         return None
         
@@ -147,15 +110,56 @@ def extract_method_schema(cls_obj: Any, method_name: str, category: str, default
                     if line.strip().startswith(f"{name}:"):
                         param_desc = line.strip().split(":", 1)[1].strip()
                         break
+            
+            name_lower = name.lower()
+            
+            # Specialized schema enhancements for LLM and Broker interoperability
+            if name == "contract":
+                param_desc = "Stock symbol (e.g. 'NVDA', 'AAPL', 'EUR') or IBKR Contract specification dictionary."
+                p_schema["type"] = "string"
+            elif name in ("reqId", "tickerId"):
+                param_desc = "Unique request ID. If omitted, Alpha Engine will automatically assign a thread-safe atomic reqId."
+            elif name_lower.endswith("options") or name_lower.endswith("list") or name in ("chartOptions", "mktDataOptions", "scannerSubscriptionFilterOptions"):
+                p_schema["type"] = "array"
+                p_schema["items"] = {"type": "string"}
+                p_schema["default"] = []
+                param_desc = f"Optional broker {name} array (defaults to empty list)."
+            
             p_schema["description"] = param_desc
             
-            if param.default is inspect.Parameter.empty:
-                required.append(name)
+            # Determine if argument is strictly required or can be safely defaulted
+            is_optional = (
+                param.default is not inspect.Parameter.empty or
+                name in ("reqId", "tickerId", "endDateTime", "keepUpToDate", "useRTH", "formatDate", 
+                         "whatToShow", "snapshot", "regulatorySnapshot", "genericTickList") or
+                name_lower.endswith("options") or
+                name_lower.endswith("list")
+            )
+            
+            if is_optional:
+                if param.default is not inspect.Parameter.empty:
+                    p_schema["default"] = str(param.default) if not isinstance(param.default, (int, float, bool)) else param.default
+                elif name == "useRTH":
+                    p_schema["default"] = 1
+                elif name == "formatDate":
+                    p_schema["default"] = 1
+                elif name == "keepUpToDate":
+                    p_schema["default"] = False
+                elif name == "whatToShow":
+                    p_schema["default"] = "TRADES"
+                elif name == "snapshot":
+                    p_schema["default"] = True
+                elif name == "regulatorySnapshot":
+                    p_schema["default"] = False
+                elif name == "genericTickList":
+                    p_schema["default"] = ""
+                elif name == "endDateTime":
+                    p_schema["default"] = ""
             else:
-                p_schema["default"] = str(param.default) if not isinstance(param.default, (int, float, bool)) else param.default
+                required.append(name)
                 
             properties[name] = p_schema
-    except Exception as e:
+    except Exception:
         properties = {"args": {"type": "object", "description": f"Dynamic arguments for {method_name}"}}
         
     return {
@@ -268,10 +272,10 @@ def reflect_institutional_feed_tools() -> List[Dict[str, Any]]:
     return feed_tools
 
 def build_full_tools_catalog() -> Dict[str, Any]:
-    """Inspects EClient, ConnectionManager, and adapters to build the unified catalog."""
+    """Dynamically inspects EClient, ConnectionManager, and adapters to build the unified catalog."""
     tools: List[Dict[str, Any]] = []
     
-    # 1. Reflect official IBKR EClient surface
+    # 1. Dynamically reflect official IBKR EClient surface
     try:
         from ibapi.client import EClient
         eclient_cls = EClient
@@ -279,19 +283,14 @@ def build_full_tools_catalog() -> Dict[str, Any]:
         eclient_cls = None
         
     if eclient_cls:
-        for m_name in IBKR_CALLABLE_METHODS:
-            cat = "broker_account"
-            if "Mkt" in m_name or "Historical" in m_name or "Histogram" in m_name or "Volatility" in m_name:
-                cat = "broker_market_data"
-            elif "Order" in m_name or "Executions" in m_name:
-                cat = "broker_orders"
-            elif "News" in m_name or "Fundamental" in m_name:
-                cat = "broker_news"
-            elif "Contract" in m_name or "SecDef" in m_name or "Matching" in m_name:
-                cat = "broker_contract"
-            elif "Scanner" in m_name:
-                cat = "broker_scanner"
-                
+        # Dynamic discovery of all callable methods on EClient
+        discovered_methods = [
+            m for m, f in inspect.getmembers(eclient_cls, predicate=inspect.isfunction)
+            if not m.startswith("_") and m not in IGNORED_METHODS
+        ]
+        
+        for m_name in sorted(discovered_methods):
+            cat = categorize_method(m_name)
             schema = extract_method_schema(eclient_cls, m_name, cat)
             if schema:
                 tools.append(schema)
@@ -353,11 +352,11 @@ def save_tools_registry(force_refresh: bool = False) -> Dict[str, Any]:
         json.dump(catalog, f, indent=2)
         
     # Save to Studio directory if it exists
-    if os.path.exists(STUDIO_DIR):
+    if os.path.exists(STUDIO_DIR) and STUDIO_DIR != BASE_DIR:
         with open(REGISTRY_PATH_STUDIO, "w", encoding="utf-8") as f:
             json.dump(catalog, f, indent=2)
             
-    print(f"[TOOLS REFLECTOR] Generated {catalog['total_tools']} tools across {len(catalog['categories'])} categories. Cached with 24h TTL.")
+    print(f"[TOOLS REFLECTOR] Dynamically generated {catalog['total_tools']} tools across {len(catalog['categories'])} categories. Cached with 24h TTL.")
     return catalog
 
 if __name__ == "__main__":
