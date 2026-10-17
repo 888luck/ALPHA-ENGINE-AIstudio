@@ -52,3 +52,4 @@ contract_spec_cache.json
 scratch/
 models/
 reports/
+system_settings.json

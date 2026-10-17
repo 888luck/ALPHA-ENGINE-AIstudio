@@ -11,7 +11,7 @@ import { systemRouter } from "./src/server/routes/system";
 import { aiRouter } from "./src/server/routes/ai";
 import { researchRouter } from "./src/server/routes/research";
 import { copilotRouter } from "./src/server/routes/copilot";
-import { loadPersistentSettings, systemSettings, db_fs } from "./src/server/state";
+import { loadPersistentSettings, systemSettings } from "./src/server/state";
 import { authMiddleware, getMaskedSettings } from "./src/server/middleware/auth";
 import { ActiveTrade, HistoricalLog } from "./src/server/types";
 
@@ -21,7 +21,7 @@ console.log("[ALPHA SERVER] Initializing institutional modular server...");
 let activeTrades: ActiveTrade[] = [];
 let historicalLogs: HistoricalLog[] = [];
 
-export { activeTrades, historicalLogs, authMiddleware, getMaskedSettings, systemSettings, db_fs };
+export { activeTrades, historicalLogs, authMiddleware, getMaskedSettings, systemSettings };
 
 const app = express();
 app.use(express.json());
