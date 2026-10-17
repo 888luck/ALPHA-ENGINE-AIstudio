@@ -220,6 +220,7 @@ class TestTier0OnnxInference:
 
     def test_onnx_headline_latency_under_budget(self):
         _require_onnx()
+        FinBertOnnxClassifier.clear_shared_cache()
         corr = NewsEventCorrelator()
         stats = run_latency_benchmark(corr, iterations=50)
         print(f"\n[tier0-bench] {stats}")

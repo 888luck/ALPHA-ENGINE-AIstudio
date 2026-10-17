@@ -70,6 +70,13 @@ def _default_thread_count() -> int:
     env = os.environ.get("ALPHA_TIER0_ORT_THREADS")
     if env and env.isdigit() and int(env) > 0:
         return int(env)
+    try:
+        import psutil
+        physical = psutil.cpu_count(logical=False)
+        if physical and physical > 0:
+            return max(1, min(4, physical))
+    except Exception:
+        pass
     return max(1, min(4, os.cpu_count() or 1))
 
 
