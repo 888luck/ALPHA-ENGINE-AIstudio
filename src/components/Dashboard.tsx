@@ -39,6 +39,7 @@ import {
   ReferenceLine
 } from "recharts";
 import { ApiVaultModal } from "./ApiVaultModal";
+import { persistVaultItem, persistVaultBatch, syncVaultToServer } from "../utils/vaultStorage";
 
 
 
@@ -130,6 +131,7 @@ export default function Dashboard({ onNavigate, navTarget, activeTabOverride }: 
   const [isIngestingTicker, setIsIngestingTicker] = useState(false);
 
   const handleSaveSingleSetting = async (key: string, value: any) => {
+    persistVaultItem(key, value);
     try {
       const res = await fetch("/api/set-settings", {
         method: "POST",
@@ -145,6 +147,15 @@ export default function Dashboard({ onNavigate, navTarget, activeTabOverride }: 
       }
     } catch (e) {
       console.error(`Failed to save ${key}:`, e);
+    }
+  };
+
+  const handleSaveMultipleSettings = async (updates: Record<string, any>) => {
+    persistVaultBatch(updates);
+    try {
+      await syncVaultToServer(updates);
+    } catch (e) {
+      console.error("Failed to save settings batch:", e);
     }
   };
 
@@ -931,8 +942,9 @@ export default function Dashboard({ onNavigate, navTarget, activeTabOverride }: 
         onClose={() => setIsVaultOpen(false)}
         settings={settings || {}}
         onSaveSetting={handleSaveSingleSetting}
-        customGeminiApiKey=""
-        onSaveGeminiKey={() => {}}
+        onSaveMultipleSettings={handleSaveMultipleSettings}
+        customGeminiApiKey={(settings as any)?.geminiApiKey || ""}
+        onSaveGeminiKey={(k) => handleSaveSingleSetting("geminiApiKey", k)}
         firebaseStatus="configured"
       />
     </div>

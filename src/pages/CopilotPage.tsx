@@ -68,6 +68,13 @@ interface CopilotStats {
 }
 
 import { ApiVaultModal } from "../components/ApiVaultModal";
+import {
+  getAllStoredVaultSettings,
+  persistVaultItem,
+  persistVaultBatch,
+  syncVaultToServer,
+  getStoredVaultValue
+} from "../utils/vaultStorage";
 
 // Offline default model (local CPU ONNX embedded in container)
 const TIER0_OFFLINE_MODEL: ModelItem = {
@@ -83,21 +90,11 @@ const TIER0_OFFLINE_MODEL: ModelItem = {
 export function CopilotPage({ onNavigateHome }: { onNavigateHome?: () => void }) {
   const [availableModels, setAvailableModels] = useState<ModelItem[]>([TIER0_OFFLINE_MODEL]);
   const [isVaultOpen, setIsVaultOpen] = useState(false);
-  const [vaultSettings, setVaultSettings] = useState<any>(() => {
-    try {
-      const raw = localStorage.getItem("alpha_engine_settings");
-      return raw ? JSON.parse(raw) : {};
-    } catch (e) {
-      return {};
-    }
-  });
+  const [vaultSettings, setVaultSettings] = useState<any>(() => getAllStoredVaultSettings());
 
   const handleSaveSetting = async (key: string, value: any) => {
-    setVaultSettings((prev: any) => {
-      const updated = { ...prev, [key]: value };
-      localStorage.setItem("alpha_engine_settings", JSON.stringify(updated));
-      return updated;
-    });
+    persistVaultItem(key, value);
+    setVaultSettings((prev: any) => ({ ...prev, [key]: value }));
     try {
       await fetch("/api/set-settings", {
         method: "POST",
@@ -114,20 +111,10 @@ export function CopilotPage({ onNavigateHome }: { onNavigateHome?: () => void })
   };
 
   const handleSaveMultipleSettings = async (updates: Record<string, any>) => {
-    setVaultSettings((prev: any) => {
-      const updated = { ...prev, ...updates };
-      localStorage.setItem("alpha_engine_settings", JSON.stringify(updated));
-      return updated;
-    });
+    persistVaultBatch(updates);
+    setVaultSettings((prev: any) => ({ ...prev, ...updates }));
     try {
-      await fetch("/api/set-settings", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "x-admin-key": "ALPHA_ADMIN_REVERT_992"
-        },
-        body: JSON.stringify(updates),
-      });
+      await syncVaultToServer(updates);
       await fetch("/api/copilot/models?refresh=1");
       await fetchStatsAndModels(true);
     } catch (e) {
@@ -207,12 +194,17 @@ Click any quick query below or type your request:`,
   const fetchStatsAndModels = async (force = false) => {
     try {
       const url = force ? "/api/copilot/stats?refresh=1" : "/api/copilot/stats";
+      const gKey = vaultSettings.geminiApiKey || getStoredVaultValue("geminiApiKey");
+      const qKey = vaultSettings.customAiApiKey || getStoredVaultValue("customAiApiKey");
+      const nvKey = vaultSettings.nvidiaApiKey || getStoredVaultValue("nvidiaApiKey");
+      const oaKey = vaultSettings.openaiApiKey || getStoredVaultValue("openaiApiKey");
+
       const res = await fetch(url, {
         headers: {
-          "x-gemini-api-key": vaultSettings.geminiApiKey || "",
-          "x-groq-api-key": vaultSettings.customAiApiKey || "",
-          "x-nvidia-api-key": vaultSettings.nvidiaApiKey || "",
-          "x-openai-api-key": vaultSettings.openaiApiKey || ""
+          "x-gemini-api-key": gKey || "",
+          "x-groq-api-key": qKey || "",
+          "x-nvidia-api-key": nvKey || "",
+          "x-openai-api-key": oaKey || ""
         }
       });
       if (res.ok) {
@@ -248,13 +240,29 @@ Click any quick query below or type your request:`,
   };
 
   useEffect(() => {
+    // Re-hydrate any missing credentials from storage immediately
+    const currentStored = getAllStoredVaultSettings();
+    setVaultSettings((prev: any) => ({ ...currentStored, ...prev }));
+
+    // Sync client credentials to server immediately so Cloud Run container is hydrated
+    syncVaultToServer(currentStored).catch(() => {});
+
     fetchStatsAndModels(true);
-    // Load initial settings from server
+
+    // Load initial settings from server, but NEVER overwrite real stored keys with empty or masked values
     fetch("/api/state")
       .then((r) => r.json())
       .then((data) => {
         if (data?.settings) {
-          setVaultSettings((prev: any) => ({ ...data.settings, ...prev }));
+          setVaultSettings((prev: any) => {
+            const cleanServerSettings: Record<string, any> = {};
+            for (const [k, v] of Object.entries(data.settings)) {
+              if (v !== "" && v !== null && v !== undefined && v !== "configured") {
+                cleanServerSettings[k] = v;
+              }
+            }
+            return { ...cleanServerSettings, ...prev };
+          });
         }
       })
       .catch(() => {});
@@ -263,10 +271,19 @@ Click any quick query below or type your request:`,
     const handleInvalidated = () => {
       fetchStatsAndModels(true);
     };
+    const handleVaultUpdated = (e: any) => {
+      if (e?.detail) {
+        setVaultSettings((prev: any) => ({ ...prev, ...e.detail }));
+        fetchStatsAndModels(true);
+      }
+    };
+
     window.addEventListener("copilot:models_invalidated", handleInvalidated);
+    window.addEventListener("alpha_vault_settings_updated", handleVaultUpdated);
     return () => {
       clearInterval(interval);
       window.removeEventListener("copilot:models_invalidated", handleInvalidated);
+      window.removeEventListener("alpha_vault_settings_updated", handleVaultUpdated);
     };
   }, []);
 
@@ -308,14 +325,19 @@ Click any quick query below or type your request:`,
         content: m.content
       }));
 
+      const gKey = vaultSettings.geminiApiKey || getStoredVaultValue("geminiApiKey");
+      const qKey = vaultSettings.customAiApiKey || getStoredVaultValue("customAiApiKey");
+      const nvKey = vaultSettings.nvidiaApiKey || getStoredVaultValue("nvidiaApiKey");
+      const oaKey = vaultSettings.openaiApiKey || getStoredVaultValue("openaiApiKey");
+
       const res = await fetch("/api/copilot/chat", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "x-gemini-api-key": vaultSettings.geminiApiKey || "",
-          "x-groq-api-key": vaultSettings.customAiApiKey || "",
-          "x-nvidia-api-key": vaultSettings.nvidiaApiKey || "",
-          "x-openai-api-key": vaultSettings.openaiApiKey || ""
+          "x-gemini-api-key": gKey || "",
+          "x-groq-api-key": qKey || "",
+          "x-nvidia-api-key": nvKey || "",
+          "x-openai-api-key": oaKey || ""
         },
         body: JSON.stringify({
           messages: payloadMessages,

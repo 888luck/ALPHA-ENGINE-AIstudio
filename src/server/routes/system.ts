@@ -67,6 +67,20 @@ systemRouter.get("/api/state", (req, res) => {
   }
 });
 
+systemRouter.get("/api/vault/credentials", authMiddleware, (req, res) => {
+  res.json({
+    geminiApiKey: systemSettings.geminiApiKey || process.env.GEMINI_API_KEY || "",
+    customAiApiKey: systemSettings.customAiApiKey || process.env.GROQ_API_KEY || "",
+    nvidiaApiKey: systemSettings.nvidiaApiKey || process.env.NVIDIA_API_KEY || process.env.NVIDIA_INFERENCE_API_KEY || "",
+    openaiApiKey: systemSettings.openaiApiKey || process.env.OPENAI_API_KEY || "",
+    anthropicApiKey: systemSettings.anthropicApiKey || process.env.ANTHROPIC_API_KEY || "",
+    openFdaApiKey: systemSettings.openFdaApiKey || "",
+    fredApiKey: systemSettings.fredApiKey || "",
+    patentsApiKey: systemSettings.patentsApiKey || "",
+    secUserAgent: systemSettings.secUserAgent || ""
+  });
+});
+
 systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
   const { 
     ibkrAccountNumber, 
