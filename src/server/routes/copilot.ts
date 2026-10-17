@@ -156,24 +156,16 @@ export async function discoverActiveModels(forceRefresh = false, incomingKeys?: 
       });
       if (res.ok) {
         const data = await res.json();
-        const raw = data.data || [];
-        const retiredNimKeywords = [
-          "nemotron-4-340b", "llama-3.3-70b", "dbrx", "jamba-1.5", "llama2",
-          "minitron", "synthetic-video", "calibration", "parse", "translate",
-          "zamba2", "sea-lion", "granite-34b"
+        const verifiedActiveNim = [
+          "meta/llama-3.2-11b-vision-instruct",
+          "meta/llama-3.2-90b-vision-instruct",
+          "openai/gpt-oss-20b",
+          "nvidia/nemotron-3-super-120b-a12b",
+          "nvidia/nemotron-3.5-super-vl-120b-a12b"
         ];
+        const raw = data.data || [];
         raw
-          .filter((m: any) => {
-            const mid = (m.id || "").toLowerCase();
-            // Filter strictly to chat, instruct, and conversational LLMs
-            const isChat = mid.includes("instruct") || mid.includes("chat") || mid.includes("nemotron");
-            if (!isChat) return false;
-            // Exclude safety guards, embeddings, rerankers, speech, audio, and reward models
-            const nonChatKeywords = ["guard", "safety", "embed", "rerank", "whisper", "audio", "parakeet", "canary", "reward", "judge", "steerlm"];
-            if (nonChatKeywords.some((k) => mid.includes(k))) return false;
-            // Exclude known retired/end-of-life models on NVIDIA serverless
-            return !retiredNimKeywords.some((k) => mid.includes(k));
-          })
+          .filter((m: any) => verifiedActiveNim.includes(m.id))
           .forEach((m: any) => {
             const rawId = m.id;
             models.push({
