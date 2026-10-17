@@ -104,6 +104,7 @@ systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
     secUserAgent
   } = req.body;
 
+  if (req.body.tradingMode !== undefined) systemSettings.tradingMode = req.body.tradingMode;
   if (ibkrAccountNumber !== undefined) systemSettings.ibkrAccountNumber = ibkrAccountNumber;
   if (ibkrHost !== undefined) systemSettings.ibkrHost = ibkrHost;
   if (ibkrPort !== undefined) systemSettings.ibkrPort = Number(ibkrPort);

@@ -623,23 +623,23 @@ def extract_provider_and_key(selected_model: str, client_headers: Dict[str, str]
     mid = selected_model
     
     if mid.startswith("google/"):
-        raw_id = mid.replace("google/", "")
+        raw_id = mid[len("google/"):]
         key = client_headers.get("x-gemini-api-key") or keys.get("gemini") or os.environ.get("GEMINI_API_KEY", "")
         return "google", raw_id, key
     elif mid.startswith("groq/"):
-        raw_id = mid.replace("groq/", "")
+        raw_id = mid[len("groq/"):]
         key = client_headers.get("x-groq-api-key") or keys.get("groq") or os.environ.get("GROQ_API_KEY", "")
         return "groq", raw_id, key
     elif mid.startswith("nvidia/"):
-        raw_id = mid.replace("nvidia/", "")
+        raw_id = mid[len("nvidia/"):]
         key = client_headers.get("x-nvidia-api-key") or keys.get("nvidia") or os.environ.get("NVIDIA_API_KEY") or os.environ.get("NVIDIA_INFERENCE_API_KEY", "")
         return "nvidia", raw_id, key
     elif mid.startswith("openai/"):
-        raw_id = mid.replace("openai/", "")
+        raw_id = mid[len("openai/"):]
         key = client_headers.get("x-openai-api-key") or keys.get("openai") or os.environ.get("OPENAI_API_KEY", "")
         return "openai", raw_id, key
     elif mid.startswith("custom/"):
-        raw_id = mid.replace("custom/", "")
+        raw_id = mid[len("custom/"):]
         key = client_headers.get("x-custom-api-key") or keys.get("custom") or os.environ.get("CUSTOM_AI_API_KEY", "")
         return "custom", raw_id, key
     else:
@@ -856,9 +856,20 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
     except urllib.error.HTTPError as he:
         err_body = he.read().decode("utf-8") if he.fp else str(he)
         logger.error("LLM Provider HTTP %s: %s", he.code, err_body)
+        clean_msg = ""
+        try:
+            parsed = json.loads(err_body)
+            if isinstance(parsed, list) and len(parsed) > 0:
+                clean_msg = parsed[0].get("error", {}).get("message", "")
+            elif isinstance(parsed, dict):
+                clean_msg = parsed.get("error", {}).get("message") or parsed.get("detail") or parsed.get("message") or ""
+        except Exception:
+            clean_msg = err_body
+        if not clean_msg:
+            clean_msg = err_body[:400]
         yield emit_sse("delta", {
-            "content": f"> ⚠️ **Provider Error ({he.code})**: {err_body}\n\n"
-                       f"Please verify your credentials in the **4-Pillar Vault** or choose another active model from the dropdown."
+            "content": f"> ⚠️ **Provider Error ({he.code})**: {clean_msg}\n\n"
+                       f"Please verify your credentials in the **4-Pillar Vault**, switch to another active provider (e.g., **NVIDIA NIM**), or select **Local Tier 0 FinBERT ($0 Offline)** from the model dropdown."
         })
     except Exception as e:
         logger.error("LLM Execution Error: %s", e)

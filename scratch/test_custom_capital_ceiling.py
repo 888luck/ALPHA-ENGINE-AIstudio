@@ -34,7 +34,7 @@ def test_custom_capital_ceiling():
         req = urllib.request.Request(
             "http://localhost:3000/api/risk/settings",
             data=payload,
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json", "x-admin-key": "ALPHA_ADMIN_REVERT_992"}
         )
         res = urllib.request.urlopen(req)
         assert res.status == 200

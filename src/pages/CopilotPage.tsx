@@ -344,35 +344,48 @@ Click any quick query below or type your request:`,
         buffer = parts.pop() || "";
 
         for (const part of parts) {
-          const lines = part.trim().split("\n");
-          let eventType = "";
-          let dataStr = "";
+          if (!part.trim()) continue;
+          const lines = part.split("\n");
+          let eventType = "delta";
+          const dataLines: string[] = [];
 
           for (const line of lines) {
             if (line.startsWith("event: ")) {
               eventType = line.slice(7).trim();
             } else if (line.startsWith("data: ")) {
-              dataStr = line.slice(6).trim();
+              dataLines.push(line.slice(6));
+            } else if (line.startsWith("data:")) {
+              dataLines.push(line.slice(5));
+            } else if (dataLines.length > 0) {
+              dataLines.push(line);
             }
           }
 
-          if (eventType === "tool_call" && dataStr) {
+          const dataStr = dataLines.join("\n").trim();
+          if (!dataStr) continue;
+
+          if (eventType === "tool_call") {
             try {
               const parsed = JSON.parse(dataStr);
               setActiveTools((prev) => [...prev, parsed.tool]);
             } catch (e) {}
-          } else if (eventType === "delta" && dataStr) {
+          } else if (eventType === "delta") {
+            let chunk = "";
             try {
               const parsed = JSON.parse(dataStr);
-              const chunk = parsed.content || "";
-              if (chunk) receivedAnyText = true;
+              chunk = typeof parsed === "string" ? parsed : (parsed.content || parsed.message || "");
+            } catch (e) {
+              chunk = dataStr;
+            }
+            if (chunk) {
+              receivedAnyText = true;
               setMessages((prev) =>
                 prev.map((msg) =>
                   msg.id === assistantMsgId ? { ...msg, content: msg.content + chunk } : msg
                 )
               );
-            } catch (e) {}
-          } else if (eventType === "telemetry" && dataStr) {
+            }
+          } else if (eventType === "telemetry") {
             try {
               const tel = JSON.parse(dataStr);
               setMessages((prev) =>
@@ -608,7 +621,7 @@ Click any quick query below or type your request:`,
               </span>
             </div>
             <p className="text-[11px] font-mono text-slate-400 flex items-center gap-2">
-              <span>Edge Node: <strong className="text-white">10.156.0.2:4002</strong> (Frankfurt GCE)</span>
+              <span>Edge Node: <strong className="text-white">{vaultSettings?.ibkrHost || "127.0.0.1"}:{vaultSettings?.ibkrPort || 4002}</strong> ({vaultSettings?.ibkrHost === "127.0.0.1" || vaultSettings?.ibkrHost === "localhost" ? "Local Edge Daemon" : "Frankfurt GCE"})</span>
               <span className="text-emerald-400 font-bold">• ACTIVE</span>
             </p>
           </div>

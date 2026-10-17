@@ -29,22 +29,29 @@ export async function fetchMarketSchedule(): Promise<any> {
     const py = getPythonExecutable();
     const scriptPath = path.join(process.cwd(), "research_controller.py");
 
-    execFile(py, [scriptPath, "schedule"], { timeout: 10000 }, (error, stdout, stderr) => {
+    execFile(py, [scriptPath, "schedule"], { timeout: 15000 }, (error, stdout, stderr) => {
       if (error) {
-        console.warn("[MARKET SCHEDULE] Dynamic resolver failed, using fallback:", stderr || error.message);
-        return resolve(null);
+        if (!cachedScheduleData) {
+          console.warn("[MARKET SCHEDULE] Dynamic resolver failed, using fallback:", stderr || error.message);
+        }
+        return resolve(cachedScheduleData);
       }
       try {
-        const data = JSON.parse(stdout);
-        if (data.status === "success") {
-          cachedScheduleData = data;
-          cachedScheduleExpiry = Date.now() + 30000; // 30 seconds TTL
-          return resolve(data);
+        const jsonStart = stdout.indexOf("{");
+        const jsonEnd = stdout.lastIndexOf("}");
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+          const jsonStr = stdout.substring(jsonStart, jsonEnd + 1);
+          const data = JSON.parse(jsonStr);
+          if (data.status === "success") {
+            cachedScheduleData = data;
+            cachedScheduleExpiry = Date.now() + 60000; // 60 seconds TTL
+            return resolve(data);
+          }
         }
-        return resolve(null);
+        return resolve(cachedScheduleData);
       } catch (e: any) {
         console.warn("[MARKET SCHEDULE] JSON parse failed:", e.message);
-        return resolve(null);
+        return resolve(cachedScheduleData);
       }
     });
   });

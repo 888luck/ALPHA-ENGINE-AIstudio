@@ -36,7 +36,7 @@ def test_market_isolation():
         req = urllib.request.Request(
             "http://localhost:3000/api/risk/settings",
             data=json.dumps({"marketScope": "US"}).encode("utf-8"),
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json", "x-admin-key": "ALPHA_ADMIN_REVERT_992"}
         )
         res_update = urllib.request.urlopen(req)
         updated = json.loads(res_update.read().decode())
