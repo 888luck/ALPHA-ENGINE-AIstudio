@@ -80,8 +80,8 @@ export async function discoverActiveModels(forceRefresh = false, incomingKeys?: 
           .filter((m: any) => {
             if (!m.supportedGenerationMethods?.includes("generateContent")) return false;
             const cleanId = (m.name || "").replace(/^models\//, "").toLowerCase();
-            // Exclude audio, speech, TTS, image generation, transcription, and preview audio models
-            const nonChatKeywords = ["tts", "audio", "speech", "banana", "imagen", "image", "embedding", "aqa", "preview", "lyria", "transcribe"];
+            // Exclude audio, speech, TTS, image generation, and known deprecated/sunset models
+            const nonChatKeywords = ["tts", "audio", "speech", "banana", "imagen", "image", "embedding", "aqa", "preview", "lyria", "transcribe", "gemini-2.5", "flash-latest", "pro-latest", "gemma-4"];
             return !nonChatKeywords.some((k) => cleanId.includes(k));
           })
           .forEach((m: any) => {
@@ -108,7 +108,10 @@ export async function discoverActiveModels(forceRefresh = false, incomingKeys?: 
   if (groqKey) {
     try {
       const res = await fetch("https://api.groq.com/openai/v1/models", {
-        headers: { Authorization: `Bearer ${groqKey}` },
+        headers: { 
+          Authorization: `Bearer ${groqKey}`,
+          "User-Agent": "AlphaEngine/2.0"
+        },
         signal: AbortSignal.timeout(4000)
       });
       if (res.ok) {
@@ -118,8 +121,9 @@ export async function discoverActiveModels(forceRefresh = false, incomingKeys?: 
           .filter((m: any) => {
             if (m.active === false) return false;
             const mid = (m.id || "").toLowerCase();
-            if (mid.includes("whisper") || mid.includes("guard") || mid.includes("distil-whisper")) return false;
-            return true;
+            // Filter strictly to chat-capable English/multilingual text LLMs
+            const nonChat = ["whisper", "guard", "distil", "orpheus", "allam"];
+            return !nonChat.some((k) => mid.includes(k));
           })
           .forEach((m: any) => {
             models.push({
@@ -127,7 +131,7 @@ export async function discoverActiveModels(forceRefresh = false, incomingKeys?: 
               rawId: m.id,
               name: m.id,
               provider: "Groq",
-              tier: m.id.includes("70b") ? "Tier 1 LPU" : "Tier 0.5 LPU",
+              tier: m.id.includes("120b") || m.id.includes("70b") ? "Tier 1 LPU" : "Tier 0.5 LPU",
               badge: "Live Discovered",
               costStr: "$0.59 / 1M tokens",
               icon: "⚡"
@@ -144,12 +148,20 @@ export async function discoverActiveModels(forceRefresh = false, incomingKeys?: 
   if (nvidiaKey) {
     try {
       const res = await fetch("https://integrate.api.nvidia.com/v1/models", {
-        headers: { Authorization: `Bearer ${nvidiaKey}` },
+        headers: { 
+          Authorization: `Bearer ${nvidiaKey}`,
+          "User-Agent": "AlphaEngine/2.0"
+        },
         signal: AbortSignal.timeout(4000)
       });
       if (res.ok) {
         const data = await res.json();
         const raw = data.data || [];
+        const retiredNimKeywords = [
+          "nemotron-4-340b", "llama-3.3-70b", "dbrx", "jamba-1.5", "llama2",
+          "minitron", "synthetic-video", "calibration", "parse", "translate",
+          "zamba2", "sea-lion", "granite-34b"
+        ];
         raw
           .filter((m: any) => {
             const mid = (m.id || "").toLowerCase();
@@ -158,16 +170,19 @@ export async function discoverActiveModels(forceRefresh = false, incomingKeys?: 
             if (!isChat) return false;
             // Exclude safety guards, embeddings, rerankers, speech, audio, and reward models
             const nonChatKeywords = ["guard", "safety", "embed", "rerank", "whisper", "audio", "parakeet", "canary", "reward", "judge", "steerlm"];
-            return !nonChatKeywords.some((k) => mid.includes(k));
+            if (nonChatKeywords.some((k) => mid.includes(k))) return false;
+            // Exclude known retired/end-of-life models on NVIDIA serverless
+            return !retiredNimKeywords.some((k) => mid.includes(k));
           })
           .forEach((m: any) => {
+            const rawId = m.id;
             models.push({
-              id: `nvidia/${m.id}`,
-              rawId: m.id,
-              name: m.id,
+              id: `nvidia/${rawId}`,
+              rawId: rawId,
+              name: rawId,
               provider: "NVIDIA NIM",
               tier: "Tier 1 NIM",
-              badge: "Live Discovered",
+              badge: "Verified Active",
               costStr: "$0.70 / 1M tokens",
               icon: "🟢"
             });

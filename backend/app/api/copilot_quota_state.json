@@ -1,13 +1,13 @@
 {
   "date": "2026-10-17",
-  "total_requests": 17,
-  "total_cost_usd": 0.0037047,
+  "total_requests": 26,
+  "total_cost_usd": 0.0053031,
   "daily_budget_ceiling": 1.0,
   "circuit_breaker_active": false,
   "provider_counts": {
-    "Groq": 1,
-    "Google GenAI": 8,
-    "NVIDIA NIM": 8,
+    "Groq": 4,
+    "Google GenAI": 10,
+    "NVIDIA NIM": 12,
     "OpenAI": 0,
     "Local Tier 0": 0
   }

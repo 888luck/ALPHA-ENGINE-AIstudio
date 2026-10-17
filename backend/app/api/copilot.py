@@ -154,7 +154,7 @@ def discover_active_models(api_keys: Optional[Dict[str, str]] = None) -> List[Di
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
                     raw = data.get("models", [])
-                    non_chat = ["tts", "audio", "speech", "banana", "imagen", "image", "embedding", "aqa", "preview", "lyria", "transcribe"]
+                    non_chat = ["tts", "audio", "speech", "banana", "imagen", "image", "embedding", "aqa", "preview", "lyria", "transcribe", "gemini-2.5", "flash-latest", "pro-latest", "gemma-4"]
                     for m in raw:
                         clean_id = m.get("name", "").replace("models/", "")
                         methods = m.get("supportedGenerationMethods", [])
@@ -176,20 +176,24 @@ def discover_active_models(api_keys: Optional[Dict[str, str]] = None) -> List[Di
     groq_key = keys.get("groq") or os.environ.get("GROQ_API_KEY", "")
     if groq_key:
         try:
-            req = urllib.request.Request("https://api.groq.com/openai/v1/models", headers={"Authorization": f"Bearer {groq_key}"})
+            req = urllib.request.Request(
+                "https://api.groq.com/openai/v1/models",
+                headers={"Authorization": f"Bearer {groq_key}", "User-Agent": "AlphaEngine/2.0"}
+            )
             with urllib.request.urlopen(req, timeout=4) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
                     raw = data.get("data", [])
+                    non_groq = ["whisper", "guard", "distil", "orpheus", "allam"]
                     for m in raw:
                         mid = m.get("id", "")
-                        if m.get("active") is not False and not any(k in mid.lower() for k in ["whisper", "guard", "distil"]):
+                        if m.get("active") is not False and not any(k in mid.lower() for k in non_groq):
                             models.append({
                                 "id": f"groq/{mid}",
                                 "rawId": mid,
                                 "name": mid,
                                 "provider": "Groq",
-                                "tier": "Tier 1 LPU" if "70b" in mid else "Tier 0.5 LPU",
+                                "tier": "Tier 1 LPU" if ("120b" in mid or "70b" in mid) else "Tier 0.5 LPU",
                                 "badge": "Live Discovered",
                                 "costStr": "$0.59 / 1M tokens",
                                 "icon": "⚡"
@@ -201,29 +205,36 @@ def discover_active_models(api_keys: Optional[Dict[str, str]] = None) -> List[Di
     nvidia_key = keys.get("nvidia") or os.environ.get("NVIDIA_API_KEY") or os.environ.get("NVIDIA_INFERENCE_API_KEY", "")
     if nvidia_key:
         try:
-            req = urllib.request.Request("https://integrate.api.nvidia.com/v1/models", headers={"Authorization": f"Bearer {nvidia_key}"})
+            req = urllib.request.Request(
+                "https://integrate.api.nvidia.com/v1/models",
+                headers={"Authorization": f"Bearer {nvidia_key}", "User-Agent": "AlphaEngine/2.0"}
+            )
             with urllib.request.urlopen(req, timeout=4) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
                     raw = data.get("data", [])
                     non_chat_nim = ["guard", "safety", "embed", "rerank", "whisper", "audio", "parakeet", "canary", "reward", "judge", "steerlm"]
+                    retired_nim = [
+                        "nemotron-4-340b", "llama-3.3-70b", "dbrx", "jamba-1.5", "llama2",
+                        "minitron", "synthetic-video", "calibration", "parse", "translate",
+                        "zamba2", "sea-lion", "granite-34b"
+                    ]
                     for m in raw:
                         mid = m.get("id", "")
                         lower_mid = mid.lower()
                         is_chat = "instruct" in lower_mid or "chat" in lower_mid or "nemotron" in lower_mid
-                        if is_chat and not any(k in lower_mid for k in non_chat_nim):
+                        if is_chat and not any(k in lower_mid for k in non_chat_nim) and not any(k in lower_mid for k in retired_nim):
                             models.append({
                                 "id": f"nvidia/{mid}",
                                 "rawId": mid,
                                 "name": mid,
                                 "provider": "NVIDIA NIM",
                                 "tier": "Tier 1 NIM",
-                                "badge": "Live Discovered",
+                                "badge": "Verified Active",
                                 "costStr": "$0.70 / 1M tokens",
                                 "icon": "🟢"
                             })
         except Exception as e:
-            logger.debug("NVIDIA NIM live discovery notice: %s", e)
             logger.debug("NVIDIA NIM live discovery notice: %s", e)
 
     return models
@@ -556,6 +567,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[ChatMessage] = []
     model: str = "local/finbert-int8"
+    raw_id: Optional[str] = None
     temperature: float = 0.2
     max_tokens: int = 2048
     daily_budget_ceiling: float = 1.00
@@ -572,6 +584,8 @@ class ChatRequest(BaseModel):
             else:
                 parsed.append(ChatMessage(role="user", content=str(m)))
         kwargs["messages"] = parsed
+        if "rawId" in kwargs and "raw_id" not in kwargs:
+            kwargs["raw_id"] = kwargs["rawId"]
         super().__init__(**kwargs)
 
 router = APIRouter(prefix="/api/copilot", tags=["copilot"]) if APIRouter is not None else DummyRouter()
@@ -623,29 +637,29 @@ Operational Guidelines:
 6. Present data in clean Markdown tables and cite official edge nodes, timestamps, and accession numbers.
 """
 
-def extract_provider_and_key(selected_model: str, client_headers: Dict[str, str], payload_keys: Optional[Dict[str, str]]) -> tuple[str, str, str]:
+def extract_provider_and_key(selected_model: str, client_headers: Dict[str, str], payload_keys: Optional[Dict[str, str]], raw_id_override: Optional[str] = None) -> tuple[str, str, str]:
     """Resolves provider name, raw model ID, and API key from headers, payload, or environment."""
     keys = payload_keys or {}
     mid = selected_model
     
     if mid.startswith("google/"):
-        raw_id = mid[len("google/"):]
+        raw_id = raw_id_override or mid[len("google/"):]
         key = client_headers.get("x-gemini-api-key") or keys.get("gemini") or os.environ.get("GEMINI_API_KEY", "")
         return "google", raw_id, key
     elif mid.startswith("groq/"):
-        raw_id = mid[len("groq/"):]
+        raw_id = raw_id_override or mid[len("groq/"):]
         key = client_headers.get("x-groq-api-key") or keys.get("groq") or os.environ.get("GROQ_API_KEY", "")
         return "groq", raw_id, key
     elif mid.startswith("nvidia/"):
-        raw_id = mid[len("nvidia/"):]
+        raw_id = raw_id_override or mid[len("nvidia/"):]
         key = client_headers.get("x-nvidia-api-key") or keys.get("nvidia") or os.environ.get("NVIDIA_API_KEY") or os.environ.get("NVIDIA_INFERENCE_API_KEY", "")
         return "nvidia", raw_id, key
     elif mid.startswith("openai/"):
-        raw_id = mid[len("openai/"):]
+        raw_id = raw_id_override or mid[len("openai/"):]
         key = client_headers.get("x-openai-api-key") or keys.get("openai") or os.environ.get("OPENAI_API_KEY", "")
         return "openai", raw_id, key
     elif mid.startswith("custom/"):
-        raw_id = mid[len("custom/"):]
+        raw_id = raw_id_override or mid[len("custom/"):]
         key = client_headers.get("x-custom-api-key") or keys.get("custom") or os.environ.get("CUSTOM_AI_API_KEY", "")
         return "custom", raw_id, key
     else:
@@ -667,7 +681,7 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
         selected_model = "local/finbert-int8"
         yield emit_sse("delta", {"content": f"> ⚠️ **CIRCUIT BREAKER ENGAGED**: Daily spending ceiling of ${round(ceiling, 2)} reached. Routed to $0 Local Tier 0 ONNX model.\n\n"})
 
-    provider, raw_model_id, api_key = extract_provider_and_key(selected_model, client_headers, request.keys)
+    provider, raw_model_id, api_key = extract_provider_and_key(selected_model, client_headers, request.keys, request.raw_id)
 
     # 1. Tier 0 Local CPU Model ($0 cost, offline ONNX)
     if provider == "local" or selected_model == "local/finbert-int8":
@@ -677,7 +691,10 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
                 last_msg = m.content
                 break
                 
-        nec = NewsEventCorrelator()
+        global _GLOBAL_NEC
+        if "_GLOBAL_NEC" not in globals() or _GLOBAL_NEC is None:
+            _GLOBAL_NEC = NewsEventCorrelator()
+        nec = _GLOBAL_NEC
         score = nec._onnx.predict(last_msg) if nec._onnx else {"positive": 0.5, "negative": 0.5, "neutral": 0.0}
         pos_pct = round(score.get("positive", 0) * 100, 1)
         neg_pct = round(score.get("negative", 0) * 100, 1)
@@ -746,7 +763,7 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
 
     # Prepare OpenAI-compatible endpoint parameters
     endpoint_url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "User-Agent": "AlphaEngine/2.0"}
     
     if provider == "google":
         # Google OpenAI-compatible endpoint

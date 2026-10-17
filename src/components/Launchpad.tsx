@@ -40,7 +40,7 @@ export default function Launchpad({ onNavigate, systemState }: LaunchpadProps) {
       actionRequired: false,
       navTarget: "system-control-center",
       details: [
-        { label: "Storage", value: "Firestore Persistent", icon: <ShieldCheck className="w-3 h-3" /> },
+        { label: "Storage", value: "Edge Socket & Secret Manager", icon: <ShieldCheck className="w-3 h-3" /> },
         { label: "Workspace", value: "Alpha-Engine-Hybrid", icon: <Globe className="w-3 h-3" /> }
       ]
     },
@@ -189,7 +189,7 @@ export default function Launchpad({ onNavigate, systemState }: LaunchpadProps) {
         </div>
         <div className="flex items-center gap-2 border-l border-white/10 pl-8">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse" />
-          FIRESTORE SYNC: CONNECTED
+          EDGE STATE BUS: CONNECTED
         </div>
         <div className="flex items-center gap-2 border-l border-white/10 pl-8">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" />

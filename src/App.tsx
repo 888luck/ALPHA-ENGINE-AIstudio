@@ -436,7 +436,7 @@ export default function App() {
                     <strong className="text-white">Cloud Run Backtesting Offload:</strong> Computational backtesting and simulation workloads run serverlessly in Cloud Run on demand, keeping the co-located VM 100% responsive for order execution.
                   </li>
                   <li>
-                    <strong className="text-white">Asynchronous Firestore Sync:</strong> State updates, risk telemetry, and audit logs synchronize over non-blocking Firestore REST/gRPC bridges.
+                    <strong className="text-white">Asynchronous Edge Telemetry Sync:</strong> State updates, risk telemetry, and audit logs synchronize over non-blocking direct TCP and REST bridges.
                   </li>
                 </ul>
               </div>
@@ -457,7 +457,7 @@ export default function App() {
                     <strong className="text-white">Zero-Crash Quota Guard:</strong> If API limits are approached, the rolling-window rate limiter engages automatically and transitions smoothly to the deterministic quantitative engine — guaranteeing zero runtime crashes and uninterrupted risk monitoring.
                   </li>
                   <li>
-                    <strong className="text-white">Attribution & Audit Logging:</strong> Every AI inference, rationale, and confidence score is permanently logged to Firestore (<code className="bg-black/30 px-1 py-0.2 rounded text-cyan-300">historical_logs</code>) for post-market calibration.
+                    <strong className="text-white">Attribution & Audit Logging:</strong> Every AI inference, rationale, and confidence score is permanently logged to the Institutional Audit Log (<code className="bg-black/30 px-1 py-0.2 rounded text-cyan-300">historical_logs</code>) for post-market calibration.
                   </li>
                 </ul>
               </div>
