@@ -625,24 +625,44 @@ export const QuantResearchLab: React.FC = () => {
             <div className="bg-black/35 border border-white/5 rounded-lg p-4 space-y-3 font-mono text-xs animate-in fade-in duration-300">
               <div className="flex justify-between items-center border-b border-white/5 pb-2">
                 <span className="font-bold text-white text-sm">REPLAY RESULTS ({btSymbol})</span>
-                <span className={`font-bold text-sm ${btResult.netProfit >= 0 ? "text-[#00ff88]" : "text-rose-400"}`}>
-                  {btResult.netProfit >= 0 ? "+" : ""}${Number(btResult.netProfit || 0).toFixed(2)}
+                <span className={`font-bold text-sm ${((btResult.totalPnL !== undefined ? btResult.totalPnL : btResult.netProfit) || 0) >= 0 ? "text-[#00ff88]" : "text-rose-400"}`}>
+                  {((btResult.totalPnL !== undefined ? btResult.totalPnL : btResult.netProfit) || 0) >= 0 ? "+" : ""}${Number((btResult.totalPnL !== undefined ? btResult.totalPnL : btResult.netProfit) || 0).toFixed(2)}
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-3 text-center pt-1">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center pt-1">
                 <div className="bg-black/40 p-2.5 rounded-lg border border-white/5">
-                  <span className="text-xs text-slate-400 block uppercase font-semibold">Sharpe Ratio</span>
-                  <span className="font-bold text-sm text-[#00ff88] mt-1 block">{btResult.sharpeRatio || "1.84"}</span>
+                  <span className="text-xs text-slate-400 block uppercase font-semibold">Annualized Sharpe</span>
+                  <span className="font-bold text-sm text-[#00ff88] mt-1 block">
+                    {btResult.annualizedSharpe !== undefined ? btResult.annualizedSharpe : (btResult.sharpeRatio || "0.00")}
+                  </span>
+                </div>
+                <div className="bg-black/40 p-2.5 rounded-lg border border-white/5">
+                  <span className="text-xs text-slate-400 block uppercase font-semibold">Deflated Sharpe (DSR)</span>
+                  <span className={`font-bold text-sm mt-1 block ${
+                    btResult.passesDsrHurdle ? "text-[#00ff88]" : "text-amber-400"
+                  }`}>
+                    {btResult.deflatedSharpeRatio !== undefined ? `${(Number(btResult.deflatedSharpeRatio) * 100).toFixed(1)}%` : "N/A"}
+                  </span>
                 </div>
                 <div className="bg-black/40 p-2.5 rounded-lg border border-white/5">
                   <span className="text-xs text-slate-400 block uppercase font-semibold">Win Rate</span>
-                  <span className="font-bold text-sm text-white mt-1 block">{btResult.winRate || "62.5"}%</span>
+                  <span className="font-bold text-sm text-white mt-1 block">{btResult.winRate !== undefined ? btResult.winRate : "0.0"}%</span>
                 </div>
                 <div className="bg-black/40 p-2.5 rounded-lg border border-white/5">
                   <span className="text-xs text-slate-400 block uppercase font-semibold">Max Drawdown</span>
-                  <span className="font-bold text-sm text-rose-400 mt-1 block">-{btResult.maxDrawdown || "1.4"}%</span>
+                  <span className="font-bold text-sm text-rose-400 mt-1 block">
+                    -{btResult.maxDrawdownPercent !== undefined ? btResult.maxDrawdownPercent : (btResult.maxDrawdown || "0.0")}%
+                  </span>
                 </div>
               </div>
+              {btResult.institutionalVerdict && (
+                <div className="flex items-center justify-between text-xs px-2.5 py-1.5 rounded bg-black/50 border border-white/5">
+                  <span className="text-slate-400">Institutional Audit Hurdle (DSR ≥ 95%):</span>
+                  <span className={`font-mono font-bold ${btResult.passesDsrHurdle ? "text-[#00ff88]" : "text-amber-400"}`}>
+                    {btResult.institutionalVerdict}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>

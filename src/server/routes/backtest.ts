@@ -178,7 +178,8 @@ backtestRouter.post("/api/backtest", (req, res) => {
     capitalOverride,
     riskBudgetPct,
     frictionCeilingPct,
-    binaryBlackoutHours
+    binaryBlackoutHours,
+    trialsTested
   } = req.body;
 
   if (!symbol || !timeframe || !startDate || !endDate) {
@@ -200,6 +201,7 @@ backtestRouter.post("/api/backtest", (req, res) => {
   const cleanRiskBudget = riskBudgetPct !== undefined ? String(Number(riskBudgetPct)) : "0.01";
   const cleanFrictionCeiling = frictionCeilingPct !== undefined ? String(Number(frictionCeilingPct)) : "15.0";
   const cleanBlackout = binaryBlackoutHours !== undefined ? String(Number(binaryBlackoutHours)) : "0.0";
+  const cleanTrials = trialsTested !== undefined ? String(Math.max(1, parseInt(trialsTested, 10) || 1)) : "1";
 
   const commandArgs = [
     cleanSymbol, 
@@ -215,7 +217,8 @@ backtestRouter.post("/api/backtest", (req, res) => {
     cleanCapital,
     cleanRiskBudget,
     cleanFrictionCeiling,
-    cleanBlackout
+    cleanBlackout,
+    cleanTrials
   ];
   const py = getPythonExecutable();
   const scriptPath = path.join(process.cwd(), "backtester.py");

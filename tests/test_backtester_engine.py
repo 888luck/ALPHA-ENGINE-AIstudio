@@ -66,9 +66,13 @@ def test_backtester_algorithmic_execution(monkeypatch):
     assert "profitFactor" in results
     assert "balanceHistory" in results
     assert "gateAttribution" in results
+    assert "deflatedSharpeRatio" in results
+    assert "annualizedSharpe" in results
+    assert "passesDsrHurdle" in results
+    assert "institutionalVerdict" in results
     assert results["startingCapital"] == 100000.0
     assert len(results["priceHistory"]) == 50
-    print(f"\n[BACKTEST VERIFIED] Trades: {results['totalTrades']} | Final Capital: ${results['finalCapital']:.2f} | Gate Attribution: {results['gateAttribution']}")
+    print(f"\n[BACKTEST VERIFIED] Trades: {results['totalTrades']} | Final Capital: ${results['finalCapital']:.2f} | DSR: {results['deflatedSharpeRatio']} | Verdict: {results['institutionalVerdict']} | Gate Attribution: {results['gateAttribution']}")
 
 def test_event_backtester_brier_score():
     ensemble = MultiModelEnsemble()
@@ -96,3 +100,56 @@ def test_event_backtester_excursions():
     assert np.isclose(excursions["mfe_pct"], 5.0, atol=1e-4)
     assert np.isclose(excursions["mae_pct"], -2.0, atol=1e-4)
     assert np.isclose(excursions["final_pct"], 3.0, atol=1e-4)
+
+def test_backtester_deflated_sharpe_ratio_integration(monkeypatch):
+    engine = AlphaBacktestingEngine(starting_capital=100000.0)
+    
+    bars = []
+    price = 100.0
+    for i in range(150):
+        if i > 25 and i % 15 == 0:
+            vol = 4000000  # breakout volume
+            high = price + 5.0
+            close = price + 3.0
+            low = price - 0.5
+        elif i > 25 and i % 15 == 5:
+            vol = 800000
+            high = price + 6.0
+            close = price + 5.5
+            low = price - 0.5
+            price += 4.0
+        else:
+            vol = 1000000
+            high = price + 1.0
+            close = price + 0.2
+            low = price - 1.0
+            price += 0.2
+            
+        bars.append({
+            "date": f"2026-03-{i+1:02d}T09:30:00Z" if i < 30 else f"2026-04-{(i-30)%30+1:02d}T09:30:00Z",
+            "open": round(price, 2),
+            "high": round(high, 2),
+            "low": round(low, 2),
+            "close": round(close, 2),
+            "volume": vol
+        })
+        
+    monkeypatch.setattr(engine, "generate_synthetic_history", lambda *args, **kwargs: bars)
+    
+    results = engine.run_backtest(
+        symbol="XLE",
+        timeframe="1h",
+        start_date="2026-03-01",
+        end_date="2026-05-01",
+        stop_atr=1.8,
+        trials_tested=5
+    )
+    
+    assert "deflatedSharpeRatio" in results
+    assert "annualizedSharpe" in results
+    assert "passesDsrHurdle" in results
+    assert "institutionalVerdict" in results
+    assert results["trialsTested"] == 5
+    assert results["institutionalAudit"] is not None
+    assert isinstance(results["deflatedSharpeRatio"], float)
+

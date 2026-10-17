@@ -11,6 +11,11 @@ try:
 except ImportError:
     pass
 
+try:
+    from institutional_auditor import InstitutionalBacktestAuditor
+except ImportError:
+    InstitutionalBacktestAuditor = None
+
 class AlphaBacktestingEngine:
     """
     Local Quantitative Backtesting Engine in Python.
@@ -45,7 +50,8 @@ class AlphaBacktestingEngine:
                      stop_atr: float = 1.8, partial_profit: bool = True, breakeven_lock: bool = True,
                      max_hold: int = 15, ofi_filter: bool = True, adaptive_stop: bool = True,
                      capital_override: float = None, risk_budget_pct: float = 0.01,
-                     friction_ceiling_pct: float = 15.0, binary_blackout_hours: float = 0.0) -> Dict[str, Any]:
+                     friction_ceiling_pct: float = 15.0, binary_blackout_hours: float = 0.0,
+                     trials_tested: int = 1) -> Dict[str, Any]:
         """
         Executes an algorithmic backtest over historical metrics with advanced institutional upgrades:
           - Adaptive Volatility ATR Stops: dynamic cushion to prevent premature stop-outs
@@ -342,6 +348,38 @@ class AlphaBacktestingEngine:
         pnl_cash = round(self.equity - self.starting_capital, 2)
         pnl_percent = round((self.equity - self.starting_capital) / self.starting_capital * 100, 2)
 
+        # Compute Marcos López de Prado Deflated Sharpe Ratio (DSR) & Institutional Audit
+        annualized_sharpe = 0.0
+        daily_sharpe = 0.0
+        deflated_sharpe = 0.0
+        skewness_val = 0.0
+        kurtosis_val = 3.0
+        passes_dsr = False
+        verdict = "INSUFFICIENT_DATA"
+        institutional_audit_data = None
+
+        if InstitutionalBacktestAuditor is not None:
+            try:
+                institutional_audit_data = InstitutionalBacktestAuditor.audit_backtest(
+                    trades=self.trades_history,
+                    balance_history=self.balance_history,
+                    starting_capital=self.starting_capital,
+                    trials_tested=max(1, trials_tested),
+                    benchmark_sharpe=0.0
+                )
+                if institutional_audit_data.get("valid"):
+                    annualized_sharpe = institutional_audit_data.get("annualized_sharpe", 0.0)
+                    daily_sharpe = institutional_audit_data.get("daily_sharpe", 0.0)
+                    deflated_sharpe = institutional_audit_data.get("deflated_sharpe_ratio", 0.0)
+                    skewness_val = institutional_audit_data.get("skewness", 0.0)
+                    kurtosis_val = institutional_audit_data.get("kurtosis", 3.0)
+                    passes_dsr = institutional_audit_data.get("passes_dsr_hurdle", False)
+                    verdict = institutional_audit_data.get("institutional_verdict", "AUDITED")
+                else:
+                    verdict = institutional_audit_data.get("institutional_verdict", "INSUFFICIENT_SAMPLE")
+            except Exception as e:
+                verdict = f"AUDIT_ERROR: {str(e)}"
+
         return {
             "symbol": symbol.upper(),
             "timeframe": timeframe,
@@ -350,13 +388,25 @@ class AlphaBacktestingEngine:
             "startingCapital": self.starting_capital,
             "finalCapital": round(self.equity, 2),
             "totalPnL": pnl_cash,
+            "netProfit": pnl_cash,
             "totalPnLPercent": pnl_percent,
             "totalTrades": total_trades,
             "winningTrades": len(winning_trades),
             "losingTrades": len(losing_trades),
             "winRate": win_rate,
             "profitFactor": profit_factor,
+            "sharpeRatio": annualized_sharpe,
+            "annualizedSharpe": annualized_sharpe,
+            "dailySharpe": daily_sharpe,
+            "deflatedSharpeRatio": deflated_sharpe,
+            "skewness": skewness_val,
+            "kurtosis": kurtosis_val,
+            "passesDsrHurdle": passes_dsr,
+            "institutionalVerdict": verdict,
+            "trialsTested": trials_tested,
+            "institutionalAudit": institutional_audit_data,
             "maxDrawdownPercent": round(max_drawdown, 2),
+            "maxDrawdown": round(max_drawdown, 2),
             "totalCommissions": round(sum([t["commission"] for t in self.trades_history]), 2),
             "balanceHistory": self.balance_history,
             "priceHistory": bars,
@@ -533,6 +583,13 @@ if __name__ == "__main__":
                 binary_blackout_hours = 0.0
         else:
             binary_blackout_hours = 0.0
+        if len(sys.argv) >= 16:
+            try:
+                trials_tested = int(sys.argv[15])
+            except (ValueError, TypeError):
+                trials_tested = 1
+        else:
+            trials_tested = 1
     else:
         # Defaults
         ticker = "XLE"
@@ -543,6 +600,7 @@ if __name__ == "__main__":
         risk_budget_pct = 0.01
         friction_ceiling_pct = 15.0
         binary_blackout_hours = 0.0
+        trials_tested = 1
         
     engine = AlphaBacktestingEngine(starting_capital=capital_override if capital_override and capital_override > 0 else 100000.0)
     results = engine.run_backtest(
@@ -559,6 +617,7 @@ if __name__ == "__main__":
         capital_override=capital_override,
         risk_budget_pct=risk_budget_pct,
         friction_ceiling_pct=friction_ceiling_pct,
-        binary_blackout_hours=binary_blackout_hours
+        binary_blackout_hours=binary_blackout_hours,
+        trials_tested=trials_tested
     )
     print(json.dumps(results))
