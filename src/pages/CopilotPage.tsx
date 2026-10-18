@@ -358,7 +358,9 @@ Click any quick query below or type your request:`,
     let receivedAnyText = false;
 
     try {
-      const payloadMessages = [...messages, userMessage].map((m) => ({
+      // Sliding context window: filter out welcome banner and retain only the most recent 6 messages to prevent 413/429 quota exhaustion
+      const slidingHistory = messages.filter((m) => m.id !== 'welcome-1').slice(-6);
+      const payloadMessages = [...slidingHistory, userMessage].map((m) => ({
         role: m.role,
         content: m.content
       }));

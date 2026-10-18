@@ -328,15 +328,88 @@ class CopilotTools:
     """Institutional execution adapters providing broker & regulatory intelligence."""
     
     @staticmethod
-    def get_market_quote(symbol: str = "EMR") -> Dict[str, Any]:
+    def parse_instrument_spec(raw_symbol: str, sec_type: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Dynamically infers and normalizes IBKR contract specifications for any asset class.
+        The user or model can casually write 'EUR/USD', 'EUR.USD', 'BTC/USD', 'AAPL', or 'DAX'.
+        """
+        raw = (raw_symbol or "EMR").strip()
+        st = (sec_type or "").upper().strip()
+
+        # Check for Crypto pairs (e.g., BTC/USD, ETH/USD, SOL/USD)
+        crypto_coins = {"BTC", "ETH", "SOL", "LTC", "AVAX", "MATIC", "DOGE", "XRP", "ADA", "LINK", "DOT", "UNI"}
+        for sep in ["/", ".", "-", " "]:
+            if sep in raw and len(raw.split(sep)) == 2:
+                parts = raw.split(sep)
+                base, quote = parts[0].upper().strip(), parts[1].upper().strip()
+                if base in crypto_coins or st == "CRYPTO":
+                    return {
+                        "symbol": base,
+                        "currency": quote,
+                        "secType": "CRYPTO",
+                        "exchange": "PAXOS",
+                        "display_symbol": f"{base}/{quote}"
+                    }
+                if len(base) == 3 and len(quote) == 3:
+                    return {
+                        "symbol": base,
+                        "currency": quote,
+                        "secType": "CASH",
+                        "exchange": "IDEALPRO",
+                        "display_symbol": f"{base}/{quote}"
+                    }
+
+        # Check for common major indices
+        indices = {"SPX": "CBOE", "NDX": "NASDAQ", "DAX": "DTB", "ESTX50": "DTB", "VIX": "CBOE"}
+        if raw.upper() in indices or st == "IND":
+            return {
+                "symbol": raw.upper(),
+                "currency": "USD" if raw.upper() in ["SPX", "NDX", "VIX"] else "EUR",
+                "secType": "IND",
+                "exchange": indices.get(raw.upper(), "SMART"),
+                "display_symbol": raw.upper()
+            }
+
+        # Explicit CASH if provided by model
+        if st == "CASH" and len(raw) == 6:
+            return {
+                "symbol": raw[:3].upper(),
+                "currency": raw[3:].upper(),
+                "secType": "CASH",
+                "exchange": "IDEALPRO",
+                "display_symbol": f"{raw[:3].upper()}/{raw[3:].upper()}"
+            }
+
+        # Default standard Equity / ETF
+        return {
+            "symbol": raw.upper(),
+            "currency": "USD",
+            "secType": st or "STK",
+            "exchange": "SMART",
+            "display_symbol": raw.upper()
+        }
+
+    @staticmethod
+    def get_market_quote(symbol: str = "EMR", sec_type: Optional[str] = None) -> Dict[str, Any]:
         """Queries official market quote and closing prices directly through funded IBKR Pro."""
-        sym = (symbol or "EMR").upper().strip()
+        spec = CopilotTools.parse_instrument_spec(symbol, sec_type)
+        sym = spec["display_symbol"]
         
         # 1. Query live IBKR Pro socket via Direct TCP Bridge (Port 4005)
         bridge_res = query_edge_tcp_bridge({
             "action": "GET_QUOTE",
-            "symbol": sym,
-            "args": {"symbol": sym, "durationStr": "5 D", "barSizeSetting": "1 day"}
+            "symbol": spec["symbol"],
+            "secType": spec["secType"],
+            "currency": spec["currency"],
+            "exchange": spec["exchange"],
+            "args": {
+                "symbol": spec["symbol"],
+                "secType": spec["secType"],
+                "currency": spec["currency"],
+                "exchange": spec["exchange"],
+                "durationStr": "5 D",
+                "barSizeSetting": "1 day"
+            }
         })
         if isinstance(bridge_res, dict) and bridge_res.get("status") == "SUCCESS":
             return bridge_res
@@ -346,7 +419,14 @@ class CopilotTools:
             from connection import ConnectionManager
             cm = ConnectionManager()
             if getattr(cm, "is_connected", False):
-                return cm.execute_synchronous_request("reqHistoricalData", {"symbol": sym, "durationStr": "5 D", "barSizeSetting": "1 day"})
+                return cm.execute_synchronous_request("reqHistoricalData", {
+                    "symbol": spec["symbol"],
+                    "secType": spec["secType"],
+                    "currency": spec["currency"],
+                    "exchange": spec["exchange"],
+                    "durationStr": "5 D",
+                    "barSizeSetting": "1 day"
+                })
         except Exception:
             pass
 
@@ -354,6 +434,7 @@ class CopilotTools:
         return {
             "status": "GATEWAY_OFFLINE",
             "symbol": sym,
+            "contract_spec": spec,
             "notice": "Interactive Brokers Gateway on port 4001/4002 is offline. Under the Zero Synthetic Policy, synthetic retail prices are prohibited. Please start the edge node or connect the IB Gateway.",
             "source": "Interactive Brokers Official API (ibapi.client.EClient)",
             "verified_at": datetime.now(timezone.utc).isoformat()
@@ -609,7 +690,8 @@ def execute_tool_call(tool_name: str, tool_args: Dict[str, Any]) -> Dict[str, An
             sym = tool_args.get("symbol") or tool_args.get("ticker") or tool_args.get("contract") or "EMR"
             if isinstance(sym, dict):
                 sym = sym.get("symbol", "EMR")
-            return CopilotTools.get_market_quote(str(sym))
+            sec_type = tool_args.get("sec_type") or tool_args.get("secType")
+            return CopilotTools.get_market_quote(str(sym), sec_type=sec_type)
         elif name in ["get_positions", "reqpositions", "reqpositionsmulti"]:
             return CopilotTools.get_positions()
         elif name in ["get_account_summary", "reqaccountsummary", "reqaccountupdates"]:
@@ -748,12 +830,15 @@ async def list_tools():
 SYSTEM_PROMPT = """You are the AlphaEngine Institutional Trading Copilot, connected directly to the Frankfurt GCE Edge Node (10.156.0.2:4002), IBKR Direct Market Access (DMA) socket, and multi-source regulatory data feeds (SEC EDGAR, ClinicalTrials.gov, OpenFDA, U.S. EIA Energy).
 
 Operational Guidelines:
-1. When asked about open positions, portfolio holdings, cash balances, or account metrics: invoke the appropriate account/position tool (`get_positions` or `get_account_summary`).
-2. When asked about SEC filings, company filings, or 8-K/10-K/10-Q forms: invoke `get_sec_filings`.
-3. When asked about biomedical catalysts, clinical trials, or FDA drug safety reports: invoke `get_clinical_trials` or `get_fda_safety_reports`.
-4. When asked about natural gas storage, crude oil, or energy telemetry: invoke `get_energy_telemetry`.
-5. For all general questions, conversational inquiries, financial analysis, institutional strategies, or IBKR relationship management questions: respond directly, professionally, and comprehensively without calling tools.
-6. Present data in clean Markdown tables and cite official edge nodes, timestamps, and accession numbers.
+1. When asked about market prices, quotes, forex rates, crypto, indices, or stocks: invoke `get_market_quote`. Contract specifications are dynamically inferred (e.g. 'EUR/USD' or 'EUR.USD' -> CASH IDEALPRO, 'BTC/USD' -> CRYPTO PAXOS, 'SPX' -> IND CBOE, 'NVDA' -> STK SMART).
+2. When asked about open positions, portfolio holdings, cash balances, or account metrics: invoke the appropriate account/position tool (`get_positions` or `get_account_summary`).
+3. When asked about SEC filings, company filings, or 8-K/10-K/10-Q forms: invoke `get_sec_filings`.
+4. When asked about biomedical catalysts, clinical trials, or FDA drug safety reports: invoke `get_clinical_trials` or `get_fda_safety_reports`.
+5. When asked about natural gas storage, crude oil, or energy telemetry: invoke `get_energy_telemetry`.
+6. STRICT ZERO-SYNTHETIC / ZERO-HALLUCINATION INVARIANT:
+   If a tool returns `status: "GATEWAY_OFFLINE"` or indicates that Interactive Brokers Gateway is offline, you MUST explicitly state that the Gateway is offline and live rates are currently unavailable. Under NO CIRCUMSTANCES should you fabricate, estimate, or hallucinate prices, quotes, or trade executions (e.g., do NOT invent a 1.0845 EUR/USD rate or mock fill). You must uphold institutional truth over speculation.
+7. For all general questions, conversational inquiries, financial analysis, institutional strategies, or IBKR relationship management questions: respond directly, professionally, and comprehensively without calling tools.
+8. Present data in clean Markdown tables and cite official edge nodes, timestamps, and accession numbers.
 """
 
 def extract_provider_and_key(selected_model: str, client_headers: Dict[str, str], payload_keys: Optional[Dict[str, str]], raw_id_override: Optional[str] = None) -> tuple[str, str, str]:
@@ -865,13 +950,17 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
             "type": "function",
             "function": {
                 "name": "get_market_quote",
-                "description": "Fetches the real-time quote, latest closing price, previous close, and 5-day closing price history for any stock or ETF symbol (e.g. EMR, NVDA, SPY, AAPL).",
+                "description": "Fetches real-time quote and historical bars directly through funded IBKR Pro for any instrument: Equities/ETFs (e.g., NVDA, EMR, SPY), Forex pairs (e.g., EUR/USD, GBP/JPY), Cryptos (e.g., BTC/USD), or Indices (e.g., SPX, DAX). Contract specifications are dynamically inferred.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "symbol": {
                             "type": "string",
-                            "description": "The equity or ETF ticker symbol (e.g., EMR, NVDA, SPY)"
+                            "description": "The symbol or ticker (e.g., EMR, NVDA, EUR/USD, BTC/USD, SPX)"
+                        },
+                        "sec_type": {
+                            "type": "string",
+                            "description": "Optional asset class: STK, CASH (Forex), CRYPTO, IND (Index). If omitted, inferred automatically."
                         }
                     },
                     "required": ["symbol"]
@@ -986,9 +1075,10 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
         base = os.environ.get("CUSTOM_AI_BASE_URL", "http://localhost:11434/v1")
         endpoint_url = f"{base}/chat/completions"
 
-    # Construct conversation messages with system prompt
+    # Construct conversation messages with system prompt (Sliding context window: last 6 messages)
     api_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    for m in request.messages:
+    recent_msgs = [m for m in request.messages if m.role in ["user", "assistant", "system"]][-6:]
+    for m in recent_msgs:
         msg_obj: Dict[str, Any] = {"role": m.role, "content": m.content}
         if m.tool_calls:
             msg_obj["tool_calls"] = m.tool_calls
@@ -1056,11 +1146,19 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
                     "summary": f"Retrieved {len(tool_result)} fields from edge adapter."
                 })
                 
+                content_str = json.dumps(tool_result)
+                if isinstance(tool_result, dict) and tool_result.get("status") == "GATEWAY_OFFLINE":
+                    content_str += (
+                        "\n\n[CRITICAL ZERO-SYNTHETIC INSTRUCTION: Interactive Brokers Gateway is OFFLINE. "
+                        "You MUST report that the gateway is offline and live market prices are currently unavailable. "
+                        "Under NO CIRCUMSTANCES should you fabricate, estimate, or hallucinate prices, quotes, or execution fills (e.g. NEVER output a fake rate like 1.0845). "
+                        "State clearly that the gateway is offline and the user should check Frankfurt edge node connectivity.]"
+                    )
                 api_messages.append({
                     "role": "tool",
                     "tool_call_id": tc.get("id"),
                     "name": fn_name,
-                    "content": json.dumps(tool_result)
+                    "content": content_str
                 })
 
             # Second turn: Synthesize final answer based on real tool output

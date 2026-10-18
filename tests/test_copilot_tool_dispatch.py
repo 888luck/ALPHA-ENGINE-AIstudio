@@ -68,3 +68,50 @@ def test_execute_tool_call_reflection_and_no_mock_dispatch():
         # Check that old mock note is absent
         assert "successfully dispatched to IBKR edge daemon" not in str(res)
         assert res.get("status") in ["SUCCESS", "GATEWAY_OFFLINE", "OFFLINE_SIMULATION", "TRANSMITTED", "EXECUTION_ERROR"]
+
+def test_dynamic_instrument_spec_parsing():
+    # Forex slash and dot format
+    eurusd = CopilotTools.parse_instrument_spec("EUR/USD")
+    assert eurusd["symbol"] == "EUR"
+    assert eurusd["currency"] == "USD"
+    assert eurusd["secType"] == "CASH"
+    assert eurusd["exchange"] == "IDEALPRO"
+    assert eurusd["display_symbol"] == "EUR/USD"
+
+    eurusd_dot = CopilotTools.parse_instrument_spec("EUR.USD")
+    assert eurusd_dot["symbol"] == "EUR"
+    assert eurusd_dot["currency"] == "USD"
+    assert eurusd_dot["secType"] == "CASH"
+    assert eurusd_dot["exchange"] == "IDEALPRO"
+
+    # Crypto
+    btc = CopilotTools.parse_instrument_spec("BTC/USD")
+    assert btc["symbol"] == "BTC"
+    assert btc["currency"] == "USD"
+    assert btc["secType"] == "CRYPTO"
+    assert btc["exchange"] == "PAXOS"
+
+    # Index
+    spx = CopilotTools.parse_instrument_spec("SPX")
+    assert spx["symbol"] == "SPX"
+    assert spx["secType"] == "IND"
+    assert spx["exchange"] == "CBOE"
+
+    # Equity
+    nvda = CopilotTools.parse_instrument_spec("NVDA")
+    assert nvda["symbol"] == "NVDA"
+    assert nvda["secType"] == "STK"
+    assert nvda["exchange"] == "SMART"
+
+def test_get_market_quote_forex_zero_synthetic():
+    res = CopilotTools.get_market_quote("EUR/USD")
+    assert res["symbol"] == "EUR/USD"
+    assert "contract_spec" in res
+    assert res["contract_spec"]["secType"] == "CASH"
+    assert res["contract_spec"]["exchange"] == "IDEALPRO"
+    if res.get("status") == "GATEWAY_OFFLINE":
+        assert "Zero Synthetic Policy" in res["notice"]
+        # Ensure no hallucinated price field is returned
+        assert "price" not in res
+        assert "close" not in res
+

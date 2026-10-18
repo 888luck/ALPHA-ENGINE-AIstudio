@@ -150,6 +150,9 @@ class EdgeTcpBridgeServer:
             args = cmd.get("args", {})
             if "symbol" in cmd and "symbol" not in args:
                 args["symbol"] = cmd["symbol"]
+            for field in ["secType", "currency", "exchange"]:
+                if field in cmd and field not in args:
+                    args[field] = cmd[field]
             if self.ibkr_dispatcher:
                 try:
                     res = self.ibkr_dispatcher(method, args)
