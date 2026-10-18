@@ -2,6 +2,7 @@ import path from "path";
 import fs from "fs";
 import { SystemSettings, ActiveTrade, HistoricalLog, Level2Book, ExecutionRecord } from "./types";
 import { edgeBridge } from "./edgeBridge";
+import { loadVaultCredentials } from "./vault";
 
 // Dedicated Local JSON Persistence for System Settings (Zero Firestore Dependency)
 const SETTINGS_FILE_PATH = path.join(process.cwd(), "system_settings.json");
@@ -101,6 +102,27 @@ export async function loadPersistentSettings() {
       console.log("[SETTINGS] No existing settings file found on disk. Initializing defaults.");
       await persistSettings();
     }
+
+    // Hydrate 12-factor vault credentials (overriding stale mocks with real credentials)
+    const vaultCreds = loadVaultCredentials();
+    systemSettings.geminiApiKey = vaultCreds.geminiApiKey || systemSettings.geminiApiKey;
+    systemSettings.customAiApiKey = vaultCreds.customAiApiKey || systemSettings.customAiApiKey;
+    systemSettings.nvidiaApiKey = vaultCreds.nvidiaApiKey || systemSettings.nvidiaApiKey;
+    systemSettings.openaiApiKey = vaultCreds.openaiApiKey || systemSettings.openaiApiKey;
+    systemSettings.anthropicApiKey = vaultCreds.anthropicApiKey || systemSettings.anthropicApiKey;
+    systemSettings.customAiBaseUrl = vaultCreds.customAiBaseUrl || systemSettings.customAiBaseUrl;
+    systemSettings.customAiModelName = vaultCreds.customAiModelName || systemSettings.customAiModelName;
+    systemSettings.selectedAiProvider = (vaultCreds.selectedAiProvider as any) || systemSettings.selectedAiProvider;
+    systemSettings.openFdaApiKey = vaultCreds.openFdaApiKey || systemSettings.openFdaApiKey;
+    systemSettings.fredApiKey = vaultCreds.fredApiKey || systemSettings.fredApiKey;
+    systemSettings.patentsApiKey = vaultCreds.patentsApiKey || systemSettings.patentsApiKey;
+    systemSettings.secUserAgent = vaultCreds.secUserAgent || systemSettings.secUserAgent;
+    systemSettings.ibkrHost = vaultCreds.edgeNodeHost || systemSettings.ibkrHost;
+    systemSettings.ibkrPort = vaultCreds.ibkrPort || systemSettings.ibkrPort;
+    systemSettings.ibkrClientId = vaultCreds.ibkrClientId || systemSettings.ibkrClientId;
+    systemSettings.ibkrAccountNumber = vaultCreds.ibkrAccountNumber || systemSettings.ibkrAccountNumber;
+    systemSettings.tradingMode = vaultCreds.tradingMode || systemSettings.tradingMode;
+    console.log("[VAULT] 12-Factor vault credentials successfully synchronized into runtime state.");
   } catch (err: any) {
     console.warn("[SETTINGS] Error loading settings from disk:", err.message);
   }

@@ -3,11 +3,16 @@ Test Suite: Direct TCP Socket Bridge (Zero Firestore Compliance)
 Universal Institutional Engineering Principles - Decoupled Lifecycle Resilience
 """
 
+import os
+import sys
 import time
-import pytest
-from edge_bridge import EdgeTcpBridgeServer
 import socket
 import json
+
+# Ensure repo root is on sys.path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from edge_bridge import EdgeTcpBridgeServer
 
 def test_direct_tcp_bridge_lifecycle_and_commands():
     # 1. Start EdgeTcpBridgeServer on test port
@@ -99,3 +104,10 @@ def test_direct_tcp_bridge_lifecycle_and_commands():
 
     finally:
         server.stop()
+
+
+if __name__ == "__main__":
+    print("Running test_direct_tcp_bridge test...")
+    test_direct_tcp_bridge_lifecycle_and_commands()
+    print("✓ test_direct_tcp_bridge_lifecycle_and_commands passed!")
+

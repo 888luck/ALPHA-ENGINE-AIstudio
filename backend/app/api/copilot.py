@@ -298,7 +298,7 @@ def load_tools_registry() -> List[Dict[str, Any]]:
 # =============================================================================
 def query_edge_tcp_bridge(payload: Dict[str, Any], timeout: float = 3.0) -> Dict[str, Any]:
     """Sends command over direct TCP socket (port 4005) to the Frankfurt GCE / local edge node."""
-    edge_host = os.environ.get("EDGE_NODE_IP") or os.environ.get("IBKR_HOST", "127.0.0.1")
+    edge_host = os.environ.get("EDGE_NODE_HOST") or os.environ.get("EDGE_NODE_IP") or os.environ.get("IBKR_HOST", "127.0.0.1")
     edge_port = int(os.environ.get("EDGE_TCP_PORT", 4005))
     auth_token = os.environ.get("EDGE_AUTH_TOKEN", "ALPHA_EDGE_SECRET_2026")
     

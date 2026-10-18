@@ -46,7 +46,7 @@ This document is the authoritative institutional blueprint of the Alpha Engine H
 
 ## 🔐 2. The 4-Pillar API Connection & Feed Vault
 
-The 4-Pillar Vault (`ApiVaultModal.tsx` & `/api/vault/credentials`) governs all system connectivity. Credentials persist to masked server-side memory (`system_settings.json` via `state.ts`) and GCP Secret Manager (`alpha-engine-env`):
+The 4-Pillar Vault (`ApiVaultModal.tsx`, `/api/vault/credentials`, `vault.ts`, and `config_loader.py`) governs all system connectivity. Credentials adhere strictly to the 12-Factor decoupled architecture: stored in standard POSIX format at `/etc/alpha-engine/secrets.env` (`chmod 600 root:root`), with in-memory sync across `process.env` and `os.environ` without proprietary cloud SDK lock-in:
 
 ### Pillar 1: Broker & Execution Infrastructure
 * **Target:** Interactive Brokers Gateway / TWS via `connection.py` and `edge_bridge.py`.
@@ -55,12 +55,16 @@ The 4-Pillar Vault (`ApiVaultModal.tsx` & `/api/vault/credentials`) governs all 
   - `ibkrHost`: Edge private IP (Frankfurt VPC `10.156.0.2` or loopback `127.0.0.1`).
   - `ibkrPort`: `4001` (Live Production) or `4002` (Paper Simulation).
   - `ibkrClientId`: Socket client identifier (default `10`).
+  - `ibkrPaperUsername` & `ibkrPaperPassword`: Automated credentials for 24/7 autonomous paper simulation.
+  - `ibkrLiveUsername` & `ibkrLivePassword`: Credentials for live DMA execution (triggers IB Key phone 2FA push).
   - `mifid2DecisionMaker` & `mifid2ExecutionTrader`: Regulatory algorithm shortcodes (e.g. `ALGO_DEC_992` / `ALGO_EXE_554`).
-* **Wiring & Mechanics:** Toggling execution lanes updates `server.ts` state and pushes an atomic payload across Direct TCP Bridge port `4005` to synchronize `dynamic_risk_manager.py`.
+* **Wiring & Mechanics:** Toggling execution lanes updates `server.ts` state and pushes an atomic payload across Direct TCP Bridge port `4005` to synchronize `main.py` and trigger `switch_gateway_mode.py`.
 
-### Pillar 2: Cloud & Edge Infrastructure (Zero Cloud DB / Zero Firestore)
+### Pillar 2: Cloud & Edge Infrastructure (12-Factor Decoupled Vault & Zero Cloud DB)
 * **Target:** Frankfurt Compute Engine VM (`alpha-edge-node` in `europe-west3-a`) + Cloud Run control plane.
 * **Mechanics:**
+  - **12-Factor Decoupled Vault (`vault.ts`, `config_loader.py`):** Multi-cloud secrets management using standard POSIX files (`/etc/alpha-engine/secrets.env` locked to `chmod 600`) with zero proprietary cloud SDK lock-in. Full portability across GCP, Hetzner, AWS, or Bare Metal.
+  - **Dynamic Edge Endpoint Resolution:** Eliminates hardcoded `127.0.0.1` references; `get_edge_endpoint()` resolves the active edge daemon dynamically from `EDGE_NODE_HOST` / `EDGE_NODE_IP` and `EDGE_TCP_PORT`.
   - **Zero Firebase / Firestore Invariant:** Completely purged. All synchronization is direct TCP socket streaming over port `4005` (<5ms latency).
   - **Local Atomic Persistence:** Failover leases (`ha_leader_lock.json`), transaction audits (`tca_executions.json`), attribution lessons (`audit_history.json`), and risk limits (`system_risk_state.json`) use atomic file write-and-replace (`.tmp` write followed by `os.replace`).
 

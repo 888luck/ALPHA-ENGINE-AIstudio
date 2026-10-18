@@ -5,6 +5,8 @@ import net from "net";
 import { systemSettings, activeTrades, historicalLogs, marketBooks, dynamicBaskets, persistSettings, setActiveTrades, setHistoricalLogs } from "../state";
 import { authMiddleware, getMaskedSettings } from "../middleware/auth";
 import { invalidateModelsCache } from "./copilot";
+import { loadVaultCredentials, getMaskedVaultCredentials, saveVaultCredentials } from "../vault";
+import { edgeBridge } from "../edgeBridge";
 
 export const systemRouter = Router();
 
@@ -62,17 +64,52 @@ systemRouter.get("/api/state", (req, res) => {
 });
 
 systemRouter.get("/api/vault/credentials", authMiddleware, (req, res) => {
-  res.json({
-    geminiApiKey: systemSettings.geminiApiKey || process.env.GEMINI_API_KEY || "",
-    customAiApiKey: systemSettings.customAiApiKey || process.env.GROQ_API_KEY || "",
-    nvidiaApiKey: systemSettings.nvidiaApiKey || process.env.NVIDIA_API_KEY || process.env.NVIDIA_INFERENCE_API_KEY || "",
-    openaiApiKey: systemSettings.openaiApiKey || process.env.OPENAI_API_KEY || "",
-    anthropicApiKey: systemSettings.anthropicApiKey || process.env.ANTHROPIC_API_KEY || "",
-    openFdaApiKey: systemSettings.openFdaApiKey || "",
-    fredApiKey: systemSettings.fredApiKey || "",
-    patentsApiKey: systemSettings.patentsApiKey || "",
-    secUserAgent: systemSettings.secUserAgent || ""
-  });
+  const masked = getMaskedVaultCredentials();
+  res.json(masked);
+});
+
+systemRouter.post("/api/vault/credentials", authMiddleware, (req, res) => {
+  try {
+    const updates = req.body || {};
+    const updated = saveVaultCredentials(updates);
+    
+    // Synchronize relevant keys to systemSettings in memory
+    if (updates.geminiApiKey !== undefined) systemSettings.geminiApiKey = updates.geminiApiKey;
+    if (updates.groqApiKey !== undefined || updates.customAiApiKey !== undefined) {
+      systemSettings.customAiApiKey = updates.groqApiKey || updates.customAiApiKey;
+    }
+    if (updates.nvidiaApiKey !== undefined) systemSettings.nvidiaApiKey = updates.nvidiaApiKey;
+    if (updates.openaiApiKey !== undefined) systemSettings.openaiApiKey = updates.openaiApiKey;
+    if (updates.anthropicApiKey !== undefined) systemSettings.anthropicApiKey = updates.anthropicApiKey;
+    if (updates.customAiBaseUrl !== undefined) systemSettings.customAiBaseUrl = updates.customAiBaseUrl;
+    if (updates.customAiModelName !== undefined) systemSettings.customAiModelName = updates.customAiModelName;
+    if (updates.selectedAiProvider !== undefined) systemSettings.selectedAiProvider = updates.selectedAiProvider;
+    if (updates.openFdaApiKey !== undefined) systemSettings.openFdaApiKey = updates.openFdaApiKey;
+    if (updates.fredApiKey !== undefined) systemSettings.fredApiKey = updates.fredApiKey;
+    if (updates.patentsApiKey !== undefined) systemSettings.patentsApiKey = updates.patentsApiKey;
+    if (updates.secUserAgent !== undefined) systemSettings.secUserAgent = updates.secUserAgent;
+    if (updates.ibkrAccountNumber !== undefined) systemSettings.ibkrAccountNumber = updates.ibkrAccountNumber;
+    if (updates.ibkrHost !== undefined) systemSettings.ibkrHost = updates.ibkrHost;
+    if (updates.ibkrPort !== undefined) systemSettings.ibkrPort = Number(updates.ibkrPort);
+    if (updates.ibkrClientId !== undefined) systemSettings.ibkrClientId = Number(updates.ibkrClientId);
+    if (updates.ibkrPaperUsername !== undefined) systemSettings.ibkrPaperUsername = updates.ibkrPaperUsername;
+    if (updates.ibkrPaperPassword !== undefined) systemSettings.ibkrPaperPassword = updates.ibkrPaperPassword;
+    if (updates.ibkrLiveUsername !== undefined) systemSettings.ibkrLiveUsername = updates.ibkrLiveUsername;
+    if (updates.ibkrLivePassword !== undefined) systemSettings.ibkrLivePassword = updates.ibkrLivePassword;
+    if (updates.tradingMode !== undefined) systemSettings.tradingMode = updates.tradingMode;
+
+    persistSettings();
+    invalidateModelsCache();
+
+    // Proactively push updated credentials to Frankfurt Edge Node over TCP Bridge (Port 4005)
+    edgeBridge.syncSettings({ ...systemSettings, ...updates }).catch((err: any) => {
+      console.warn("[VAULT TCP SYNC NOTICE] Edge sync notice (edge node offline or local):", err.message);
+    });
+
+    res.json({ success: true, credentials: getMaskedVaultCredentials() });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
@@ -145,6 +182,7 @@ systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
   if (patentsApiKey !== undefined) systemSettings.patentsApiKey = patentsApiKey;
   if (secUserAgent !== undefined) systemSettings.secUserAgent = secUserAgent;
 
+  saveVaultCredentials(req.body);
   persistSettings();
   invalidateModelsCache();
   res.json({ success: true, settings: getMaskedSettings(systemSettings) });
@@ -172,12 +210,20 @@ systemRouter.post("/api/sync-from-cloud", (req, res) => {
 });
 
 systemRouter.post("/api/test-broker-connection", (req, res) => {
-  // If running on Cloud Run and no host is explicitly provided, default to EDGE_NODE_IP or loopback
-  const defaultHost = process.env.EDGE_NODE_IP || (process.env.K_SERVICE ? "10.156.0.2" : "10.156.0.2");
-  const host = req.body.host || defaultHost;
+  const isCloudRun = !!process.env.K_SERVICE;
+  const vaultCreds = loadVaultCredentials();
+  const dynamicEdgeHost = process.env.EDGE_NODE_HOST || process.env.EDGE_NODE_IP || vaultCreds.edgeNodeHost || (isCloudRun ? "10.156.0.2" : "127.0.0.1");
+
+  // Dynamic Bridge Endpoint Routing: If running on Cloud Run and request specifies 127.0.0.1 (or empty),
+  // automatically route socket traffic to the dynamic edge host across the VPC connector!
+  let host = req.body.host;
+  let rerouted = false;
+  if (!host || (isCloudRun && host === "127.0.0.1")) {
+    host = dynamicEdgeHost;
+    rerouted = (req.body.host === "127.0.0.1");
+  }
   const port = Number(req.body.port) || systemSettings.ibkrPort || 4002;
   const startTime = Date.now();
-  const isCloudRun = !!process.env.K_SERVICE;
   
   const socket = new net.Socket();
   let finished = false;
@@ -194,7 +240,7 @@ systemRouter.post("/api/test-broker-connection", (req, res) => {
       host,
       port,
       status: "CONNECTED",
-      message: `TCP handshake with IB Gateway (${host}:${port}) succeeded in ${latencyMs}ms.`
+      message: `TCP handshake with IB Gateway (${host}:${port}) succeeded in ${latencyMs}ms.${rerouted ? " (Dynamic Bridge Endpoint Routing auto-redirected from container loopback)" : ""}`
     });
   });
 
@@ -207,9 +253,7 @@ systemRouter.post("/api/test-broker-connection", (req, res) => {
       host,
       port,
       status: "TIMEOUT",
-      message: isCloudRun && host === "127.0.0.1"
-        ? `Cloud Run container isolation: IB Gateway runs on the Frankfurt Edge Node VM (10.156.0.2:4002 via VPC connector), not inside this stateless Cloud Run container.`
-        : `TCP socket timeout after 3500ms attempting to reach IB Gateway (${host}:${port}).`
+      message: `TCP socket timeout after 3500ms attempting to reach IB Gateway (${host}:${port}). Check if the Edge VM (alpha-edge-node) and ibgateway service are running in Frankfurt.`
     });
   });
 
@@ -222,9 +266,7 @@ systemRouter.post("/api/test-broker-connection", (req, res) => {
       host,
       port,
       status: "REFUSED",
-      message: isCloudRun && host === "127.0.0.1"
-        ? `Cloud Run container isolation: IB Gateway runs on the Frankfurt Edge Node VM (10.156.0.2:4002 via VPC connector), not inside this stateless Cloud Run container (127.0.0.1:4002 returned ECONNREFUSED).`
-        : `TCP connection to ${host}:${port} failed: ${err.message}`
+      message: `TCP connection to ${host}:${port} failed (${err.message}). Verify that IB Gateway is active on the Frankfurt Edge Node (${host}) on port ${port}.`
     });
   });
 

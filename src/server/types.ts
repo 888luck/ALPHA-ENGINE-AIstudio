@@ -42,6 +42,8 @@ export interface SystemSettings {
   ibkrClientId: number;
   ibkrPaperUsername?: string;
   ibkrPaperPassword?: string;
+  ibkrLiveUsername?: string;
+  ibkrLivePassword?: string;
   mifid2DecisionMaker: string;
   mifid2ExecutionTrader: string;
   referenceEquity: number;

@@ -22,15 +22,26 @@ export class EdgeBridgeClient {
   private authToken: string;
 
   constructor() {
-    this.host = process.env.EDGE_NODE_IP || "127.0.0.1";
+    this.host = process.env.EDGE_NODE_HOST || process.env.EDGE_NODE_IP || "127.0.0.1";
     this.port = Number(process.env.EDGE_TCP_PORT) || 4005;
     this.authToken = process.env.EDGE_AUTH_TOKEN || "ALPHA_EDGE_SECRET_2026";
+  }
+
+  public getHost(): string {
+    return process.env.EDGE_NODE_HOST || process.env.EDGE_NODE_IP || this.host;
+  }
+
+  public getPort(): number {
+    return Number(process.env.EDGE_TCP_PORT) || this.port;
   }
 
   /**
    * Sends a single newline-delimited JSON command over a raw TCP socket and awaits the JSON response.
    */
   public async sendCommand(payload: EdgeCommandPayload, timeoutMs: number = 3000): Promise<any> {
+    const targetHost = this.getHost();
+    const targetPort = this.getPort();
+
     return new Promise((resolve, reject) => {
       const socket = new net.Socket();
       let responseData = "";
@@ -40,11 +51,11 @@ export class EdgeBridgeClient {
         if (!settled) {
           settled = true;
           socket.destroy();
-          reject(new Error(`Edge TCP Bridge timeout after ${timeoutMs}ms connecting to ${this.host}:${this.port}`));
+          reject(new Error(`Edge TCP Bridge timeout after ${timeoutMs}ms connecting to ${targetHost}:${targetPort}`));
         }
       }, timeoutMs);
 
-      socket.connect(this.port, this.host, () => {
+      socket.connect(targetPort, targetHost, () => {
         const fullPayload = {
           ...payload,
           token: this.authToken,

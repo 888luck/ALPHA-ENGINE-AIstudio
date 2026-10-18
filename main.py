@@ -7,7 +7,7 @@ import argparse
 import zoneinfo
 from typing import List, Dict, Any, Optional
 
-from config_loader import load_config
+from config_loader import load_config, save_secrets_to_vault
 from connection import ConnectionManager
 from risk_engine import DRMMiddleware
 from alpha_strategy import AlphaStrategy, ProactiveSimulator
@@ -240,6 +240,12 @@ def main_loop():
         return {"flushed": True, "active_positions": len(cm.active_positions)}
 
     def handle_direct_settings(settings_dict):
+        # 12-Factor Vault Persistence on the Edge Node
+        try:
+            save_secrets_to_vault(settings_dict)
+        except Exception as e:
+            print(f"[TCP BRIDGE WARN] Error persisting secrets to vault: {e}")
+
         if "routerLocked" in settings_dict:
             drm.router_locked = bool(settings_dict["routerLocked"])
             print(f"[TCP BRIDGE] Updated router_locked = {drm.router_locked}")

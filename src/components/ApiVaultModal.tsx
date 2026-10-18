@@ -62,7 +62,14 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
 
   // Form State for Broker
   const [accountNumber, setAccountNumber] = useState(() => getStoredVaultValue("ibkrAccountNumber", settings?.ibkrAccountNumber || "DU1234567"));
-  const [ibkrHost, setIbkrHost] = useState(() => getStoredVaultValue("ibkrHost", settings?.ibkrHost || (typeof window !== "undefined" && window.location.hostname.includes("run.app") ? "10.156.0.2" : "10.156.0.2")));
+  const [ibkrHost, setIbkrHost] = useState(() => {
+    const isCloudRun = typeof window !== "undefined" && window.location.hostname.includes("run.app");
+    const stored = getStoredVaultValue("ibkrHost", "");
+    if (isCloudRun && (!stored || stored === "127.0.0.1")) return "10.156.0.2";
+    if (stored) return stored;
+    if (settings?.ibkrHost && settings.ibkrHost !== "127.0.0.1") return settings.ibkrHost;
+    return isCloudRun ? "10.156.0.2" : (settings?.ibkrHost || "10.156.0.2");
+  });
   const [ibkrPort, setIbkrPort] = useState(() => Number(getStoredVaultValue("ibkrPort", String(settings?.ibkrPort || 4002))));
   const [ibkrClientId, setIbkrClientId] = useState(() => Number(getStoredVaultValue("ibkrClientId", String(settings?.ibkrClientId || 1))));
   const [mifidMaker, setMifidMaker] = useState(() => getStoredVaultValue("mifid2DecisionMaker", settings?.mifid2DecisionMaker || "ALGO_DEC_992"));
@@ -71,7 +78,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
   const [ibkrPassword, setIbkrPassword] = useState(() => getStoredVaultValue("ibkrPaperPassword", settings?.ibkrPaperPassword || ""));
 
   // Form State for Cloud & Edge Node
-  const [edgeNodeStatus, setEdgeNodeStatus] = useState<string>("Local Edge Daemon (127.0.0.1)");
+  const [edgeNodeStatus, setEdgeNodeStatus] = useState<string>("Frankfurt Edge Node (10.156.0.2)");
 
   // Form State for AI (Zero-Omission Persistent Hydration)
   const [geminiKey, setGeminiKey] = useState(() => getStoredVaultValue("geminiApiKey", customGeminiApiKey || settings?.geminiApiKey));
@@ -101,6 +108,24 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
         .then((r) => r.json())
         .then((creds) => {
           if (creds && typeof creds === "object") {
+            const isCloudRun = typeof window !== "undefined" && window.location.hostname.includes("run.app");
+            if (creds.ibkrAccountNumber) setAccountNumber(creds.ibkrAccountNumber);
+            if (creds.ibkrHost) {
+              if (isCloudRun && creds.ibkrHost === "127.0.0.1") {
+                setIbkrHost("10.156.0.2");
+              } else {
+                setIbkrHost(creds.ibkrHost);
+              }
+            } else if (isCloudRun) {
+              setIbkrHost("10.156.0.2");
+            }
+            if (creds.ibkrPort) setIbkrPort(Number(creds.ibkrPort));
+            if (creds.ibkrClientId) setIbkrClientId(Number(creds.ibkrClientId));
+            if (creds.mifid2DecisionMaker) setMifidMaker(creds.mifid2DecisionMaker);
+            if (creds.mifid2ExecutionTrader) setMifidTrader(creds.mifid2ExecutionTrader);
+            if (creds.ibkrPaperUsername) setIbkrUsername(creds.ibkrPaperUsername);
+            if (creds.edgeNodeHost) setEdgeNodeStatus(creds.edgeNodeHost);
+
             if (creds.geminiApiKey) setGeminiKey(creds.geminiApiKey);
             if (creds.customAiApiKey) setGroqKey(creds.customAiApiKey);
             if (creds.nvidiaApiKey) setNvidiaKey(creds.nvidiaApiKey);
@@ -496,7 +521,41 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-mono font-bold text-slate-600 uppercase">Target Host IP:</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-mono font-bold text-slate-600 uppercase">Target Host IP:</label>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIbkrHost("10.156.0.2");
+                          persistVaultItem("ibkrHost", "10.156.0.2");
+                        }}
+                        className={`text-[9px] font-mono px-1.5 py-0.5 rounded cursor-pointer transition border ${
+                          ibkrHost === "10.156.0.2"
+                            ? "bg-indigo-600 text-white border-indigo-600 font-bold"
+                            : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+                        }`}
+                        title="Frankfurt Edge Node Internal IP (VPC)"
+                      >
+                        Node (10.156.0.2)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIbkrHost("127.0.0.1");
+                          persistVaultItem("ibkrHost", "127.0.0.1");
+                        }}
+                        className={`text-[9px] font-mono px-1.5 py-0.5 rounded cursor-pointer transition border ${
+                          ibkrHost === "127.0.0.1"
+                            ? "bg-indigo-600 text-white border-indigo-600 font-bold"
+                            : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+                        }`}
+                        title="Local Machine Loopback"
+                      >
+                        Local (127.0.0.1)
+                      </button>
+                    </div>
+                  </div>
                   <input
                     type="text"
                     value={ibkrHost}
@@ -695,6 +754,20 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                     )}
                   </div>
                   <p className="text-[11px] leading-relaxed">{testResults["ibkr"].message}</p>
+                  {!testResults["ibkr"].success && typeof window !== "undefined" && window.location.hostname.includes("run.app") && ibkrHost === "127.0.0.1" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIbkrHost("10.156.0.2");
+                        persistVaultItem("ibkrHost", "10.156.0.2");
+                        runTestProbe("ibkr", "/api/test-broker-connection", { host: "10.156.0.2", port: ibkrPort });
+                      }}
+                      className="mt-2 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition"
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>Switch to Frankfurt Node (10.156.0.2) & Retest</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>

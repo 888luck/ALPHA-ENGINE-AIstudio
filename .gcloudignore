@@ -1,0 +1,10 @@
+.gcloudignore
+.git
+.gitignore
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.log
+archive/

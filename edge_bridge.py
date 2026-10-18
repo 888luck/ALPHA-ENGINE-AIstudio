@@ -16,7 +16,7 @@ from typing import Callable, Dict, Any, Optional
 class EdgeTcpBridgeServer:
     def __init__(self, host: str = "0.0.0.0", port: int = 4005, auth_token: Optional[str] = None):
         self.host = host
-        self.port = int(os.getenv("EDGE_TCP_PORT", port))
+        self.port = port if port != 4005 else int(os.getenv("EDGE_TCP_PORT", 4005))
         self.auth_token = auth_token or os.getenv("EDGE_AUTH_TOKEN", "ALPHA_EDGE_SECRET_2026")
         self.running = False
         self.server_socket: Optional[socket.socket] = None

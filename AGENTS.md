@@ -133,3 +133,24 @@ To support autonomous, high-depth conversational reasoning across current and fu
    - Risk management parameters and open trade state persist to local atomic JSON files with direct atomic write-and-replace patterns (`.tmp` write followed by `os.replace`), eliminating race conditions, network lock contention, and cloud database billing overhead.
 3. **Direct TCP Socket Telemetry**:
    - High-frequency communication between Cloud Run and the Frankfurt Edge VM uses direct, encrypted TCP streaming (`edge_bridge.py` port 4005) with microsecond serialization and zero cloud database middleware.
+
+---
+
+## 🔒 10. 12-Factor Decoupled Vault & Zero Hardcoded Endpoints Invariant
+
+1. **Strict 12-Factor POSIX Secrets Hierarchy**:
+   - Secrets and API keys must NEVER be hardcoded in repository files, committed to git, or bound to proprietary cloud SDKs (e.g. `google-cloud-secretmanager`).
+   - All credentials across the 4 pillars (Brokerage, Infrastructure, AI Providers, Feeds) must resolve via the standard 12-factor priority hierarchy:
+     1. `/etc/alpha-engine/secrets.env` (Hardened POSIX environment file, `chmod 600 root:root`)
+     2. `process.env` / `os.environ` (Host / container injection)
+     3. `.env` (Local development fallback)
+     4. `system_settings.json` (Local disk persistence)
+2. **Zero Hardcoded Host/Socket Endpoints**:
+   - Callers (backtester, copilot, integration tests, CLI tools) must NEVER hardcode `127.0.0.1` or socket ports.
+   - All connections to the edge execution node must resolve dynamically via `get_edge_endpoint()` from `EDGE_NODE_HOST` / `EDGE_NODE_IP` and `EDGE_TCP_PORT`.
+3. **Atomic In-Memory & Disk Synchronization**:
+   - Whenever credentials or configurations are updated via the dashboard (`ApiVaultModal` / `/api/vault/credentials`), changes must:
+     a. Update running process memory (`process.env` / `os.environ`) instantly without requiring service restarts.
+     b. Write atomically to the secrets file using atomic write-and-replace (`.tmp` write followed by `fs.renameSync` / `os.replace`) with strict `0o600` permissions.
+     c. Push the updated settings payload across the Direct TCP Bridge (`port 4005`) to synchronize the Frankfurt Edge VM in real time.
+

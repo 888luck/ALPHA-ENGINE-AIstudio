@@ -16,6 +16,12 @@ try:
 except ImportError:
     InstitutionalBacktestAuditor = None
 
+try:
+    from config_loader import get_edge_endpoint
+except ImportError:
+    def get_edge_endpoint():
+        return os.environ.get("EDGE_NODE_HOST") or os.environ.get("EDGE_NODE_IP") or "127.0.0.1", int(os.environ.get("EDGE_TCP_PORT", "4005"))
+
 class AlphaBacktestingEngine:
     """
     Local Quantitative Backtesting Engine in Python.
@@ -458,11 +464,12 @@ class AlphaBacktestingEngine:
         
         bars = []
         
-        # 1. Attempt query via Edge TCP Bridge (port 4005) to IBKR Pro Gateway
+        # 1. Attempt query via Edge TCP Bridge to IBKR Pro Gateway
+        edge_host, edge_port = get_edge_endpoint()
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(5.0)
-            sock.connect(("127.0.0.1", 4005))
+            sock.connect((edge_host, edge_port))
             cmd = {
                 "action": "DISPATCH_IBKR",
                 "method": "reqHistoricalData",
@@ -488,10 +495,10 @@ class AlphaBacktestingEngine:
                 if resp.get("status") == "SUCCESS" and "bars" in resp:
                     bars = resp["bars"]
                     if len(bars) > 0:
-                        print(f"[BACKTESTER] Successfully retrieved {len(bars)} verified historical bars for {symbol} from IBKR Pro Tape.", file=sys.stderr)
+                        print(f"[BACKTESTER] Successfully retrieved {len(bars)} verified historical bars for {symbol} from IBKR Pro Tape via {edge_host}:{edge_port}.", file=sys.stderr)
                         return bars
         except Exception as e:
-            print(f"[BACKTESTER] TCP Bridge to IBKR Pro currently unreachable on port 4005 ({e}). Checking local verified cache...", file=sys.stderr)
+            print(f"[BACKTESTER] TCP Bridge to IBKR Pro currently unreachable at {edge_host}:{edge_port} ({e}). Checking local verified cache...", file=sys.stderr)
 
         # 2. Check local verified historical cache if TCP bridge offline
         cache_filename = f"historical_bars_{symbol.upper()}_{timeframe.lower()}.json"
@@ -513,7 +520,7 @@ class AlphaBacktestingEngine:
 
         # 3. Institutional Policy: Never fabricate random walks or scrape retail portals
         raise RuntimeError(
-            f"Zero Synthetic Policy Violation: Live Interactive Brokers Pro Gateway on port 4005 is offline and "
+            f"Zero Synthetic Policy Violation: Live Interactive Brokers Pro Gateway at {edge_host}:{edge_port} is offline and "
             f"no verified local market cache exists for {symbol} ({start_date_str} to {end_date_str}). "
             f"Random-walk fabrication and retail web scraping are strictly prohibited. "
             f"Connect IB Gateway or provide authentic broker historical bars."
