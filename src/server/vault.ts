@@ -155,6 +155,12 @@ export function maskSecret(val?: string, fullMask: boolean = false): string {
   return `${trimmed.slice(0, 4)}...${trimmed.slice(-4)}`;
 }
 
+export function isMaskedString(val?: any): boolean {
+  if (!val || typeof val !== "string") return false;
+  const s = val.trim();
+  return s.includes("...") || s.includes("••••") || s === "configured";
+}
+
 /**
  * Returns safe masked credentials for UI rendering across ApiVaultModal and Sub-menus.
  */
@@ -192,7 +198,20 @@ export function getMaskedVaultCredentials(): Record<string, any> {
  */
 export function saveVaultCredentials(updates: Partial<VaultCredentials>): VaultCredentials {
   const current = loadVaultCredentials();
-  const merged: VaultCredentials = { ...current, ...updates };
+  
+  // Clean incoming updates: Never let masked strings overwrite existing secrets!
+  const sanitizedUpdates: Partial<VaultCredentials> = {};
+  for (const [k, v] of Object.entries(updates)) {
+    if (v !== undefined && v !== null) {
+      if (typeof v === "string" && isMaskedString(v)) {
+        // Skip masked string
+        continue;
+      }
+      (sanitizedUpdates as any)[k] = v;
+    }
+  }
+
+  const merged: VaultCredentials = { ...current, ...sanitizedUpdates };
 
   // Map updates to standard environment variable keys
   const envMap: Record<string, string> = {

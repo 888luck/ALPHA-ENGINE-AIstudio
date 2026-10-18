@@ -5,7 +5,7 @@ import net from "net";
 import { systemSettings, activeTrades, historicalLogs, marketBooks, dynamicBaskets, persistSettings, setActiveTrades, setHistoricalLogs } from "../state";
 import { authMiddleware, getMaskedSettings } from "../middleware/auth";
 import { invalidateModelsCache } from "./copilot";
-import { loadVaultCredentials, getMaskedVaultCredentials, saveVaultCredentials } from "../vault";
+import { loadVaultCredentials, getMaskedVaultCredentials, saveVaultCredentials, isMaskedString } from "../vault";
 import { edgeBridge } from "../edgeBridge";
 
 export const systemRouter = Router();
@@ -64,8 +64,10 @@ systemRouter.get("/api/state", (req, res) => {
 });
 
 systemRouter.get("/api/vault/credentials", authMiddleware, (req, res) => {
-  const masked = getMaskedVaultCredentials();
-  res.json(masked);
+  // Return the authentic credentials for the authorized administrative operator
+  // so the Vault UI input elements receive clean unmasked values.
+  const creds = loadVaultCredentials();
+  res.json(creds);
 });
 
 systemRouter.post("/api/vault/credentials", authMiddleware, (req, res) => {
@@ -73,36 +75,38 @@ systemRouter.post("/api/vault/credentials", authMiddleware, (req, res) => {
     const updates = req.body || {};
     const updated = saveVaultCredentials(updates);
     
-    // Synchronize relevant keys to systemSettings in memory
-    if (updates.geminiApiKey !== undefined) systemSettings.geminiApiKey = updates.geminiApiKey;
-    if (updates.groqApiKey !== undefined || updates.customAiApiKey !== undefined) {
+    // Synchronize relevant keys to systemSettings in memory (ignoring masked strings)
+    const isClean = (v: any) => v !== undefined && v !== null && typeof v === "string" && !isMaskedString(v);
+
+    if (isClean(updates.geminiApiKey)) systemSettings.geminiApiKey = updates.geminiApiKey;
+    if (isClean(updates.groqApiKey) || isClean(updates.customAiApiKey)) {
       systemSettings.customAiApiKey = updates.groqApiKey || updates.customAiApiKey;
     }
-    if (updates.nvidiaApiKey !== undefined) systemSettings.nvidiaApiKey = updates.nvidiaApiKey;
-    if (updates.openaiApiKey !== undefined) systemSettings.openaiApiKey = updates.openaiApiKey;
-    if (updates.anthropicApiKey !== undefined) systemSettings.anthropicApiKey = updates.anthropicApiKey;
-    if (updates.customAiBaseUrl !== undefined) systemSettings.customAiBaseUrl = updates.customAiBaseUrl;
-    if (updates.customAiModelName !== undefined) systemSettings.customAiModelName = updates.customAiModelName;
+    if (isClean(updates.nvidiaApiKey)) systemSettings.nvidiaApiKey = updates.nvidiaApiKey;
+    if (isClean(updates.openaiApiKey)) systemSettings.openaiApiKey = updates.openaiApiKey;
+    if (isClean(updates.anthropicApiKey)) systemSettings.anthropicApiKey = updates.anthropicApiKey;
+    if (isClean(updates.customAiBaseUrl)) systemSettings.customAiBaseUrl = updates.customAiBaseUrl;
+    if (isClean(updates.customAiModelName)) systemSettings.customAiModelName = updates.customAiModelName;
     if (updates.selectedAiProvider !== undefined) systemSettings.selectedAiProvider = updates.selectedAiProvider;
-    if (updates.openFdaApiKey !== undefined) systemSettings.openFdaApiKey = updates.openFdaApiKey;
-    if (updates.fredApiKey !== undefined) systemSettings.fredApiKey = updates.fredApiKey;
-    if (updates.patentsApiKey !== undefined) systemSettings.patentsApiKey = updates.patentsApiKey;
-    if (updates.secUserAgent !== undefined) systemSettings.secUserAgent = updates.secUserAgent;
+    if (isClean(updates.openFdaApiKey)) systemSettings.openFdaApiKey = updates.openFdaApiKey;
+    if (isClean(updates.fredApiKey)) systemSettings.fredApiKey = updates.fredApiKey;
+    if (isClean(updates.patentsApiKey)) systemSettings.patentsApiKey = updates.patentsApiKey;
+    if (isClean(updates.secUserAgent)) systemSettings.secUserAgent = updates.secUserAgent;
     if (updates.ibkrAccountNumber !== undefined) systemSettings.ibkrAccountNumber = updates.ibkrAccountNumber;
     if (updates.ibkrHost !== undefined) systemSettings.ibkrHost = updates.ibkrHost;
     if (updates.ibkrPort !== undefined) systemSettings.ibkrPort = Number(updates.ibkrPort);
     if (updates.ibkrClientId !== undefined) systemSettings.ibkrClientId = Number(updates.ibkrClientId);
-    if (updates.ibkrPaperUsername !== undefined) systemSettings.ibkrPaperUsername = updates.ibkrPaperUsername;
-    if (updates.ibkrPaperPassword !== undefined) systemSettings.ibkrPaperPassword = updates.ibkrPaperPassword;
-    if (updates.ibkrLiveUsername !== undefined) systemSettings.ibkrLiveUsername = updates.ibkrLiveUsername;
-    if (updates.ibkrLivePassword !== undefined) systemSettings.ibkrLivePassword = updates.ibkrLivePassword;
+    if (isClean(updates.ibkrPaperUsername)) systemSettings.ibkrPaperUsername = updates.ibkrPaperUsername;
+    if (isClean(updates.ibkrPaperPassword)) systemSettings.ibkrPaperPassword = updates.ibkrPaperPassword;
+    if (isClean(updates.ibkrLiveUsername)) systemSettings.ibkrLiveUsername = updates.ibkrLiveUsername;
+    if (isClean(updates.ibkrLivePassword)) systemSettings.ibkrLivePassword = updates.ibkrLivePassword;
     if (updates.tradingMode !== undefined) systemSettings.tradingMode = updates.tradingMode;
 
     persistSettings();
     invalidateModelsCache();
 
     // Proactively push updated credentials to Frankfurt Edge Node over TCP Bridge (Port 4005)
-    edgeBridge.syncSettings({ ...systemSettings, ...updates }).catch((err: any) => {
+    edgeBridge.syncSettings({ ...systemSettings, ...updated }).catch((err: any) => {
       console.warn("[VAULT TCP SYNC NOTICE] Edge sync notice (edge node offline or local):", err.message);
     });
 
@@ -154,8 +158,8 @@ systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
   if (ibkrHost !== undefined) systemSettings.ibkrHost = ibkrHost;
   if (ibkrPort !== undefined) systemSettings.ibkrPort = Number(ibkrPort);
   if (ibkrClientId !== undefined) systemSettings.ibkrClientId = Number(ibkrClientId);
-  if (ibkrPaperUsername !== undefined) systemSettings.ibkrPaperUsername = ibkrPaperUsername;
-  if (ibkrPaperPassword !== undefined) systemSettings.ibkrPaperPassword = ibkrPaperPassword;
+  if (ibkrPaperUsername !== undefined && !isMaskedString(ibkrPaperUsername)) systemSettings.ibkrPaperUsername = ibkrPaperUsername;
+  if (ibkrPaperPassword !== undefined && !isMaskedString(ibkrPaperPassword)) systemSettings.ibkrPaperPassword = ibkrPaperPassword;
   if (mifid2DecisionMaker !== undefined) systemSettings.mifid2DecisionMaker = mifid2DecisionMaker;
   if (mifid2ExecutionTrader !== undefined) systemSettings.mifid2ExecutionTrader = mifid2ExecutionTrader;
   if (gatewayConnectionActive !== undefined) systemSettings.gatewayConnectionActive = Boolean(gatewayConnectionActive);
@@ -169,18 +173,18 @@ systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
   if (dailyDrawdownLimitCash !== undefined) systemSettings.dailyDrawdownLimitCash = Number(dailyDrawdownLimitCash);
   if (marketScope !== undefined) systemSettings.marketScope = marketScope;
 
-  if (geminiApiKey !== undefined) systemSettings.geminiApiKey = geminiApiKey;
-  if (openaiApiKey !== undefined) systemSettings.openaiApiKey = openaiApiKey;
-  if (anthropicApiKey !== undefined) systemSettings.anthropicApiKey = anthropicApiKey;
-  if (nvidiaApiKey !== undefined) systemSettings.nvidiaApiKey = nvidiaApiKey;
-  if (customAiApiKey !== undefined) systemSettings.customAiApiKey = customAiApiKey;
-  if (customAiBaseUrl !== undefined) systemSettings.customAiBaseUrl = customAiBaseUrl;
-  if (customAiModelName !== undefined) systemSettings.customAiModelName = customAiModelName;
+  if (geminiApiKey !== undefined && !isMaskedString(geminiApiKey)) systemSettings.geminiApiKey = geminiApiKey;
+  if (openaiApiKey !== undefined && !isMaskedString(openaiApiKey)) systemSettings.openaiApiKey = openaiApiKey;
+  if (anthropicApiKey !== undefined && !isMaskedString(anthropicApiKey)) systemSettings.anthropicApiKey = anthropicApiKey;
+  if (nvidiaApiKey !== undefined && !isMaskedString(nvidiaApiKey)) systemSettings.nvidiaApiKey = nvidiaApiKey;
+  if (customAiApiKey !== undefined && !isMaskedString(customAiApiKey)) systemSettings.customAiApiKey = customAiApiKey;
+  if (customAiBaseUrl !== undefined && !isMaskedString(customAiBaseUrl)) systemSettings.customAiBaseUrl = customAiBaseUrl;
+  if (customAiModelName !== undefined && !isMaskedString(customAiModelName)) systemSettings.customAiModelName = customAiModelName;
   if (selectedAiProvider !== undefined) systemSettings.selectedAiProvider = selectedAiProvider;
-  if (openFdaApiKey !== undefined) systemSettings.openFdaApiKey = openFdaApiKey;
-  if (fredApiKey !== undefined) systemSettings.fredApiKey = fredApiKey;
-  if (patentsApiKey !== undefined) systemSettings.patentsApiKey = patentsApiKey;
-  if (secUserAgent !== undefined) systemSettings.secUserAgent = secUserAgent;
+  if (openFdaApiKey !== undefined && !isMaskedString(openFdaApiKey)) systemSettings.openFdaApiKey = openFdaApiKey;
+  if (fredApiKey !== undefined && !isMaskedString(fredApiKey)) systemSettings.fredApiKey = fredApiKey;
+  if (patentsApiKey !== undefined && !isMaskedString(patentsApiKey)) systemSettings.patentsApiKey = patentsApiKey;
+  if (secUserAgent !== undefined && !isMaskedString(secUserAgent)) systemSettings.secUserAgent = secUserAgent;
 
   saveVaultCredentials(req.body);
   persistSettings();

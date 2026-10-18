@@ -98,9 +98,13 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
     settings?.secUserAgent || "AlphaEngine/2.0 (InstitutionalResearch; contact@alphaengine.internal)"
   ));
 
-  // Re-hydrate state whenever modal opens or parent settings update (Multi-machine server-backed)
+  const dirtyFieldsRef = React.useRef<Set<string>>(new Set());
+
+  // Re-hydrate state strictly when modal opens (never on background poll ticks while open)
   useEffect(() => {
     if (isOpen) {
+      dirtyFieldsRef.current.clear();
+
       // 1. Fetch centralized server-side credentials (for seamless access across any machine)
       fetch("/api/vault/credentials", {
         headers: { "x-admin-key": "ALPHA_ADMIN_REVERT_992" }
@@ -109,63 +113,36 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
         .then((creds) => {
           if (creds && typeof creds === "object") {
             const isCloudRun = typeof window !== "undefined" && window.location.hostname.includes("run.app");
-            if (creds.ibkrAccountNumber) setAccountNumber(creds.ibkrAccountNumber);
-            if (creds.ibkrHost) {
-              if (isCloudRun && creds.ibkrHost === "127.0.0.1") {
+            if (!dirtyFieldsRef.current.has("accountNumber") && creds.ibkrAccountNumber) setAccountNumber(creds.ibkrAccountNumber);
+            if (!dirtyFieldsRef.current.has("ibkrHost")) {
+              if (creds.ibkrHost) {
+                setIbkrHost(isCloudRun && creds.ibkrHost === "127.0.0.1" ? "10.156.0.2" : creds.ibkrHost);
+              } else if (isCloudRun) {
                 setIbkrHost("10.156.0.2");
-              } else {
-                setIbkrHost(creds.ibkrHost);
               }
-            } else if (isCloudRun) {
-              setIbkrHost("10.156.0.2");
             }
-            if (creds.ibkrPort) setIbkrPort(Number(creds.ibkrPort));
-            if (creds.ibkrClientId) setIbkrClientId(Number(creds.ibkrClientId));
-            if (creds.mifid2DecisionMaker) setMifidMaker(creds.mifid2DecisionMaker);
-            if (creds.mifid2ExecutionTrader) setMifidTrader(creds.mifid2ExecutionTrader);
-            if (creds.ibkrPaperUsername) setIbkrUsername(creds.ibkrPaperUsername);
+            if (!dirtyFieldsRef.current.has("ibkrPort") && creds.ibkrPort) setIbkrPort(Number(creds.ibkrPort));
+            if (!dirtyFieldsRef.current.has("ibkrClientId") && creds.ibkrClientId) setIbkrClientId(Number(creds.ibkrClientId));
+            if (!dirtyFieldsRef.current.has("mifidMaker") && creds.mifid2DecisionMaker) setMifidMaker(creds.mifid2DecisionMaker);
+            if (!dirtyFieldsRef.current.has("mifidTrader") && creds.mifid2ExecutionTrader) setMifidTrader(creds.mifid2ExecutionTrader);
+            if (!dirtyFieldsRef.current.has("ibkrUsername") && creds.ibkrPaperUsername) setIbkrUsername(creds.ibkrPaperUsername);
             if (creds.edgeNodeHost) setEdgeNodeStatus(creds.edgeNodeHost);
 
-            if (creds.geminiApiKey) setGeminiKey(creds.geminiApiKey);
-            if (creds.customAiApiKey) setGroqKey(creds.customAiApiKey);
-            if (creds.nvidiaApiKey) setNvidiaKey(creds.nvidiaApiKey);
-            if (creds.openaiApiKey) setOpenaiKey(creds.openaiApiKey);
-            if (creds.anthropicApiKey) setAnthropicKey(creds.anthropicApiKey);
-            if (creds.openFdaApiKey) setOpenFdaKey(creds.openFdaApiKey);
-            if (creds.fredApiKey) setFredKey(creds.fredApiKey);
-            if (creds.patentsApiKey) setPatentsKey(creds.patentsApiKey);
-            if (creds.secUserAgent) setSecUserAgent(creds.secUserAgent);
+            if (!dirtyFieldsRef.current.has("geminiKey") && creds.geminiApiKey) setGeminiKey(creds.geminiApiKey);
+            if (!dirtyFieldsRef.current.has("groqKey") && (creds.customAiApiKey || creds.groqApiKey)) setGroqKey(creds.customAiApiKey || creds.groqApiKey);
+            if (!dirtyFieldsRef.current.has("nvidiaKey") && creds.nvidiaApiKey) setNvidiaKey(creds.nvidiaApiKey);
+            if (!dirtyFieldsRef.current.has("openaiKey") && creds.openaiApiKey) setOpenaiKey(creds.openaiApiKey);
+            if (!dirtyFieldsRef.current.has("anthropicKey") && creds.anthropicApiKey) setAnthropicKey(creds.anthropicApiKey);
+            if (!dirtyFieldsRef.current.has("openFdaKey") && creds.openFdaApiKey) setOpenFdaKey(creds.openFdaApiKey);
+            if (!dirtyFieldsRef.current.has("fredKey") && creds.fredApiKey) setFredKey(creds.fredApiKey);
+            if (!dirtyFieldsRef.current.has("patentsKey") && creds.patentsApiKey) setPatentsKey(creds.patentsApiKey);
+            if (!dirtyFieldsRef.current.has("secUserAgent") && creds.secUserAgent) setSecUserAgent(creds.secUserAgent);
             persistVaultBatch(creds);
           }
         })
         .catch(() => {});
-
-      // 2. Fallback to settings prop if available
-      const gKey = getStoredVaultValue("geminiApiKey", customGeminiApiKey || settings?.geminiApiKey);
-      if (gKey) setGeminiKey(gKey);
-
-      const qKey = getStoredVaultValue("customAiApiKey", settings?.customAiApiKey);
-      if (qKey) setGroqKey(qKey);
-
-      const nvKey = getStoredVaultValue("nvidiaApiKey", settings?.nvidiaApiKey);
-      if (nvKey) setNvidiaKey(nvKey);
-
-      const oaKey = getStoredVaultValue("openaiApiKey", settings?.openaiApiKey);
-      if (oaKey) setOpenaiKey(oaKey);
-
-      const antKey = getStoredVaultValue("anthropicApiKey", settings?.anthropicApiKey);
-      if (antKey) setAnthropicKey(antKey);
-
-      const fdaKey = getStoredVaultValue("openFdaApiKey", settings?.openFdaApiKey);
-      if (fdaKey) setOpenFdaKey(fdaKey);
-
-      const frKey = getStoredVaultValue("fredApiKey", settings?.fredApiKey);
-      if (frKey) setFredKey(frKey);
-
-      const ptKey = getStoredVaultValue("patentsApiKey", settings?.patentsApiKey);
-      if (ptKey) setPatentsKey(ptKey);
     }
-  }, [isOpen, settings, customGeminiApiKey]);
+  }, [isOpen]);
 
   // Masking toggles
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
@@ -281,9 +258,18 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.geminiApiKey) setGeminiKey(data.geminiApiKey);
-        if (data.customAiApiKey) setGroqKey(data.customAiApiKey);
-        if (data.nvidiaApiKey) setNvidiaKey(data.nvidiaApiKey);
+        if (data.geminiApiKey) {
+          dirtyFieldsRef.current.add("geminiKey");
+          setGeminiKey(data.geminiApiKey);
+        }
+        if (data.customAiApiKey) {
+          dirtyFieldsRef.current.add("groqKey");
+          setGroqKey(data.customAiApiKey);
+        }
+        if (data.nvidiaApiKey) {
+          dirtyFieldsRef.current.add("nvidiaKey");
+          setNvidiaKey(data.nvidiaApiKey);
+        }
         persistVaultBatch(data);
         if (onSaveMultipleSettings) {
           onSaveMultipleSettings(data).catch(() => {});
@@ -296,9 +282,18 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
 
     // Fallback: check localStorage
     const stored = getAllStoredVaultSettings();
-    if (stored.geminiApiKey) setGeminiKey(stored.geminiApiKey);
-    if (stored.customAiApiKey) setGroqKey(stored.customAiApiKey);
-    if (stored.nvidiaApiKey) setNvidiaKey(stored.nvidiaApiKey);
+    if (stored.geminiApiKey) {
+      dirtyFieldsRef.current.add("geminiKey");
+      setGeminiKey(stored.geminiApiKey);
+    }
+    if (stored.customAiApiKey) {
+      dirtyFieldsRef.current.add("groqKey");
+      setGroqKey(stored.customAiApiKey);
+    }
+    if (stored.nvidiaApiKey) {
+      dirtyFieldsRef.current.add("nvidiaKey");
+      setNvidiaKey(stored.nvidiaApiKey);
+    }
     setAiSavedMsg("Loaded from local browser persistent vault.");
     setTimeout(() => setAiSavedMsg(null), 4000);
   };
@@ -935,6 +930,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                         value={geminiKey}
                         onChange={(e) => {
                           const val = e.target.value;
+                          dirtyFieldsRef.current.add("geminiKey");
                           setGeminiKey(val);
                           persistVaultItem("geminiApiKey", val);
                         }}
@@ -1018,6 +1014,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                         value={groqKey}
                         onChange={(e) => {
                           const val = e.target.value;
+                          dirtyFieldsRef.current.add("groqKey");
                           setGroqKey(val);
                           persistVaultItem("customAiApiKey", val);
                         }}
@@ -1101,6 +1098,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                         value={nvidiaKey}
                         onChange={(e) => {
                           const val = e.target.value;
+                          dirtyFieldsRef.current.add("nvidiaKey");
                           setNvidiaKey(val);
                           persistVaultItem("nvidiaApiKey", val);
                         }}
@@ -1174,6 +1172,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       value={customBaseUrl}
                       onChange={(e) => {
                         const val = e.target.value;
+                        dirtyFieldsRef.current.add("customBaseUrl");
                         setCustomBaseUrl(val);
                         persistVaultItem("customAiBaseUrl", val);
                       }}
@@ -1185,6 +1184,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                       value={customModelName}
                       onChange={(e) => {
                         const val = e.target.value;
+                        dirtyFieldsRef.current.add("customModelName");
                         setCustomModelName(val);
                         persistVaultItem("customAiModelName", val);
                       }}

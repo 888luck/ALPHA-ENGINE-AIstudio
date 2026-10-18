@@ -4,8 +4,9 @@ import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import fs from "fs";
 import path from "path";
-import { systemSettings, dynamicBaskets, marketBooks, ingestScannedInstrument } from "../state";
+import { systemSettings, dynamicBaskets, marketBooks, ingestScannedInstrument, persistSettings } from "../state";
 import { getUniversalAIResponse } from "../services/ai_service";
+import { isMaskedString, saveVaultCredentials } from "../vault";
 
 export const aiRouter = Router();
 
@@ -120,8 +121,16 @@ aiRouter.post("/api/test-ai-key", async (req, res) => {
 
   try {
     if (provider === "gemini") {
-      const key = apiKey || systemSettings.geminiApiKey || process.env.GEMINI_API_KEY;
-      if (!key || key === "MY_GEMINI_API_KEY") throw new Error("No Gemini API key supplied.");
+      let key = (apiKey && !isMaskedString(apiKey)) ? apiKey.trim() : (systemSettings.geminiApiKey || process.env.GEMINI_API_KEY || "");
+      if (key && isMaskedString(key)) {
+        key = process.env.GEMINI_API_KEY || "";
+      }
+      if (!key || key === "MY_GEMINI_API_KEY" || isMaskedString(key)) {
+        throw new Error("No Gemini API key supplied. Please paste your AIzaSy... key from https://aistudio.google.com/app/apikey");
+      }
+      if (key.startsWith("AQ.")) {
+        throw new Error("Detected Google Cloud OAuth token ('AQ...'). Google Gemini API requires a standard API key starting with 'AIzaSy...' from https://aistudio.google.com/app/apikey");
+      }
       
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
       if (!response.ok) {
@@ -147,6 +156,12 @@ aiRouter.post("/api/test-ai-key", async (req, res) => {
           };
         });
 
+      if (apiKey && !isMaskedString(apiKey)) {
+        saveVaultCredentials({ geminiApiKey: key });
+        systemSettings.geminiApiKey = key;
+        persistSettings();
+      }
+
       const latencyMs = Date.now() - startTime;
       return res.json({
         success: true,
@@ -158,8 +173,13 @@ aiRouter.post("/api/test-ai-key", async (req, res) => {
     }
 
     if (provider === "groq") {
-      const key = apiKey || systemSettings.customAiApiKey || process.env.GROQ_API_KEY;
-      if (!key) throw new Error("No Groq API key supplied.");
+      let key = (apiKey && !isMaskedString(apiKey)) ? apiKey.trim() : (systemSettings.customAiApiKey || process.env.GROQ_API_KEY || "");
+      if (key && isMaskedString(key)) {
+        key = process.env.GROQ_API_KEY || "";
+      }
+      if (!key || isMaskedString(key)) {
+        throw new Error("No Groq API key supplied. Please paste your gsk_... key from https://console.groq.com/keys");
+      }
 
       const response = await fetch("https://api.groq.com/openai/v1/models", {
         headers: { "Authorization": `Bearer ${key}` }
@@ -183,6 +203,12 @@ aiRouter.post("/api/test-ai-key", async (req, res) => {
           icon: "⚡"
         }));
 
+      if (apiKey && !isMaskedString(apiKey)) {
+        saveVaultCredentials({ customAiApiKey: key, groqApiKey: key });
+        systemSettings.customAiApiKey = key;
+        persistSettings();
+      }
+
       const latencyMs = Date.now() - startTime;
       return res.json({
         success: true,
@@ -194,8 +220,13 @@ aiRouter.post("/api/test-ai-key", async (req, res) => {
     }
 
     if (provider === "nvidia") {
-      const key = apiKey || systemSettings.nvidiaApiKey || process.env.NVIDIA_API_KEY;
-      if (!key) throw new Error("No NVIDIA API key supplied.");
+      let key = (apiKey && !isMaskedString(apiKey)) ? apiKey.trim() : (systemSettings.nvidiaApiKey || process.env.NVIDIA_API_KEY || "");
+      if (key && isMaskedString(key)) {
+        key = process.env.NVIDIA_API_KEY || "";
+      }
+      if (!key || isMaskedString(key)) {
+        throw new Error("No NVIDIA API key supplied. Please paste your nvapi-... key from https://build.nvidia.com");
+      }
 
       const response = await fetch("https://integrate.api.nvidia.com/v1/models", {
         headers: { "Authorization": `Bearer ${key}` }
@@ -217,6 +248,12 @@ aiRouter.post("/api/test-ai-key", async (req, res) => {
         icon: "🟢"
       }));
 
+      if (apiKey && !isMaskedString(apiKey)) {
+        saveVaultCredentials({ nvidiaApiKey: key });
+        systemSettings.nvidiaApiKey = key;
+        persistSettings();
+      }
+
       const latencyMs = Date.now() - startTime;
       return res.json({
         success: true,
@@ -228,8 +265,13 @@ aiRouter.post("/api/test-ai-key", async (req, res) => {
     }
 
     if (provider === "openai") {
-      const key = apiKey || systemSettings.openaiApiKey || process.env.OPENAI_API_KEY;
-      if (!key) throw new Error("No OpenAI API key supplied.");
+      let key = (apiKey && !isMaskedString(apiKey)) ? apiKey.trim() : (systemSettings.openaiApiKey || process.env.OPENAI_API_KEY || "");
+      if (key && isMaskedString(key)) {
+        key = process.env.OPENAI_API_KEY || "";
+      }
+      if (!key || isMaskedString(key)) {
+        throw new Error("No OpenAI API key supplied. Please paste your sk-... key from https://platform.openai.com/api-keys");
+      }
 
       const response = await fetch("https://api.openai.com/v1/models", {
         headers: { "Authorization": `Bearer ${key}` }
@@ -252,6 +294,12 @@ aiRouter.post("/api/test-ai-key", async (req, res) => {
           costStr: "$2.50 / 1M tokens",
           icon: "🧠"
         }));
+
+      if (apiKey && !isMaskedString(apiKey)) {
+        saveVaultCredentials({ openaiApiKey: key });
+        systemSettings.openaiApiKey = key;
+        persistSettings();
+      }
 
       const latencyMs = Date.now() - startTime;
       return res.json({

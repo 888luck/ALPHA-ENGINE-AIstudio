@@ -30,11 +30,17 @@ const KEY_MAPPINGS: Record<string, string[]> = {
   customAiModelName: ["alpha_custom_ai_model_name"],
 };
 
+export function isMaskedString(val?: any): boolean {
+  if (!val || typeof val !== "string") return false;
+  const s = val.trim();
+  return s.includes("...") || s.includes("••••") || s === "configured";
+}
+
 export function getStoredVaultValue(key: string, fallback?: string): string {
   if (typeof window === "undefined") return fallback || "";
 
   // 1. If fallback is a real non-empty unmasked key, return it
-  if (fallback && fallback.trim() !== "" && fallback !== "configured") {
+  if (fallback && fallback.trim() !== "" && !isMaskedString(fallback)) {
     return fallback.trim();
   }
 
@@ -44,7 +50,7 @@ export function getStoredVaultValue(key: string, fallback?: string): string {
     if (raw) {
       const parsed = JSON.parse(raw);
       const val = parsed[key];
-      if (val !== undefined && val !== null && String(val).trim() !== "" && String(val) !== "configured") {
+      if (val !== undefined && val !== null && String(val).trim() !== "" && !isMaskedString(String(val))) {
         return String(val).trim();
       }
     }
@@ -55,13 +61,13 @@ export function getStoredVaultValue(key: string, fallback?: string): string {
   for (const alias of aliases) {
     try {
       const val = localStorage.getItem(alias);
-      if (val !== undefined && val !== null && val.trim() !== "" && val !== "configured") {
+      if (val !== undefined && val !== null && val.trim() !== "" && !isMaskedString(val)) {
         return val.trim();
       }
     } catch (e) {}
   }
 
-  return (fallback && fallback !== "configured") ? fallback : "";
+  return (fallback && !isMaskedString(fallback)) ? fallback : "";
 }
 
 export function getAllStoredVaultSettings(): Record<string, any> {
@@ -92,6 +98,9 @@ export function persistVaultItem(key: string, value: any): void {
   if (typeof window === "undefined") return;
   const strVal = value !== undefined && value !== null ? String(value) : "";
   
+  // Institutional protection: Never persist masked strings (•••• or ...) into localStorage
+  if (isMaskedString(strVal)) return;
+
   // Save in master object
   try {
     const raw = localStorage.getItem(MASTER_KEY);
@@ -117,17 +126,27 @@ export function persistVaultItem(key: string, value: any): void {
 }
 
 export function persistVaultBatch(updates: Record<string, any>): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || !updates) return;
+
+  // Filter out any masked values
+  const cleanUpdates: Record<string, any> = {};
+  for (const [key, value] of Object.entries(updates)) {
+    if (value !== undefined && value !== null && !isMaskedString(value)) {
+      cleanUpdates[key] = value;
+    }
+  }
+
+  if (Object.keys(cleanUpdates).length === 0) return;
 
   try {
     const raw = localStorage.getItem(MASTER_KEY);
     const master = raw ? JSON.parse(raw) : {};
-    const merged = { ...master, ...updates };
+    const merged = { ...master, ...cleanUpdates };
     localStorage.setItem(MASTER_KEY, JSON.stringify(merged));
   } catch (e) {}
 
-  for (const [key, value] of Object.entries(updates)) {
-    const strVal = value !== undefined && value !== null ? String(value) : "";
+  for (const [key, value] of Object.entries(cleanUpdates)) {
+    const strVal = String(value);
     const aliases = KEY_MAPPINGS[key] || [`alpha_${key.toLowerCase()}`];
     for (const alias of aliases) {
       try {
@@ -138,7 +157,7 @@ export function persistVaultBatch(updates: Record<string, any>): void {
     }
   }
 
-  window.dispatchEvent(new CustomEvent("alpha_vault_settings_updated", { detail: updates }));
+  window.dispatchEvent(new CustomEvent("alpha_vault_settings_updated", { detail: cleanUpdates }));
 }
 
 // Background Server Re-hydration: Sends verified local client keys to server so current container instance stays in sync
@@ -146,7 +165,7 @@ export async function syncVaultToServer(updates?: Record<string, any>): Promise<
   const settingsToSync = updates || getAllStoredVaultSettings();
   const cleanPayload: Record<string, any> = {};
   for (const [k, v] of Object.entries(settingsToSync)) {
-    if (v !== undefined && v !== null && v !== "" && v !== "configured") {
+    if (v !== undefined && v !== null && v !== "" && v !== "configured" && !isMaskedString(v)) {
       cleanPayload[k] = v;
     }
   }
