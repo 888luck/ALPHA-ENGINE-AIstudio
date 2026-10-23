@@ -56,6 +56,27 @@ export default function App() {
 
   const [systemState, setSystemState] = useState<any>(null);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [triggering2FA, setTriggering2FA] = useState(false);
+  const [trigger2FAMsg, setTrigger2FAMsg] = useState<string | null>(null);
+
+  const handleTrigger2FALogin = async () => {
+    setTriggering2FA(true);
+    setTrigger2FAMsg("Dispatching signal...");
+    try {
+      const res = await fetch("/api/gateway/trigger-login", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        setTrigger2FAMsg("📲 2FA Sent! Check phone.");
+      } else {
+        setTrigger2FAMsg("❌ Failed: " + (data.error || "Error"));
+      }
+    } catch (err: any) {
+      setTrigger2FAMsg("❌ Error: " + err.message);
+    } finally {
+      setTriggering2FA(false);
+      setTimeout(() => setTrigger2FAMsg(null), 8000);
+    }
+  };
 
   const toggleTheme = () => {
     setTheme((prev) => {
@@ -201,6 +222,22 @@ export default function App() {
           >
             🔄 SWITCH TO {systemState?.settings?.tradingMode === "LIVE" ? "PAPER (4002)" : "LIVE (4001)"}
           </button>
+          {systemState?.settings?.tradingMode === "LIVE" && (
+            <button
+              type="button"
+              disabled={triggering2FA}
+              onClick={handleTrigger2FALogin}
+              className="px-3 py-1 rounded-md text-xs font-mono font-black border transition cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95 bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400 disabled:opacity-50"
+              title="Dispatches on-demand signal to Frankfurt node to send IB Key 2FA push to your phone immediately"
+            >
+              📲 {triggering2FA ? "SENDING..." : "REQUEST 2FA APPROVAL"}
+            </button>
+          )}
+          {trigger2FAMsg && (
+            <span className="px-2 py-0.5 rounded text-xs font-mono font-bold text-emerald-300 bg-black/60 border border-emerald-500/40 animate-pulse">
+              {trigger2FAMsg}
+            </span>
+          )}
           <span className="hidden lg:inline-block px-2.5 py-1 rounded bg-black/40 border border-white/10 text-xs font-semibold text-slate-300">
             ZERO SYNTHETIC POLICY ENFORCED
           </span>

@@ -213,6 +213,15 @@ systemRouter.post("/api/sync-from-cloud", (req, res) => {
   res.json({ success: true, settings: getMaskedSettings(systemSettings), activeTrades, historicalLogs });
 });
 
+systemRouter.post("/api/gateway/trigger-login", async (req, res) => {
+  try {
+    const result = await edgeBridge.triggerGatewayLogin();
+    res.json({ success: true, message: "On-demand 2FA login signal dispatched to edge node.", result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 systemRouter.post("/api/test-broker-connection", (req, res) => {
   const isCloudRun = !!process.env.K_SERVICE;
   const vaultCreds = loadVaultCredentials();

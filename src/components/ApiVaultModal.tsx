@@ -84,6 +84,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
   const [geminiKey, setGeminiKey] = useState(() => getStoredVaultValue("geminiApiKey", customGeminiApiKey || settings?.geminiApiKey));
   const [groqKey, setGroqKey] = useState(() => getStoredVaultValue("customAiApiKey", settings?.customAiApiKey));
   const [nvidiaKey, setNvidiaKey] = useState(() => getStoredVaultValue("nvidiaApiKey", settings?.nvidiaApiKey));
+  const [openrouterKey, setOpenrouterKey] = useState(() => getStoredVaultValue("openrouterApiKey", settings?.openrouterApiKey));
   const [openaiKey, setOpenaiKey] = useState(() => getStoredVaultValue("openaiApiKey", settings?.openaiApiKey));
   const [anthropicKey, setAnthropicKey] = useState(() => getStoredVaultValue("anthropicApiKey", settings?.anthropicApiKey));
   const [customBaseUrl, setCustomBaseUrl] = useState(() => getStoredVaultValue("customAiBaseUrl", settings?.customAiBaseUrl || "http://localhost:11434/v1"));
@@ -346,6 +347,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
       geminiApiKey: geminiKey,
       customAiApiKey: groqKey,
       nvidiaApiKey: nvidiaKey,
+      openrouterApiKey: openrouterKey,
       openaiApiKey: openaiKey,
       anthropicApiKey: anthropicKey,
       customAiBaseUrl: customBaseUrl,
@@ -1144,6 +1146,91 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
                           <span key={m.id || m} className="px-2 py-0.5 bg-white border border-emerald-200 text-emerald-900 text-[10px] font-mono rounded-md shadow-xs flex items-center gap-1">
                             <span>🟢</span>
                             <span className="font-bold">{m.name || m.id || m}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* OpenRouter API (470+ Models & Free Endpoints) */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-black text-xs font-mono">OR</div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-900">OpenRouter Multi-Provider Hub</span>
+                          <span className="text-[9px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded font-mono font-bold">470+ MODELS</span>
+                          <span className="text-[9px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-mono font-bold">30+ FREE ENDPOINTS</span>
+                        </div>
+                      </div>
+                    </div>
+                    <a
+                      href="https://openrouter.ai/keys"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-indigo-600 hover:text-indigo-800 font-mono font-bold flex items-center gap-1 hover:underline"
+                    >
+                      <span>Get Free Key (OpenRouter)</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type={showKeys["openrouter"] ? "text" : "password"}
+                        value={openrouterKey}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          dirtyFieldsRef.current.add("openrouterKey");
+                          setOpenrouterKey(val);
+                          persistVaultItem("openrouterApiKey", val);
+                        }}
+                        placeholder="Paste sk-or-v1-... OpenRouter Key (or leave blank to probe public models)"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 pr-10 text-xs font-mono text-slate-900"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleShowKey("openrouter")}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                      >
+                        {showKeys["openrouter"] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => runTestProbe("openrouter", "/api/test-ai-key", { provider: "openrouter", apiKey: openrouterKey })}
+                      disabled={testResults["openrouter"]?.loading}
+                      className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0"
+                    >
+                      {testResults["openrouter"]?.loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />}
+                      Test Ping
+                    </button>
+                  </div>
+
+                  {testResults["openrouter"] && (
+                    <div className={`p-2.5 rounded-lg font-mono text-[11px] ${
+                      testResults["openrouter"].success ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"
+                    }`}>
+                      {testResults["openrouter"].success ? "🟢 " : "🔴 "}
+                      {testResults["openrouter"].message}
+                    </div>
+                  )}
+
+                  {testResults["openrouter"]?.models && testResults["openrouter"].models.length > 0 && (
+                    <div className="p-3 bg-indigo-50/70 rounded-xl border border-indigo-200 space-y-1.5">
+                      <div className="text-[10px] font-mono font-bold text-indigo-900 uppercase flex items-center justify-between">
+                        <span>Discovered Models ({testResults["openrouter"].models.length}):</span>
+                        <span className="text-[9px] text-indigo-700 font-normal">Live from OpenRouter API</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                        {testResults["openrouter"].models.map((m: any) => (
+                          <span key={m.id || m} className="px-2 py-0.5 bg-white border border-indigo-200 text-indigo-900 text-[10px] font-mono rounded-md shadow-xs flex items-center gap-1">
+                            <span>{m.isFree ? "🎁" : "🌐"}</span>
+                            <span className="font-bold">{m.name || m.id || m}</span>
+                            {m.isFree && <span className="text-[8px] bg-emerald-100 text-emerald-800 px-1 rounded font-bold">FREE</span>}
                           </span>
                         ))}
                       </div>

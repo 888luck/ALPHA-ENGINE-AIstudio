@@ -7,7 +7,7 @@ import net from "net";
  */
 
 export interface EdgeCommandPayload {
-  action: "PING" | "SUBMIT_ORDER" | "EMERGENCY_FLUSH" | "UPDATE_SETTINGS" | "GET_TELEMETRY" | "DISPATCH_IBKR" | "GET_QUOTE" | "GET_HISTORICAL_BARS" | "GET_FUNDAMENTALS";
+  action: "PING" | "SUBMIT_ORDER" | "EMERGENCY_FLUSH" | "UPDATE_SETTINGS" | "GET_TELEMETRY" | "DISPATCH_IBKR" | "GET_QUOTE" | "GET_HISTORICAL_BARS" | "GET_FUNDAMENTALS" | "TRIGGER_GATEWAY_LOGIN";
   token?: string;
   timestamp?: number;
   method?: string;
@@ -175,7 +175,15 @@ export class EdgeBridgeClient {
     return this.sendCommand({
       action: "GET_QUOTE",
       symbol,
-      args: { symbol, durationStr: "5 D", barSizeSetting: "1 day" }
+    }, timeoutMs);
+  }
+
+  /**
+   * Dispatches an on-demand IPC trigger to the Frankfurt edge node gateway autologin daemon.
+   */
+  public async triggerGatewayLogin(timeoutMs: number = 3000): Promise<any> {
+    return this.sendCommand({
+      action: "TRIGGER_GATEWAY_LOGIN",
     }, timeoutMs);
   }
 }

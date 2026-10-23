@@ -79,6 +79,7 @@ export interface SystemSettings {
   customAiBaseUrl: string;
   customAiModelName: string;
   selectedAiProvider: "gemini-flash" | "gemini-pro" | "openai-4o" | "openai-4o-mini" | "anthropic-sonnet" | "anthropic-haiku" | "nvidia-llama-405" | "nvidia-llama-70" | "nvidia-nemotron" | "custom" | "auto";
+  openrouterApiKey?: string;
   openFdaApiKey: string;
   fredApiKey: string;
   patentsApiKey: string;

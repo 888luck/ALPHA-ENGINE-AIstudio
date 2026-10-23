@@ -311,6 +311,56 @@ aiRouter.post("/api/test-ai-key", async (req, res) => {
       });
     }
 
+    if (provider === "openrouter") {
+      let key = (apiKey && !isMaskedString(apiKey)) ? apiKey.trim() : ((systemSettings as any).openrouterApiKey || process.env.OPENROUTER_API_KEY || "");
+      if (key && isMaskedString(key)) {
+        key = process.env.OPENROUTER_API_KEY || "";
+      }
+      const headers: Record<string, string> = { "User-Agent": "AlphaEngine/2.0" };
+      if (key) headers["Authorization"] = `Bearer ${key}`;
+
+      const response = await fetch("https://openrouter.ai/api/v1/models", { headers });
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`OpenRouter API returned ${response.status}: ${errText}`);
+      }
+      const data = await response.json();
+      const rawModels = data.data || [];
+      const discoveredModels = rawModels
+        .filter((m: any) => {
+          const mid = (m.id || "").toLowerCase();
+          const pPrompt = parseFloat(m.pricing?.prompt || "0");
+          return mid.includes(":free") || pPrompt === 0 || mid.includes("deepseek") || mid.includes("qwen") || mid.includes("nemotron") || mid.includes("llama-3.3");
+        })
+        .slice(0, 30)
+        .map((m: any) => ({
+          id: `openrouter/${m.id}`,
+          rawId: m.id,
+          name: m.name || m.id,
+          provider: "OpenRouter",
+          tier: m.id.includes(":free") ? "Free Tier" : "Tier 1 OpenRouter",
+          badge: m.id.includes(":free") ? "🎁 FREE" : "OpenRouter",
+          costStr: m.id.includes(":free") ? "$0.00 / 1M tokens" : `$${(parseFloat(m.pricing?.prompt || "0") * 1000000).toFixed(2)} / 1M`,
+          icon: m.id.includes(":free") ? "🎁" : "🌐",
+          isFree: m.id.includes(":free")
+        }));
+
+      if (apiKey && !isMaskedString(apiKey)) {
+        saveVaultCredentials({ openrouterApiKey: key });
+        (systemSettings as any).openrouterApiKey = key;
+        persistSettings();
+      }
+
+      const latencyMs = Date.now() - startTime;
+      return res.json({
+        success: true,
+        latencyMs,
+        provider: "OpenRouter",
+        models: discoveredModels,
+        message: `OpenRouter verified. Discovered ${discoveredModels.length} models directly from OpenRouter API.`
+      });
+    }
+
     if (provider === "custom") {
       const targetUrl = baseUrl || systemSettings.customAiBaseUrl || "http://localhost:11434/v1";
       const modelsEndpoint = targetUrl.endsWith("/") ? `${targetUrl}models` : `${targetUrl}/models`;

@@ -39,6 +39,7 @@ export interface VaultCredentials {
   nvidiaApiKey: string;
   openaiApiKey: string;
   anthropicApiKey: string;
+  openrouterApiKey?: string;
   customAiBaseUrl: string;
   customAiModelName: string;
   selectedAiProvider: string;
@@ -132,6 +133,7 @@ export function loadVaultCredentials(): VaultCredentials {
     nvidiaApiKey: getVal("NVIDIA_API_KEY", "") || getVal("NVIDIA_INFERENCE_API_KEY", ""),
     openaiApiKey: getVal("OPENAI_API_KEY", ""),
     anthropicApiKey: getVal("ANTHROPIC_API_KEY", ""),
+    openrouterApiKey: getVal("OPENROUTER_API_KEY", ""),
     customAiBaseUrl: getVal("CUSTOM_AI_BASE_URL", "http://localhost:11434/v1"),
     customAiModelName: getVal("CUSTOM_AI_MODEL_NAME", "llama3.1"),
     selectedAiProvider: getVal("SELECTED_AI_PROVIDER", "gemini-flash"),
@@ -239,6 +241,7 @@ export function saveVaultCredentials(updates: Partial<VaultCredentials>): VaultC
     NVIDIA_API_KEY: merged.nvidiaApiKey,
     OPENAI_API_KEY: merged.openaiApiKey,
     ANTHROPIC_API_KEY: merged.anthropicApiKey,
+    OPENROUTER_API_KEY: merged.openrouterApiKey || "",
     CUSTOM_AI_BASE_URL: merged.customAiBaseUrl,
     CUSTOM_AI_MODEL_NAME: merged.customAiModelName,
     SELECTED_AI_PROVIDER: merged.selectedAiProvider,

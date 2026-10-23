@@ -49,6 +49,7 @@ export let systemSettings: SystemSettings = {
   customAiBaseUrl: "",
   customAiModelName: "",
   selectedAiProvider: "gemini-flash",
+  openrouterApiKey: "",
   openFdaApiKey: "",
   fredApiKey: "",
   patentsApiKey: "",

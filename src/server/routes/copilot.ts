@@ -33,6 +33,7 @@ export interface DiscoveredModel {
   badge: string;
   costStr: string;
   icon: string;
+  isFree?: boolean;
 }
 
 let cachedDiscoveredModels: DiscoveredModel[] = [];
@@ -61,7 +62,8 @@ export async function discoverActiveModels(forceRefresh = false, incomingKeys?: 
     tier: "Tier 0 Offline",
     badge: "$0 Cost / <15ms",
     costStr: "$0.00 (Offline)",
-    icon: "🛡️"
+    icon: "🛡️",
+    isFree: true
   });
 
   // 2. Google GenAI (Query live API if key is present)
@@ -216,6 +218,51 @@ export async function discoverActiveModels(forceRefresh = false, incomingKeys?: 
     }
   }
 
+  // 6. OpenRouter (Query live API - works with or without key for discovery)
+  const openrouterKey = incomingKeys?.openrouter || process.env.OPENROUTER_API_KEY || (systemSettings as any).openrouterApiKey;
+  try {
+    const headers: Record<string, string> = { "User-Agent": "AlphaEngine/2.0" };
+    if (openrouterKey) headers["Authorization"] = `Bearer ${openrouterKey}`;
+    const res = await fetch("https://openrouter.ai/api/v1/models", {
+      headers,
+      signal: AbortSignal.timeout(5000)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const raw = data.data || [];
+      raw
+        .filter((m: any) => {
+          const mid = (m.id || "").toLowerCase();
+          const pPrompt = parseFloat(m.pricing?.prompt || "0");
+          const pComp = parseFloat(m.pricing?.completion || "0");
+          const isFree = mid.includes(":free") || (pPrompt === 0 && pComp === 0);
+          // Always surface all free models, plus flagship frontier/coding models
+          if (isFree) return true;
+          return mid.includes("deepseek") || mid.includes("qwen") || mid.includes("nemotron") || mid.includes("llama-3.3") || mid.includes("claude-3.5") || mid.includes("gpt-4o");
+        })
+        .slice(0, 100) // Keep top 100 to maintain instant UI rendering
+        .forEach((m: any) => {
+          const mid = m.id || "";
+          const pPrompt = parseFloat(m.pricing?.prompt || "0");
+          const isFree = mid.includes(":free") || pPrompt === 0;
+          const promptPerM = (pPrompt * 1000000).toFixed(2);
+          models.push({
+            id: `openrouter/${mid}`,
+            rawId: mid,
+            name: m.name || mid,
+            provider: "OpenRouter",
+            tier: isFree ? "Free Tier" : "Tier 1 OpenRouter",
+            badge: isFree ? "🎁 100% FREE" : "OpenRouter Live",
+            costStr: isFree ? "$0.00 / 1M tokens" : `$${promptPerM} / 1M tokens`,
+            icon: isFree ? "🎁" : "🌐",
+            isFree: isFree
+          });
+        });
+    }
+  } catch (e) {
+    console.warn("[COPILOT DISCOVERY] Error querying OpenRouter /models:", e);
+  }
+
   cachedDiscoveredModels = models;
   modelsCacheTimestamp = now;
   return models;
@@ -227,7 +274,8 @@ copilotRouter.get("/api/copilot/models", async (req, res) => {
     gemini: (req.headers["x-gemini-api-key"] as string) || "",
     groq: (req.headers["x-groq-api-key"] as string) || "",
     nvidia: (req.headers["x-nvidia-api-key"] as string) || "",
-    openai: (req.headers["x-openai-api-key"] as string) || ""
+    openai: (req.headers["x-openai-api-key"] as string) || "",
+    openrouter: (req.headers["x-openrouter-api-key"] as string) || ""
   };
   const force = req.query.refresh === "1" || req.query.refresh === "true";
   const models = await discoverActiveModels(force, incomingKeys);
@@ -249,7 +297,7 @@ copilotRouter.get("/api/copilot/stats", async (req, res) => {
     daily_quota: 1500,
     daily_budget_ceiling_usd: 1.00,
     circuit_breaker_active: false,
-    provider_counts: { Groq: 0, "Google GenAI": 0, "NVIDIA NIM": 0, "Local Tier 0": 0 }
+    provider_counts: { Groq: 0, "Google GenAI": 0, "NVIDIA NIM": 0, "Local Tier 0": 0, OpenRouter: 0 }
   };
 
   if (targetPath) {
@@ -269,7 +317,8 @@ copilotRouter.get("/api/copilot/stats", async (req, res) => {
     gemini: (req.headers["x-gemini-api-key"] as string) || "",
     groq: (req.headers["x-groq-api-key"] as string) || "",
     nvidia: (req.headers["x-nvidia-api-key"] as string) || "",
-    openai: (req.headers["x-openai-api-key"] as string) || ""
+    openai: (req.headers["x-openai-api-key"] as string) || "",
+    openrouter: (req.headers["x-openrouter-api-key"] as string) || ""
   };
   const force = req.query.refresh === "1" || req.query.refresh === "true";
   const models = await discoverActiveModels(force, incomingKeys);
@@ -337,6 +386,7 @@ copilotRouter.post("/api/copilot/chat", (req, res) => {
   const groqKey = (req.headers["x-groq-api-key"] as string) || systemSettings.customAiApiKey || process.env.GROQ_API_KEY || "";
   const nvidiaKey = (req.headers["x-nvidia-api-key"] as string) || systemSettings.nvidiaApiKey || process.env.NVIDIA_API_KEY || process.env.NVIDIA_INFERENCE_API_KEY || "";
   const openaiKey = (req.headers["x-openai-api-key"] as string) || systemSettings.openaiApiKey || process.env.OPENAI_API_KEY || "";
+  const openrouterKey = (req.headers["x-openrouter-api-key"] as string) || (systemSettings as any).openrouterApiKey || process.env.OPENROUTER_API_KEY || "";
 
   const childEnv = {
     ...process.env,
@@ -344,6 +394,7 @@ copilotRouter.post("/api/copilot/chat", (req, res) => {
     GROQ_API_KEY: groqKey,
     NVIDIA_API_KEY: nvidiaKey,
     OPENAI_API_KEY: openaiKey,
+    OPENROUTER_API_KEY: openrouterKey,
     CUSTOM_AI_BASE_URL: systemSettings.customAiBaseUrl || process.env.CUSTOM_AI_BASE_URL || "",
     CUSTOM_AI_MODEL_NAME: systemSettings.customAiModelName || process.env.CUSTOM_AI_MODEL_NAME || ""
   };
@@ -389,7 +440,8 @@ copilotRouter.post("/api/copilot/chat", (req, res) => {
       gemini: geminiKey,
       groq: groqKey,
       nvidia: nvidiaKey,
-      openai: openaiKey
+      openai: openaiKey,
+      openrouter: openrouterKey
     }
   };
   const payloadStr = JSON.stringify(payload);

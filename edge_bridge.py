@@ -136,14 +136,35 @@ class EdgeTcpBridgeServer:
                     return {"status": "ERROR", "message": str(ex), "timestamp": timestamp}
             return {"status": "ACK", "message": "Settings received", "timestamp": timestamp}
 
+        elif action == "TRIGGER_GATEWAY_LOGIN":
+            try:
+                trigger_path = "/tmp/gateway_login.trigger"
+                with open(trigger_path, "w") as f:
+                    f.write(str(time.time()))
+                try:
+                    os.chmod(trigger_path, 0o666)
+                except Exception:
+                    pass
+                return {"status": "TRIGGERED", "message": "On-demand 2FA login signal dispatched to gateway daemon.", "timestamp": timestamp}
+            except Exception as ex:
+                return {"status": "ERROR", "message": str(ex), "timestamp": timestamp}
+
         elif action == "GET_TELEMETRY":
+            telemetry = {}
             if self.telemetry_provider:
                 try:
-                    telemetry = self.telemetry_provider()
-                    return {"status": "OK", "telemetry": telemetry, "timestamp": timestamp}
+                    telemetry = self.telemetry_provider() or {}
                 except Exception as ex:
                     return {"status": "ERROR", "message": str(ex), "timestamp": timestamp}
-            return {"status": "OK", "telemetry": {}, "timestamp": timestamp}
+            # Attach gateway auth status if present on edge node
+            status_file = "/tmp/gateway_status.json"
+            if os.path.exists(status_file):
+                try:
+                    with open(status_file, "r") as f:
+                        telemetry["gateway_auth"] = json.load(f)
+                except Exception:
+                    pass
+            return {"status": "OK", "telemetry": telemetry, "timestamp": timestamp}
 
         elif action in ["DISPATCH_IBKR", "GET_QUOTE", "GET_HISTORICAL_BARS", "GET_FUNDAMENTALS"]:
             method = cmd.get("method") or ("reqHistoricalData" if action in ["GET_QUOTE", "GET_HISTORICAL_BARS"] else "reqFundamentalData")

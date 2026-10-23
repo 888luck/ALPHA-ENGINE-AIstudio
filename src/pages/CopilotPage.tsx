@@ -50,12 +50,14 @@ export interface CopilotMessage {
 
 interface ModelItem {
   id: string;
+  rawId?: string;
   name: string;
   provider: string;
   tier: string;
   badge: string;
   costStr: string;
   icon: string;
+  isFree?: boolean;
 }
 
 interface CopilotStats {
@@ -84,7 +86,8 @@ const TIER0_OFFLINE_MODEL: ModelItem = {
   tier: "Tier 0 Offline",
   badge: "$0 Cost / <15ms",
   costStr: "$0.00 (Offline)",
-  icon: "🛡️"
+  icon: "🛡️",
+  isFree: true
 };
 
 export function CopilotPage({ onNavigateHome }: { onNavigateHome?: () => void }) {
@@ -661,11 +664,22 @@ Click any quick query below or type your request:`,
   const filteredModels = useMemo(() => {
     return availableModels.filter((m) => {
       if (selectedProviderFilter !== "ALL") {
-        if (selectedProviderFilter === "LOCAL" && !m.id.startsWith("local")) return false;
-        if (selectedProviderFilter === "NVIDIA" && !m.id.startsWith("nvidia")) return false;
-        if (selectedProviderFilter === "GOOGLE" && !m.id.startsWith("google")) return false;
-        if (selectedProviderFilter === "GROQ" && !m.id.startsWith("groq")) return false;
-        if (selectedProviderFilter === "OPENAI" && !m.id.startsWith("openai")) return false;
+        if (selectedProviderFilter === "FREE") {
+          const isFree = m.isFree === true || m.id.includes(":free") || m.costStr.includes("$0.00") || m.id.startsWith("local");
+          if (!isFree) return false;
+        } else if (selectedProviderFilter === "LOCAL" && !m.id.startsWith("local")) {
+          return false;
+        } else if (selectedProviderFilter === "OPENROUTER" && !m.id.startsWith("openrouter")) {
+          return false;
+        } else if (selectedProviderFilter === "NVIDIA" && !m.id.startsWith("nvidia")) {
+          return false;
+        } else if (selectedProviderFilter === "GOOGLE" && !m.id.startsWith("google")) {
+          return false;
+        } else if (selectedProviderFilter === "GROQ" && !m.id.startsWith("groq")) {
+          return false;
+        } else if (selectedProviderFilter === "OPENAI" && !m.id.startsWith("openai")) {
+          return false;
+        }
       }
       if (modelSearchQuery.trim()) {
         const q = modelSearchQuery.toLowerCase();
@@ -829,22 +843,27 @@ Click any quick query below or type your request:`,
 
                 {/* Provider Filter Tabs */}
                 <div className="flex items-center gap-1 mb-2 pb-2 border-b border-white/10 overflow-x-auto text-[10px]">
-                  {["ALL", "LOCAL", "NVIDIA", "GROQ", "GOOGLE"].map((tab) => {
+                  {["ALL", "FREE", "OPENROUTER", "GROQ", "NVIDIA", "GOOGLE", "LOCAL"].map((tab) => {
                     const count = tab === "ALL" 
                       ? availableModels.length 
-                      : availableModels.filter(m => m.id.toUpperCase().startsWith(tab)).length;
+                      : tab === "FREE"
+                        ? availableModels.filter(m => m.isFree === true || m.id.includes(":free") || m.costStr.includes("$0.00") || m.id.startsWith("local")).length
+                        : availableModels.filter(m => m.id.toUpperCase().startsWith(tab) || m.provider.toUpperCase().includes(tab)).length;
                     return (
                       <button
                         key={tab}
                         type="button"
                         onClick={() => setSelectedProviderFilter(tab)}
-                        className={`px-2 py-0.5 rounded transition cursor-pointer font-bold whitespace-nowrap ${
+                        className={`px-2 py-0.5 rounded transition cursor-pointer font-bold whitespace-nowrap flex items-center gap-1 ${
                           selectedProviderFilter === tab
-                            ? "bg-[#00ff88]/20 text-[#00ff88] border border-[#00ff88]/40"
+                            ? tab === "FREE"
+                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                              : "bg-[#00ff88]/20 text-[#00ff88] border border-[#00ff88]/40"
                             : "bg-white/5 hover:bg-white/10 text-slate-400"
                         }`}
                       >
-                        {tab} ({count})
+                        <span>{tab === "FREE" ? "🎁 FREE ONLY" : tab}</span>
+                        <span className="text-[9px] opacity-75">({count})</span>
                       </button>
                     );
                   })}
@@ -914,7 +933,14 @@ Click any quick query below or type your request:`,
                         <div className="flex-1 min-w-0">
                           <div className="font-bold text-white truncate flex items-center justify-between">
                             <span className="truncate" title={m.name}>{m.name}</span>
-                            {selectedModel === m.id && <Check className="w-3.5 h-3.5 text-[#00ff88] shrink-0 ml-1" />}
+                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                              {(m.isFree || m.id.includes(":free")) && (
+                                <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.2 rounded font-mono font-bold">
+                                  FREE
+                                </span>
+                              )}
+                              {selectedModel === m.id && <Check className="w-3.5 h-3.5 text-[#00ff88] shrink-0" />}
+                            </div>
                           </div>
                           <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
                             <span className="text-indigo-400 font-bold">{m.provider}</span>
