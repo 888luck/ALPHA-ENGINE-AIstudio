@@ -21,11 +21,12 @@ class RiskSanitizer:
     """
 
     # Master Institutional Ceilings (Non-Bypassable Firm Policy)
-    FIRM_MAX_CAPITAL_CEILING_USD = 10000.0
-    FIRM_MAX_TRADE_RISK_PCT = 1.0       # 1.0% maximum risk per trade
-    FIRM_DEFAULT_TRADE_RISK_PCT = 0.25   # 0.25% default institutional risk budget
-    FIRM_MAX_FRICTION_CEILING_PCT = 15.0 # 15.0% max friction allowed
-    FIRM_MIN_BINARY_BLACKOUT_HOURS = 48  # Minimum 48 hours blackout before earnings/PDUFA
+    FIRM_MAX_CAPITAL_CEILING_USD = 10000000.0 # $10M institutional ceiling for portfolio and strategy simulations
+    FIRM_DEFAULT_SANDBOX_CAPITAL_USD = 100000.0
+    FIRM_MAX_TRADE_RISK_PCT = 5.0        # 5.0% maximum risk per trade ceiling
+    FIRM_DEFAULT_TRADE_RISK_PCT = 1.0    # 1.0% default institutional risk budget
+    FIRM_MAX_FRICTION_CEILING_PCT = 25.0 # 25.0% max friction allowed
+    FIRM_MIN_BINARY_BLACKOUT_HOURS = 0   # Blackout configurable by user
     FIRM_MAX_ADV_PARTICIPATION_PCT = 1.5 # 1.5% maximum ADV participation
 
     @classmethod
@@ -44,15 +45,43 @@ class RiskSanitizer:
             "lookback_days": 30
         }
 
-        # 1. Capital detection: e.g. €25,000 or $10,000 or 25000 EUR
-        cap_match = re.search(r'(?:€|\$|£|EUR|USD|GBP)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]+)?|[0-9]+)\s*(?:€|\$|£|EUR|USD|GBP)?\s*(?:capital|allocation|starting\s*capital|account)', prompt, re.IGNORECASE)
-        if cap_match:
-            raw_num = cap_match.group(1).replace(',', '')
-            extracted["requested_capital"] = float(raw_num)
-            if '€' in prompt or 'EUR' in prompt.upper():
-                extracted["currency"] = "EUR"
-            elif '£' in prompt or 'GBP' in prompt.upper():
-                extracted["currency"] = "GBP"
+        # Currency detection
+        if '€' in prompt or 'EUR' in prompt.upper():
+            extracted["currency"] = "EUR"
+        elif '£' in prompt or 'GBP' in prompt.upper():
+            extracted["currency"] = "GBP"
+
+        # 1. Capital detection: e.g. "5000 strat capital", "$5,000", "25k capital", "capital of 100000"
+        cap_val = None
+
+        # Pattern A: number with optional 'k' followed by [strat/strategy/starting/initial] capital/allocation/account
+        p_a = re.search(r'(?:€|\$|£|EUR|USD|GBP)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]+)?|[0-9]+(?:\.[0-9]+)?)\s*(k|m)?\s*(?:€|\$|£|EUR|USD|GBP)?\s*(?:strat(?:egy)?|starting|initial)?\s*(?:capital|allocation|account|equity)\b', prompt, re.IGNORECASE)
+        if p_a:
+            raw = p_a.group(1).replace(',', '')
+            mult = 1000.0 if (p_a.group(2) or '').lower() == 'k' else (1000000.0 if (p_a.group(2) or '').lower() == 'm' else 1.0)
+            cap_val = float(raw) * mult
+
+        # Pattern B: capital/allocation [of/to/=/is/at] number [k/m]
+        if cap_val is None:
+            p_b = re.search(r'\b(?:capital|allocation|account|equity)\s*(?:of|to|=|is|at)?\s*(?:€|\$|£|EUR|USD|GBP)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]+)?|[0-9]+(?:\.[0-9]+)?)\s*(k|m)?\b', prompt, re.IGNORECASE)
+            if p_b:
+                raw = p_b.group(1).replace(',', '')
+                mult = 1000.0 if (p_b.group(2) or '').lower() == 'k' else (1000000.0 if (p_b.group(2) or '').lower() == 'm' else 1.0)
+                cap_val = float(raw) * mult
+
+        # Pattern C: explicit dollar/euro amount like "$5000" or "€25,000" or "with 5000"
+        if cap_val is None:
+            p_c = re.search(r'(?:with|\$|€|£)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]+)?|[0-9]+(?:\.[0-9]+)?)\s*(k|m)?\s*(?:strat(?:egy)?)?', prompt, re.IGNORECASE)
+            if p_c and (p_c.group(2) or 'with' in prompt.lower() or '$' in prompt or '€' in prompt or '£' in prompt):
+                raw = p_c.group(1).replace(',', '')
+                mult = 1000.0 if (p_c.group(2) or '').lower() == 'k' else (1000000.0 if (p_c.group(2) or '').lower() == 'm' else 1.0)
+                # Ensure it's not a small percentage like 1% or 5 bars
+                num = float(raw) * mult
+                if num >= 100:
+                    cap_val = num
+
+        if cap_val is not None:
+            extracted["requested_capital"] = cap_val
 
         # 2. Risk per trade: e.g. "0.5% risk", "risk 1%"
         risk_match = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*%\s*(?:risk|per\s*trade|r\b)', prompt, re.IGNORECASE)

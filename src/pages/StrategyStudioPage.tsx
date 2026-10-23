@@ -42,6 +42,7 @@ export interface StrategyStudioExperiment {
   symbol: string;
   timeframe: string;
   parameters: {
+    capitalOverride?: number;
     stopAtrMultiplier: number;
     partialProfit: boolean;
     breakevenLock: boolean;
@@ -79,9 +80,25 @@ interface ChatMessage {
 export function StrategyStudioPage() {
   // Strategy Parameters & Studio State
   const [symbol, setSymbol] = useState("XLE");
+  const [customTickerInput, setCustomTickerInput] = useState("XLE");
+  const [dynamicUniverse, setDynamicUniverse] = useState<Array<{ symbol: string; sector?: string }>>([
+    { symbol: "XLE", sector: "Energy Sector Trading Strategy" },
+    { symbol: "VLO", sector: "Energy Sector Trading Strategy" },
+    { symbol: "COP", sector: "Energy Sector Trading Strategy" },
+    { symbol: "ASML", sector: "Euronext Semiconductor Leader" },
+    { symbol: "SAP", sector: "DAX 40 Enterprise Cloud" },
+    { symbol: "NVDA", sector: "AI Accelerated Compute" },
+    { symbol: "RWE", sector: "Euronext Clean Utilities" },
+    { symbol: "XLU", sector: "Utilities Structural Arbitrage" },
+    { symbol: "ICLN", sector: "Clean Energy Tech Imbalances" }
+  ]);
+  const [resolvedInfo, setResolvedInfo] = useState<any>(null);
+  const [resolvingSymbol, setResolvingSymbol] = useState(false);
+
   const [timeframe, setTimeframe] = useState("1h");
   const [startDate, setStartDate] = useState("2026-05-01");
   const [endDate, setEndDate] = useState("2026-06-16");
+  const [capitalOverride, setCapitalOverride] = useState<number>(100000);
   const [stopAtr, setStopAtr] = useState(1.8);
   const [partialProfit, setPartialProfit] = useState(true);
   const [breakevenLock, setBreakevenLock] = useState(true);
@@ -109,7 +126,7 @@ export function StrategyStudioPage() {
       id: "msg_init",
       role: "assistant",
       content:
-        "👋 Welcome to the **Institutional Strategy Studio**. I am your Strategy Optimization Agent.\n\nYou can chat with me naturally to design, tune, or explore strategies. For example:\n- *'Optimize ASML for maximum Deflated Sharpe Ratio with low friction'* \n- *'Set Stop ATR to 1.5x and run a test on XLE'* \n- *'Explore a scalp configuration on NVDA with tight 10-bar max hold'* \n\nYou can also adjust the tactile sliders on the right, toggle institutional friction gates, or let me sweep the parameter frontier autonomously.",
+        "👋 Welcome to the **Institutional Strategy Studio**. I am your Strategy Optimization Agent.\n\nYou can direct me naturally with capital, risk, and asset parameters. For example:\n- *'run the same with 5000 strat capital'* \n- *'Optimize ASML for maximum Deflated Sharpe Ratio with low friction'* \n- *'Set Stop ATR to 1.5x and run a test on NVDA'* \n- *'Run test on TSLA with $25,000 capital and 12-bar hold'* \n\nAll instruments resolve dynamically via official IBKR contract specifications, with real-time risk sanitization.",
       timestamp: new Date().toLocaleTimeString()
     }
   ]);
@@ -125,15 +142,78 @@ export function StrategyStudioPage() {
     }
   });
 
+  // Dynamically load active universe from run-expectancy / dynamic baskets on mount
+  useEffect(() => {
+    const loadUniverse = async () => {
+      try {
+        const res = await fetch("/api/run-expectancy");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.baskets && Array.isArray(data.baskets)) {
+            const list: Array<{ symbol: string; sector?: string }> = [];
+            const seen = new Set<string>();
+            data.baskets.forEach((b: any) => {
+              (b.tickers || []).forEach((t: string) => {
+                if (!seen.has(t)) {
+                  seen.add(t);
+                  list.push({ symbol: t, sector: b.sector });
+                }
+              });
+            });
+            // Ensure core institutional tickers are present
+            ["XLE", "ASML", "SAP", "NVDA", "RWE", "VLO", "COP", "NEE"].forEach((t) => {
+              if (!seen.has(t)) {
+                seen.add(t);
+                list.push({ symbol: t, sector: "Core Dynamic Universe" });
+              }
+            });
+            setDynamicUniverse(list);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch dynamic universe:", err);
+      }
+    };
+    loadUniverse();
+  }, []);
+
+  // Universal Contract Resolver
+  const resolveContractForSymbol = async (sym: string) => {
+    if (!sym) return;
+    setResolvingSymbol(true);
+    try {
+      const res = await fetch("/api/research/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: sym })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.primary_contract) {
+          setResolvedInfo(data.primary_contract);
+        }
+      }
+    } catch (err) {
+      console.warn("Contract resolution error:", err);
+    } finally {
+      setResolvingSymbol(false);
+    }
+  };
+
+  useEffect(() => {
+    resolveContractForSymbol(symbol);
+  }, [symbol]);
+
   // Auto scroll chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, exploring]);
 
-  // Execute Simulation Core
+  // Execute Simulation Core with capitalOverride
   const executeSimulation = async (overrides?: Partial<{
     symbol: string;
     timeframe: string;
+    capitalOverride: number;
     stopAtrMultiplier: number;
     partialProfit: boolean;
     breakevenLock: boolean;
@@ -146,6 +226,7 @@ export function StrategyStudioPage() {
   }>) => {
     const s = overrides?.symbol || symbol;
     const tf = overrides?.timeframe || timeframe;
+    const cap = overrides?.capitalOverride !== undefined ? overrides.capitalOverride : capitalOverride;
     const stop = overrides?.stopAtrMultiplier !== undefined ? overrides.stopAtrMultiplier : stopAtr;
     const partial = overrides?.partialProfit !== undefined ? overrides.partialProfit : partialProfit;
     const breakeven = overrides?.breakevenLock !== undefined ? overrides.breakevenLock : breakevenLock;
@@ -164,6 +245,7 @@ export function StrategyStudioPage() {
         timeframe: tf,
         startDate: startDate,
         endDate: endDate,
+        capitalOverride: cap,
         stopAtrMultiplier: stop,
         partialProfit: partial,
         breakevenLock: breakeven,
@@ -181,13 +263,20 @@ export function StrategyStudioPage() {
   };
 
   // Run Manual Simulation
-  const handleRunSimulation = async () => {
+  const handleRunSimulation = async (overrides?: any) => {
     setLoading(true);
     setErrorMsg(null);
+
+    const activeCap = overrides?.capitalOverride !== undefined ? overrides.capitalOverride : capitalOverride;
+    const activeSym = overrides?.symbol || symbol;
+    const activeTf = overrides?.timeframe || timeframe;
 
     try {
       if (!baselineResult) {
         const baseRun = await executeSimulation({
+          symbol: activeSym,
+          timeframe: activeTf,
+          capitalOverride: activeCap,
           stopAtrMultiplier: 1.8,
           partialProfit: false,
           breakevenLock: false,
@@ -199,7 +288,7 @@ export function StrategyStudioPage() {
         }
       }
 
-      const run = await executeSimulation();
+      const run = await executeSimulation(overrides);
       if (run.ok) {
         setResult(run.data);
         setMessages((prev) => [
@@ -207,7 +296,7 @@ export function StrategyStudioPage() {
           {
             id: "msg_" + Date.now(),
             role: "assistant",
-            content: `✅ **Simulation completed for ${symbol} (${timeframe})**:\n- **Net PnL**: \`+$${Number(run.data.totalPnL || 0).toFixed(2)}\` (${run.data.totalPnLPercent}%)\n- **Win Rate**: \`${run.data.winRate}%\` (${run.data.winningTrades}W / ${run.data.losingTrades}L)\n- **Profit Factor**: \`${run.data.profitFactor}\`\n- **Deflated Sharpe (DSR)**: \`${(Number(run.data.deflatedSharpeRatio || 0) * 100).toFixed(1)}%\`\n- **Max Drawdown**: \`-${run.data.maxDrawdownPercent}%\``,
+            content: `✅ **Simulation completed for ${run.data.symbol || activeSym} (${run.data.timeframe || activeTf})**:\n- **Starting Capital**: \`$${Number(run.data.startingCapital || activeCap).toLocaleString()}\`\n- **Net PnL**: \`+$${Number(run.data.totalPnL || 0).toFixed(2)}\` (${run.data.totalPnLPercent}%)\n- **Ending Equity**: \`$${Number(run.data.finalCapital || activeCap).toLocaleString()}\`\n- **Win Rate**: \`${run.data.winRate}%\` (${run.data.winningTrades}W / ${run.data.losingTrades}L)\n- **Profit Factor**: \`${run.data.profitFactor}\`\n- **Deflated Sharpe (DSR)**: \`${(Number(run.data.deflatedSharpeRatio || 0) * 100).toFixed(1)}%\`\n- **Max Drawdown**: \`-${run.data.maxDrawdownPercent}%\``,
             timestamp: new Date().toLocaleTimeString(),
             actionTriggered: "RUN_SIMULATION"
           }
@@ -223,10 +312,13 @@ export function StrategyStudioPage() {
   };
 
   // Agent Multi-Parameter Optimization Sweep
-  const handleAgentExplore = async (customPrompt?: string) => {
+  const handleAgentExplore = async (customPrompt?: string, overrides?: any) => {
     const q = customPrompt || chatInput || "Optimize strategy parameters";
     setExploring(true);
     setErrorMsg(null);
+
+    const activeCap = overrides?.capitalOverride !== undefined ? overrides.capitalOverride : capitalOverride;
+    const activeSym = overrides?.symbol || symbol;
 
     // Add user message to conversation
     setMessages((prev) => [
@@ -240,7 +332,7 @@ export function StrategyStudioPage() {
       {
         id: "msg_agent_prog_" + Date.now(),
         role: "assistant",
-        content: `🔍 **Starting Autonomous Optimization Sweep** for **${symbol}**...\n- Analyzing parameter space: Stop ATR (1.4x - 2.4x), Max Hold (10 - 24 bars), Tranche Scaling, and OFI filters.\n- Testing against verified historical broker bars...`,
+        content: `🔍 **Starting Autonomous Optimization Sweep** for **${activeSym}** with **$${Number(activeCap).toLocaleString()}** Capital...\n- Analyzing parameter space: Stop ATR (1.4x - 2.4x), Max Hold (10 - 24 bars), Tranche Scaling, and OFI filters.\n- Testing against verified historical broker bars...`,
         timestamp: new Date().toLocaleTimeString()
       }
     ]);
@@ -249,6 +341,8 @@ export function StrategyStudioPage() {
       // 1. Ensure baseline exists
       if (!baselineResult) {
         const baseRun = await executeSimulation({
+          symbol: activeSym,
+          capitalOverride: activeCap,
           stopAtrMultiplier: 1.8,
           partialProfit: false,
           breakevenLock: false,
@@ -274,7 +368,11 @@ export function StrategyStudioPage() {
 
       for (let i = 0; i < candidates.length; i++) {
         const c = candidates[i];
-        const run = await executeSimulation(c);
+        const run = await executeSimulation({
+          ...c,
+          symbol: activeSym,
+          capitalOverride: activeCap
+        });
         if (run.ok) {
           const dsr = Number(run.data.deflatedSharpeRatio || 0);
           const sharpe = Number(run.data.annualizedSharpe || 0);
@@ -297,14 +395,14 @@ export function StrategyStudioPage() {
         setOfiFilter(bestConfig.ofiFilter);
         setMaxHoldBars(bestConfig.maxHoldBars);
         setResult(bestResult);
-        setStrategyName(`Agent Optimized: ${symbol} Alpha Frontier`);
+        setStrategyName(`Agent Optimized: ${activeSym} Alpha Frontier`);
 
         setMessages((prev) => [
           ...prev,
           {
             id: "msg_agent_done_" + Date.now(),
             role: "assistant",
-            content: `🎯 **Frontier Optimization Succeeded!**\n\nI have identified the highest-expectancy configuration (**${bestConfig.label}**) and loaded it into your studio:\n- **Stop ATR**: \`${bestConfig.stopAtrMultiplier}x\`\n- **Max Hold Bars**: \`${bestConfig.maxHoldBars} bars\`\n- **Tranche Scaling**: \`Active (50% @ 2.5 ATR)\`\n- **Breakeven Ratchet**: \`${bestConfig.breakevenLock ? "Active (+1.0 ATR)" : "Off"}\`\n\n**Performance Metrics:**\n- 💰 **Net PnL**: \`+$${Number(bestResult.totalPnL || 0).toFixed(2)}\` (${bestResult.totalPnLPercent}%)\n- 🏆 **Deflated Sharpe (DSR)**: \`${(Number(bestResult.deflatedSharpeRatio || 0) * 100).toFixed(1)}%\`\n- 📈 **Annual Sharpe**: \`${bestResult.annualizedSharpe}\`\n- 🎯 **Win Rate**: \`${bestResult.winRate}%\` (${bestResult.winningTrades}W / ${bestResult.losingTrades}L)\n- 📉 **Max Drawdown**: \`-${bestResult.maxDrawdownPercent}%\`\n\n*Review the interactive curve and league table on the right, or click 'Save Experiment' to archive it.*`,
+            content: `🎯 **Frontier Optimization Succeeded!**\n\nI have identified the highest-expectancy configuration (**${bestConfig.label}**) on **$${Number(activeCap).toLocaleString()}** capital and loaded it into your studio:\n- **Starting Capital**: \`$${Number(bestResult.startingCapital || activeCap).toLocaleString()}\`\n- **Stop ATR**: \`${bestConfig.stopAtrMultiplier}x\`\n- **Max Hold Bars**: \`${bestConfig.maxHoldBars} bars\`\n- **Tranche Scaling**: \`Active (50% @ 2.5 ATR)\`\n- **Breakeven Ratchet**: \`${bestConfig.breakevenLock ? "Active (+1.0 ATR)" : "Off"}\`\n\n**Performance Metrics:**\n- 💰 **Net PnL**: \`+$${Number(bestResult.totalPnL || 0).toFixed(2)}\` (${bestResult.totalPnLPercent}%)\n- 🏆 **Deflated Sharpe (DSR)**: \`${(Number(bestResult.deflatedSharpeRatio || 0) * 100).toFixed(1)}%\`\n- 📈 **Annual Sharpe**: \`${bestResult.annualizedSharpe}\`\n- 🎯 **Win Rate**: \`${bestResult.winRate}%\` (${bestResult.winningTrades}W / ${bestResult.losingTrades}L)\n- 📉 **Max Drawdown**: \`-${bestResult.maxDrawdownPercent}%\`\n\n*Review the interactive curve and league table on the right, or click 'Save Experiment' to archive it.*`,
             timestamp: new Date().toLocaleTimeString(),
             actionTriggered: "OPTIMIZATION_SWEEP_SUCCESS"
           }
@@ -334,44 +432,146 @@ export function StrategyStudioPage() {
     const text = chatInput.trim();
     if (!text || exploring) return;
 
-    // Check for parameter adjustment intent
+    setChatInput("");
+
+    // Show user message in chat
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: "msg_user_" + Date.now(),
+        role: "user",
+        content: text,
+        timestamp: new Date().toLocaleTimeString()
+      }
+    ]);
+
+    let detectedCapital = capitalOverride;
+    let detectedRiskPct = riskBudgetPct;
+    let detectedFriction = frictionCeiling;
+    let detectedStopAtr = stopAtr;
+    let detectedHoldBars = maxHoldBars;
+    let detectedTimeframe = timeframe;
+    let detectedSymbol = symbol;
+
+    // 1. Call Institutional Risk Sanitizer Endpoint to extract capital and risk parameters
+    try {
+      const sanRes = await fetch("/api/research/sanitize-risk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: text })
+      });
+      if (sanRes.ok) {
+        const sanData = await sanRes.json();
+        const rawCap = sanData.raw_parsed?.requested_capital;
+        const sanitizedCap = sanData.sanitized_parameters?.sanitized_capital;
+        if (sanitizedCap !== undefined && sanitizedCap !== null && sanitizedCap > 0) {
+          detectedCapital = Number(sanitizedCap);
+          setCapitalOverride(detectedCapital);
+        } else if (rawCap !== undefined && rawCap !== null && rawCap > 0) {
+          detectedCapital = Number(rawCap);
+          setCapitalOverride(detectedCapital);
+        }
+
+        const rawRisk = sanData.sanitized_parameters?.risk_per_trade_pct;
+        if (rawRisk !== undefined && rawRisk !== null && rawRisk > 0) {
+          detectedRiskPct = Number(rawRisk) / 100.0;
+          setRiskBudgetPct(detectedRiskPct);
+        }
+
+        const rawFric = sanData.sanitized_parameters?.friction_ceiling_pct;
+        if (rawFric !== undefined && rawFric !== null && rawFric > 0) {
+          detectedFriction = Number(rawFric);
+          setFrictionCeiling(detectedFriction);
+        }
+      }
+    } catch (err) {
+      console.warn("Risk sanitizer failed, falling back to local regex:", err);
+      const capMatch = text.match(/(?:with|\$|€|£)?\s*([0-9]{1,3}(?:,[0-9]{3})*|[0-9]+)\s*(?:k)?\s*(?:strat(?:egy)?\s*)?(?:capital|allocation)/i);
+      if (capMatch && capMatch[1]) {
+        let val = parseFloat(capMatch[1].replace(/,/g, ''));
+        if (capMatch[0].toLowerCase().includes('k')) val *= 1000;
+        if (val > 0) {
+          detectedCapital = val;
+          setCapitalOverride(val);
+        }
+      }
+    }
+
+    // 2. Dynamic Symbol Extraction
+    const words = text.split(/[\s,;.!?]+/);
+    for (const w of words) {
+      const cleanW = w.toUpperCase().replace(/[^A-Z]/g, '');
+      if (cleanW.length >= 2 && cleanW.length <= 5) {
+        const matchInUniverse = dynamicUniverse.find(u => u.symbol.toUpperCase() === cleanW);
+        if (matchInUniverse) {
+          detectedSymbol = matchInUniverse.symbol;
+          setSymbol(detectedSymbol);
+          setCustomTickerInput(detectedSymbol);
+          break;
+        } else if (/^[A-Z]{2,5}$/.test(cleanW) && !["WITH", "THAT", "SAME", "OVER", "FROM", "TEST", "HOLD", "STOP", "RISK", "RUN", "THE", "FOR", "AND"].includes(cleanW)) {
+          try {
+            const resolveRes = await fetch("/api/research/resolve", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ query: cleanW })
+            });
+            if (resolveRes.ok) {
+              const resData = await resolveRes.json();
+              if (resData.primary_contract?.symbol) {
+                detectedSymbol = resData.primary_contract.symbol;
+                setSymbol(detectedSymbol);
+                setCustomTickerInput(detectedSymbol);
+                setResolvedInfo(resData.primary_contract);
+                break;
+              }
+            }
+          } catch {}
+        }
+      }
+    }
+
+    // 3. Timeframe detection
     const lower = text.toLowerCase();
-    if (lower.includes("asml")) setSymbol("ASML");
-    else if (lower.includes("sap")) setSymbol("SAP");
-    else if (lower.includes("nvda")) setSymbol("NVDA");
-    else if (lower.includes("rwe")) setSymbol("RWE");
-    else if (lower.includes("xle")) setSymbol("XLE");
+    if (lower.includes("5m") || lower.includes("5-min")) {
+      detectedTimeframe = "5m";
+      setTimeframe("5m");
+    } else if (lower.includes("15m") || lower.includes("15-min")) {
+      detectedTimeframe = "15m";
+      setTimeframe("15m");
+    } else if (lower.includes("1h") || lower.includes("1-hour") || lower.includes("hourly")) {
+      detectedTimeframe = "1h";
+      setTimeframe("1h");
+    }
 
-    if (lower.includes("5m")) setTimeframe("5m");
-    else if (lower.includes("15m")) setTimeframe("15m");
-    else if (lower.includes("1h")) setTimeframe("1h");
-
+    // 4. Stop ATR detection
     const stopMatch = text.match(/stop\s*(?:atr)?\s*(?:to|=)?\s*([0-9.]+)/i);
     if (stopMatch && stopMatch[1]) {
-      setStopAtr(parseFloat(stopMatch[1]));
+      detectedStopAtr = parseFloat(stopMatch[1]);
+      setStopAtr(detectedStopAtr);
     }
 
+    // 5. Max Hold detection
     const holdMatch = text.match(/(?:max\s*hold|hold)\s*(?:to|=)?\s*([0-9]+)/i);
     if (holdMatch && holdMatch[1]) {
-      setMaxHoldBars(parseInt(holdMatch[1], 10));
+      detectedHoldBars = parseInt(holdMatch[1], 10);
+      setMaxHoldBars(detectedHoldBars);
     }
+
+    const currentOverrides = {
+      symbol: detectedSymbol,
+      timeframe: detectedTimeframe,
+      capitalOverride: detectedCapital,
+      riskBudgetPct: detectedRiskPct,
+      frictionCeilingPct: detectedFriction,
+      stopAtrMultiplier: detectedStopAtr,
+      maxHoldBars: detectedHoldBars
+    };
 
     // Trigger exploration if query asks for optimization or exploration
     if (lower.includes("optimize") || lower.includes("explore") || lower.includes("tune") || lower.includes("find")) {
-      await handleAgentExplore(text);
+      await handleAgentExplore(text, currentOverrides);
     } else {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: "msg_user_" + Date.now(),
-          role: "user",
-          content: text,
-          timestamp: new Date().toLocaleTimeString()
-        }
-      ]);
-      setChatInput("");
-      // Run standard simulation with updated parameters
-      await handleRunSimulation();
+      await handleRunSimulation(currentOverrides);
     }
   };
 
@@ -385,6 +585,7 @@ export function StrategyStudioPage() {
       symbol,
       timeframe,
       parameters: {
+        capitalOverride,
         stopAtrMultiplier: stopAtr,
         partialProfit,
         breakevenLock,
@@ -426,7 +627,11 @@ export function StrategyStudioPage() {
   const handleLoadExperiment = (exp: StrategyStudioExperiment) => {
     setStrategyName(exp.name);
     setSymbol(exp.symbol);
+    setCustomTickerInput(exp.symbol);
     setTimeframe(exp.timeframe);
+    if (exp.parameters.capitalOverride) {
+      setCapitalOverride(exp.parameters.capitalOverride);
+    }
     setStopAtr(exp.parameters.stopAtrMultiplier);
     setPartialProfit(exp.parameters.partialProfit);
     setBreakevenLock(exp.parameters.breakevenLock);
@@ -441,6 +646,8 @@ export function StrategyStudioPage() {
       success: true,
       symbol: exp.symbol,
       timeframe: exp.timeframe,
+      startingCapital: exp.parameters.capitalOverride || 100000,
+      finalCapital: (exp.parameters.capitalOverride || 100000) + exp.metrics.totalPnL,
       totalPnL: exp.metrics.totalPnL,
       totalPnLPercent: exp.metrics.totalPnLPercent,
       winRate: exp.metrics.winRate,
@@ -467,6 +674,8 @@ export function StrategyStudioPage() {
     ]);
   };
 
+
+
   // Delete from vault
   const handleDeleteExperiment = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -479,9 +688,10 @@ export function StrategyStudioPage() {
 
   // Quick Query Chips
   const quickChips = [
-    "Optimize ASML for maximum Sharpe and low friction",
-    "Run XLE 1h with Stop ATR 1.5x and 12-bar hold",
-    "Explore NVDA breakout with tight risk (0.5% r)",
+    "run the same with 5000 strat capital",
+    "Run ASML with $5,000 capital and 1.8 ATR stop",
+    "Optimize XLE for maximum Deflated Sharpe",
+    "Explore NVDA breakout with $25,000 capital and 12-bar hold",
     "Test SAP mean reversion with Breakeven ratchet"
   ];
 
@@ -659,28 +869,74 @@ export function StrategyStudioPage() {
             </div>
 
             {/* Selector Row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {/* Dynamic Ticker Resolution Box */}
               <div>
-                <label className="text-[11px] text-slate-300 uppercase font-mono font-bold block mb-1">Ticker</label>
-                <select
-                  value={symbol}
-                  onChange={(e) => setSymbol(e.target.value)}
-                  className="w-full bg-slate-900 border border-white/10 rounded-lg px-2.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500 font-bold"
-                >
-                  <option value="XLE">XLE (US Energy ETF)</option>
-                  <option value="ASML">ASML (Euronext Tech)</option>
-                  <option value="SAP">SAP (DAX 40 Enterprise)</option>
-                  <option value="NVDA">NVDA (AI Semiconductor)</option>
-                  <option value="RWE">RWE (Euronext Utilities)</option>
-                </select>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] text-slate-300 uppercase font-mono font-bold">
+                    Ticker (Dynamic)
+                  </label>
+                  {resolvingSymbol ? (
+                    <span className="text-[10px] text-emerald-400 font-mono animate-pulse">Resolving...</span>
+                  ) : resolvedInfo ? (
+                    <span className="text-[10px] text-[#00ff88] font-mono font-semibold truncate max-w-[120px]">
+                      {resolvedInfo.exchange || "SMART"} • {resolvedInfo.currency || "USD"}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={customTickerInput}
+                    onChange={(e) => setCustomTickerInput(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (customTickerInput.trim()) {
+                          const s = customTickerInput.trim().toUpperCase();
+                          setSymbol(s);
+                          resolveContractForSymbol(s);
+                        }
+                      }
+                    }}
+                    onBlur={() => {
+                      if (customTickerInput.trim() && customTickerInput.trim().toUpperCase() !== symbol) {
+                        const s = customTickerInput.trim().toUpperCase();
+                        setSymbol(s);
+                        resolveContractForSymbol(s);
+                      }
+                    }}
+                    placeholder="Ticker (e.g. TSLA)..."
+                    className="flex-1 bg-slate-900 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono uppercase font-bold focus:outline-none focus:border-emerald-500"
+                  />
+                  <select
+                    value={symbol}
+                    onChange={(e) => {
+                      setSymbol(e.target.value);
+                      setCustomTickerInput(e.target.value);
+                      resolveContractForSymbol(e.target.value);
+                    }}
+                    className="w-24 bg-slate-900 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500 font-bold"
+                  >
+                    {dynamicUniverse.map((u) => (
+                      <option key={u.symbol} value={u.symbol}>
+                        {u.symbol}
+                      </option>
+                    ))}
+                    {!dynamicUniverse.some(u => u.symbol === symbol) && (
+                      <option value={symbol}>{symbol}</option>
+                    )}
+                  </select>
+                </div>
               </div>
 
+              {/* Timeframe */}
               <div>
                 <label className="text-[11px] text-slate-300 uppercase font-mono font-bold block mb-1">Timeframe</label>
                 <select
                   value={timeframe}
                   onChange={(e) => setTimeframe(e.target.value)}
-                  className="w-full bg-slate-900 border border-white/10 rounded-lg px-2.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500 font-bold"
+                  className="w-full bg-slate-900 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500 font-bold"
                 >
                   <option value="5m">5 Min (Microstructure)</option>
                   <option value="15m">15 Min (Intraday Drift)</option>
@@ -688,6 +944,40 @@ export function StrategyStudioPage() {
                 </select>
               </div>
 
+              {/* Starting Capital with Quick Presets */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[11px] text-slate-300 uppercase font-mono font-bold">Capital ($)</label>
+                  <span className="text-xs text-emerald-400 font-mono font-bold">${capitalOverride.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-1 mb-1">
+                  {[5000, 25000, 100000].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setCapitalOverride(preset)}
+                      className={`flex-1 py-0.5 rounded text-[10px] font-mono cursor-pointer transition ${
+                        capitalOverride === preset
+                          ? "bg-emerald-500/30 text-[#00ff88] border border-emerald-500/50 font-bold"
+                          : "bg-white/5 text-slate-400 hover:text-white border border-white/5"
+                      }`}
+                    >
+                      ${preset >= 1000 ? `${preset / 1000}k` : preset}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  min="500"
+                  max="10000000"
+                  step="1000"
+                  value={capitalOverride}
+                  onChange={(e) => setCapitalOverride(Math.max(500, parseFloat(e.target.value) || 500))}
+                  className="w-full bg-slate-900 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              {/* Stop ATR */}
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[11px] text-slate-300 uppercase font-mono font-bold">Stop ATR</label>
@@ -700,10 +990,11 @@ export function StrategyStudioPage() {
                   step="0.1"
                   value={stopAtr}
                   onChange={(e) => setStopAtr(parseFloat(e.target.value))}
-                  className="w-full accent-emerald-500 cursor-pointer"
+                  className="w-full accent-emerald-500 cursor-pointer mt-2"
                 />
               </div>
 
+              {/* Max Hold */}
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[11px] text-slate-300 uppercase font-mono font-bold">Max Hold</label>
@@ -716,7 +1007,7 @@ export function StrategyStudioPage() {
                   step="1"
                   value={maxHoldBars}
                   onChange={(e) => setMaxHoldBars(parseInt(e.target.value, 10))}
-                  className="w-full accent-cyan-500 cursor-pointer"
+                  className="w-full accent-cyan-500 cursor-pointer mt-2"
                 />
               </div>
             </div>
