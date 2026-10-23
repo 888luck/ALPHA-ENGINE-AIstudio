@@ -14,6 +14,7 @@ const KEY_MAPPINGS: Record<string, string[]> = {
   nvidiaApiKey: ["alpha_nvidia_key", "alpha_nvidia_api_key"],
   openaiApiKey: ["alpha_openai_key", "alpha_openai_api_key"],
   anthropicApiKey: ["alpha_anthropic_key", "alpha_anthropic_api_key"],
+  openrouterApiKey: ["alpha_openrouter_key", "alpha_openrouter_api_key"],
   openFdaApiKey: ["alpha_openfda_key"],
   fredApiKey: ["alpha_fred_key"],
   patentsApiKey: ["alpha_patents_key"],

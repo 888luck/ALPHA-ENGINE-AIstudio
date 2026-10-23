@@ -134,6 +134,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
             if (!dirtyFieldsRef.current.has("nvidiaKey") && creds.nvidiaApiKey) setNvidiaKey(creds.nvidiaApiKey);
             if (!dirtyFieldsRef.current.has("openaiKey") && creds.openaiApiKey) setOpenaiKey(creds.openaiApiKey);
             if (!dirtyFieldsRef.current.has("anthropicKey") && creds.anthropicApiKey) setAnthropicKey(creds.anthropicApiKey);
+            if (!dirtyFieldsRef.current.has("openrouterKey") && creds.openrouterApiKey) setOpenrouterKey(creds.openrouterApiKey);
             if (!dirtyFieldsRef.current.has("openFdaKey") && creds.openFdaApiKey) setOpenFdaKey(creds.openFdaApiKey);
             if (!dirtyFieldsRef.current.has("fredKey") && creds.fredApiKey) setFredKey(creds.fredApiKey);
             if (!dirtyFieldsRef.current.has("patentsKey") && creds.patentsApiKey) setPatentsKey(creds.patentsApiKey);
@@ -203,6 +204,10 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
           persistVaultItem("anthropicApiKey", payload.apiKey);
           onSaveSetting("anthropicApiKey", payload.apiKey).catch(() => {});
           successMsg = `${successMsg || "Anthropic probe verified"} • 🔒 Auto-saved to Vault`;
+        } else if (testId === "openrouter" && payload.apiKey) {
+          persistVaultItem("openrouterApiKey", payload.apiKey);
+          onSaveSetting("openrouterApiKey", payload.apiKey).catch(() => {});
+          successMsg = `${successMsg || "OpenRouter probe verified"} • 🔒 Auto-saved to Vault`;
         } else if (testId === "openfda" && payload.apiKey) {
           persistVaultItem("openFdaApiKey", payload.apiKey);
           onSaveSetting("openFdaApiKey", payload.apiKey).catch(() => {});

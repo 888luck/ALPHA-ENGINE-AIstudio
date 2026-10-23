@@ -1024,30 +1024,74 @@ def extract_provider_and_key(selected_model: str, client_headers: Dict[str, str]
     
     if mid.startswith("google/"):
         raw_id = raw_id_override or mid[len("google/"):]
+        if raw_id.startswith("google/"):
+            raw_id = raw_id[len("google/"):]
         key = client_headers.get("x-gemini-api-key") or keys.get("gemini") or os.environ.get("GEMINI_API_KEY", "")
         return "google", raw_id, key
     elif mid.startswith("groq/"):
         raw_id = raw_id_override or mid[len("groq/"):]
+        if raw_id.startswith("groq/"):
+            raw_id = raw_id[len("groq/"):]
         key = client_headers.get("x-groq-api-key") or keys.get("groq") or os.environ.get("GROQ_API_KEY", "")
         return "groq", raw_id, key
     elif mid.startswith("nvidia/"):
         raw_id = raw_id_override or mid[len("nvidia/"):]
+        parts = raw_id.split("/")
+        if len(parts) > 1 and parts[0] == "nvidia" and parts[1] == "nvidia":
+            raw_id = "/".join(parts[1:])
         key = client_headers.get("x-nvidia-api-key") or keys.get("nvidia") or os.environ.get("NVIDIA_API_KEY") or os.environ.get("NVIDIA_INFERENCE_API_KEY", "")
         return "nvidia", raw_id, key
     elif mid.startswith("openai/"):
         raw_id = raw_id_override or mid[len("openai/"):]
+        if raw_id.startswith("openai/"):
+            raw_id = raw_id[len("openai/"):]
         key = client_headers.get("x-openai-api-key") or keys.get("openai") or os.environ.get("OPENAI_API_KEY", "")
         return "openai", raw_id, key
     elif mid.startswith("openrouter/"):
         raw_id = raw_id_override or mid[len("openrouter/"):]
+        if raw_id.startswith("openrouter/"):
+            raw_id = raw_id[len("openrouter/"):]
         key = client_headers.get("x-openrouter-api-key") or keys.get("openrouter") or os.environ.get("OPENROUTER_API_KEY", "")
         return "openrouter", raw_id, key
     elif mid.startswith("custom/"):
         raw_id = raw_id_override or mid[len("custom/"):]
+        if raw_id.startswith("custom/"):
+            raw_id = raw_id[len("custom/"):]
         key = client_headers.get("x-custom-api-key") or keys.get("custom") or os.environ.get("CUSTOM_AI_API_KEY", "")
         return "custom", raw_id, key
     else:
         return "local", "finbert-int8", ""
+
+def get_fallback_provider_candidate(current_provider: str, current_model: str, client_headers: Dict[str, str], payload_keys: Optional[Dict[str, str]]) -> Optional[tuple[str, str, str, str]]:
+    """
+    Returns (fallback_provider, fallback_raw_id, fallback_api_key, fallback_endpoint_url)
+    to automatically recover from provider outages, 404 NVCF function errors, 410 EoL, or 401 unauthenticated keys.
+    Order of preference: Groq -> Google GenAI -> NVIDIA (verified working model) -> OpenRouter.
+    """
+    keys = payload_keys or {}
+
+    # 1. Groq Cloud (verified active LPU)
+    groq_key = client_headers.get("x-groq-api-key") or keys.get("groq") or os.environ.get("GROQ_API_KEY", "")
+    if groq_key and len(groq_key.strip()) > 10 and "MY_" not in groq_key and current_provider != "groq":
+        return "groq", "openai/gpt-oss-20b", groq_key.strip(), "https://api.groq.com/openai/v1/chat/completions"
+
+    # 2. Google GenAI (official OpenAI-compatible endpoint)
+    gemini_key = client_headers.get("x-gemini-api-key") or keys.get("gemini") or os.environ.get("GEMINI_API_KEY", "")
+    if gemini_key and len(gemini_key.strip()) > 20 and "MY_" not in gemini_key and current_provider != "google":
+        return "google", "gemini-2.5-flash", gemini_key.strip(), "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+
+    # 3. NVIDIA NIM active alternative model
+    nvidia_key = client_headers.get("x-nvidia-api-key") or keys.get("nvidia") or os.environ.get("NVIDIA_API_KEY") or os.environ.get("NVIDIA_INFERENCE_API_KEY", "")
+    if nvidia_key and len(nvidia_key.strip()) > 15 and "MY_" not in nvidia_key:
+        if current_model != "nvidia/nemotron-3.5-lightning-30b-a3b":
+            return "nvidia", "nvidia/nemotron-3.5-lightning-30b-a3b", nvidia_key.strip(), "https://integrate.api.nvidia.com/v1/chat/completions"
+
+    # 4. OpenRouter Hub
+    or_key = client_headers.get("x-openrouter-api-key") or keys.get("openrouter") or os.environ.get("OPENROUTER_API_KEY", "")
+    if or_key and len(or_key.strip()) > 10 and "MY_" not in or_key and current_provider != "openrouter":
+        return "openrouter", "meta-llama/llama-3.3-70b-instruct:free", or_key.strip(), "https://openrouter.ai/api/v1/chat/completions"
+
+    return None
 
 async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str, str]) -> AsyncGenerator[str, None]:
     """
@@ -1368,22 +1412,25 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
         }
     ]
 
-    # Prepare OpenAI-compatible endpoint parameters
-    endpoint_url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "User-Agent": "AlphaEngine/2.0"}
-    
-    if provider == "google":
-        # Google OpenAI-compatible endpoint
-        endpoint_url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-    elif provider == "nvidia":
-        endpoint_url = "https://integrate.api.nvidia.com/v1/chat/completions"
-    elif provider == "openai":
-        endpoint_url = "https://api.openai.com/v1/chat/completions"
-    elif provider == "openrouter":
-        endpoint_url = "https://openrouter.ai/api/v1/chat/completions"
-    elif provider == "custom":
-        base = os.environ.get("CUSTOM_AI_BASE_URL", "http://localhost:11434/v1")
-        endpoint_url = f"{base}/chat/completions"
+    def resolve_endpoint_and_headers(prov: str, key: str) -> tuple[str, Dict[str, str]]:
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        if prov == "google":
+            url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        elif prov == "nvidia":
+            url = "https://integrate.api.nvidia.com/v1/chat/completions"
+        elif prov == "openai":
+            url = "https://api.openai.com/v1/chat/completions"
+        elif prov == "openrouter":
+            url = "https://openrouter.ai/api/v1/chat/completions"
+        elif prov == "custom":
+            base = os.environ.get("CUSTOM_AI_BASE_URL", "http://localhost:11434/v1")
+            url = f"{base}/chat/completions"
+        hdrs = {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "User-Agent": "AlphaEngine/2.0"
+        }
+        return url, hdrs
 
     # Construct conversation messages with system prompt (Sliding context window: last 6 messages)
     api_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -1396,144 +1443,200 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
             msg_obj["tool_call_id"] = m.tool_call_id
         api_messages.append(msg_obj)
 
-    # First turn: Check if model wants to call tools (non-streaming probe for reliable function resolution)
-    payload_turn1: Dict[str, Any] = {
-        "model": raw_model_id,
-        "messages": api_messages,
-        "temperature": request.temperature,
-        "max_tokens": request.max_tokens
-    }
-    if tools_payload:
-        payload_turn1["tools"] = tools_payload
+    cur_provider = provider
+    cur_raw_id = raw_model_id
+    cur_key = api_key
+    cur_endpoint, cur_headers = resolve_endpoint_and_headers(cur_provider, cur_key)
 
-    try:
-        res_data = None
+    attempt = 0
+    max_attempts = 2
+    execution_success = False
+
+    while attempt < max_attempts and not execution_success:
+        attempt += 1
+        payload_turn1: Dict[str, Any] = {
+            "model": cur_raw_id,
+            "messages": api_messages,
+            "temperature": request.temperature,
+            "max_tokens": request.max_tokens
+        }
+        if tools_payload:
+            payload_turn1["tools"] = tools_payload
+
         try:
-            req1 = urllib.request.Request(
-                endpoint_url,
-                headers=headers,
-                data=json.dumps(payload_turn1).encode("utf-8"),
-                method="POST"
-            )
-            with urllib.request.urlopen(req1, timeout=20) as resp1:
-                res_data = json.loads(resp1.read().decode("utf-8"))
-        except urllib.error.HTTPError as he:
-            # If tool validation fails upstream (e.g. 400 schema error, 404 NVCF function error, or 500), retry conversationally
-            if payload_turn1.get("tools") and he.code in [400, 404, 500, 503]:
-                logger.info("Tool calling rejected by provider (HTTP %s), retrying conversationally without tools: %s", he.code, he)
-                payload_turn1.pop("tools", None)
-                req1_fb = urllib.request.Request(
-                    endpoint_url,
-                    headers=headers,
+            res_data = None
+            try:
+                req1 = urllib.request.Request(
+                    cur_endpoint,
+                    headers=cur_headers,
                     data=json.dumps(payload_turn1).encode("utf-8"),
                     method="POST"
                 )
-                with urllib.request.urlopen(req1_fb, timeout=20) as resp1_fb:
-                    res_data = json.loads(resp1_fb.read().decode("utf-8"))
-            else:
-                raise
-
-        choice = (res_data.get("choices") or [{}])[0]
-        message_obj = choice.get("message", {})
-        tool_calls = message_obj.get("tool_calls", [])
-        content_res = message_obj.get("content", "")
-        # If tool calls were requested, execute each tool
-        if tool_calls:
-            api_messages.append(message_obj)
-            for tc in tool_calls:
-                fn_name = tc.get("function", {}).get("name", "")
-                raw_args = tc.get("function", {}).get("arguments", "{}")
-                try:
-                    args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
-                except Exception:
-                    args = {}
-                    
-                yield emit_sse("tool_call", {"tool": fn_name, "args": args, "id": tc.get("id")})
-                tool_result = execute_tool_call(fn_name, args)
-                yield emit_sse("tool_result", {
-                    "tool": fn_name,
-                    "status": "completed",
-                    "data": tool_result,
-                    "summary": f"Retrieved {len(tool_result)} fields from edge adapter."
-                })
-                
-                content_str = json.dumps(tool_result)
-                if isinstance(tool_result, dict) and tool_result.get("status") == "GATEWAY_OFFLINE":
-                    content_str += (
-                        "\n\n[CRITICAL ZERO-SYNTHETIC INSTRUCTION: Interactive Brokers Gateway is OFFLINE. "
-                        "You MUST report that the gateway is offline and live market prices are currently unavailable. "
-                        "Under NO CIRCUMSTANCES should you fabricate, estimate, or hallucinate prices, quotes, or execution fills (e.g. NEVER output a fake rate like 1.0845). "
-                        "State clearly that the gateway is offline and the user should check Frankfurt edge node connectivity.]"
+                with urllib.request.urlopen(req1, timeout=25) as resp1:
+                    res_data = json.loads(resp1.read().decode("utf-8"))
+            except urllib.error.HTTPError as he:
+                # If tool validation fails upstream (e.g. 400 schema error, 500, 503), retry conversationally
+                if payload_turn1.get("tools") and he.code in [400, 500, 503]:
+                    logger.info("Tool calling rejected by provider (HTTP %s), retrying conversationally without tools: %s", he.code, he)
+                    payload_turn1.pop("tools", None)
+                    req1_fb = urllib.request.Request(
+                        cur_endpoint,
+                        headers=cur_headers,
+                        data=json.dumps(payload_turn1).encode("utf-8"),
+                        method="POST"
                     )
-                api_messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc.get("id"),
-                    "name": fn_name,
-                    "content": content_str
-                })
+                    with urllib.request.urlopen(req1_fb, timeout=25) as resp1_fb:
+                        res_data = json.loads(resp1_fb.read().decode("utf-8"))
+                else:
+                    raise
 
-            # Second turn: Synthesize final answer based on real tool output
-            payload_turn2 = {
-                "model": raw_model_id,
-                "messages": api_messages,
-                "temperature": request.temperature,
-                "max_tokens": request.max_tokens,
-                "stream": True
-            }
-            
-            req2 = urllib.request.Request(
-                endpoint_url,
-                headers=headers,
-                data=json.dumps(payload_turn2).encode("utf-8"),
-                method="POST"
-            )
-            
-            with urllib.request.urlopen(req2, timeout=30) as resp2:
-                for raw_line in resp2:
-                    line = raw_line.decode("utf-8").strip()
-                    if not line or not line.startswith("data:"):
-                        continue
-                    chunk_str = line[5:].strip()
-                    if chunk_str == "[DONE]":
-                        break
+            choice = (res_data.get("choices") or [{}])[0]
+            message_obj = choice.get("message", {})
+            tool_calls = message_obj.get("tool_calls", [])
+            content_res = message_obj.get("content") or message_obj.get("reasoning_content") or ""
+
+            # If tool calls were requested, execute each tool
+            if tool_calls:
+                api_messages.append(message_obj)
+                for tc in tool_calls:
+                    fn_name = tc.get("function", {}).get("name", "")
+                    raw_args = tc.get("function", {}).get("arguments", "{}")
                     try:
-                        chunk_json = json.loads(chunk_str)
-                        delta_content = chunk_json.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                        if delta_content:
-                            yield emit_sse("delta", {"content": delta_content})
+                        args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
                     except Exception:
-                        continue
-        else:
-            # No tool call made - stream direct conversational output
-            if content_res:
-                    words = content_res.split(" ")
+                        args = {}
+                        
+                    yield emit_sse("tool_call", {"tool": fn_name, "args": args, "id": tc.get("id")})
+                    tool_result = execute_tool_call(fn_name, args)
+                    yield emit_sse("tool_result", {
+                        "tool": fn_name,
+                        "status": "completed",
+                        "data": tool_result,
+                        "summary": f"Retrieved {len(tool_result)} fields from edge adapter."
+                    })
+                    
+                    content_str = json.dumps(tool_result)
+                    if isinstance(tool_result, dict) and tool_result.get("status") == "GATEWAY_OFFLINE":
+                        content_str += (
+                            "\n\n[CRITICAL ZERO-SYNTHETIC INSTRUCTION: Interactive Brokers Gateway is OFFLINE. "
+                            "You MUST report that the gateway is offline and live market prices are currently unavailable. "
+                            "Under NO CIRCUMSTANCES should you fabricate, estimate, or hallucinate prices, quotes, or execution fills (e.g. NEVER output a fake rate like 1.0845). "
+                            "State clearly that the gateway is offline and the user should check Frankfurt edge node connectivity.]"
+                        )
+                    api_messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc.get("id"),
+                        "name": fn_name,
+                        "content": content_str
+                    })
+
+                # Second turn: Synthesize final answer based on real tool output
+                payload_turn2 = {
+                    "model": cur_raw_id,
+                    "messages": api_messages,
+                    "temperature": request.temperature,
+                    "max_tokens": request.max_tokens,
+                    "stream": True
+                }
+                
+                req2 = urllib.request.Request(
+                    cur_endpoint,
+                    headers=cur_headers,
+                    data=json.dumps(payload_turn2).encode("utf-8"),
+                    method="POST"
+                )
+                
+                with urllib.request.urlopen(req2, timeout=30) as resp2:
+                    for raw_line in resp2:
+                        line = raw_line.decode("utf-8").strip()
+                        if not line or not line.startswith("data:"):
+                            continue
+                        chunk_str = line[5:].strip()
+                        if chunk_str == "[DONE]":
+                            break
+                        try:
+                            chunk_json = json.loads(chunk_str)
+                            delta_obj = chunk_json.get("choices", [{}])[0].get("delta", {})
+                            delta_content = delta_obj.get("content") or delta_obj.get("reasoning_content") or ""
+                            if delta_content:
+                                yield emit_sse("delta", {"content": delta_content})
+                        except Exception:
+                            continue
+            else:
+                # No tool call made - stream direct conversational output
+                if content_res:
+                    words = str(content_res).split(" ")
                     for i, w in enumerate(words):
                         yield emit_sse("delta", {"content": w + (" " if i < len(words) - 1 else "")})
                         time.sleep(0.008)
 
-    except urllib.error.HTTPError as he:
-        err_body = he.read().decode("utf-8") if he.fp else str(he)
-        logger.error("LLM Provider HTTP %s: %s", he.code, err_body)
-        clean_msg = ""
-        try:
-            parsed = json.loads(err_body)
-            if isinstance(parsed, list) and len(parsed) > 0:
-                clean_msg = parsed[0].get("error", {}).get("message", "")
-            elif isinstance(parsed, dict):
-                clean_msg = parsed.get("error", {}).get("message") or parsed.get("detail") or parsed.get("message") or ""
-        except Exception:
-            clean_msg = err_body
-        if not clean_msg:
-            clean_msg = err_body[:400]
-        yield emit_sse("delta", {
-            "content": f"> ⚠️ **Provider Error ({he.code})**: {clean_msg}\n\n"
-                       f"Please verify your credentials in the **4-Pillar Vault**, switch to another active provider (e.g., **NVIDIA NIM**), or select **Local Tier 0 FinBERT ($0 Offline)** from the model dropdown."
-        })
-    except Exception as e:
-        logger.error("LLM Execution Error: %s", e)
-        yield emit_sse("delta", {
-            "content": f"> ❌ **Execution Error**: {str(e)}\n\n"
-        })
+            execution_success = True
+
+        except urllib.error.HTTPError as he:
+            err_body = he.read().decode("utf-8") if he.fp else str(he)
+            logger.error("LLM Provider HTTP %s on %s/%s: %s", he.code, cur_provider, cur_raw_id, err_body)
+            clean_msg = ""
+            try:
+                parsed = json.loads(err_body)
+                if isinstance(parsed, list) and len(parsed) > 0:
+                    clean_msg = parsed[0].get("error", {}).get("message", "")
+                elif isinstance(parsed, dict):
+                    clean_msg = parsed.get("error", {}).get("message") or parsed.get("detail") or parsed.get("message") or ""
+            except Exception:
+                clean_msg = err_body
+            if not clean_msg:
+                clean_msg = err_body[:250]
+
+            # Automatic Failover: If 404 Function not found, 410 EoL, or 401 unauthenticated, attempt alternative active provider
+            fallback = get_fallback_provider_candidate(cur_provider, cur_raw_id, client_headers, request.keys)
+            if fallback and attempt < max_attempts:
+                fb_provider, fb_raw_id, fb_key, fb_url = fallback
+                logger.info("Failing over from %s/%s (HTTP %s) to %s/%s", cur_provider, cur_raw_id, he.code, fb_provider, fb_raw_id)
+                yield emit_sse("delta", {
+                    "content": f"> ℹ️ **Autonomous Session Recovery**: Provider model `{cur_provider}/{cur_raw_id}` returned HTTP {he.code} (`{clean_msg[:120]}`). Seamlessly recovering session via active provider `{fb_provider.upper()} ({fb_raw_id})`...\n\n"
+                })
+                cur_provider = fb_provider
+                cur_raw_id = fb_raw_id
+                cur_key = fb_key
+                cur_endpoint = fb_url
+                cur_headers = {
+                    "Authorization": f"Bearer {cur_key}",
+                    "Content-Type": "application/json",
+                    "User-Agent": "AlphaEngine/2.0"
+                }
+                selected_model = f"{fb_provider}/{fb_raw_id}"
+                continue
+            else:
+                yield emit_sse("delta", {
+                    "content": f"> ⚠️ **Provider Error ({he.code})**: {clean_msg}\n\n"
+                               f"Please verify your credentials in the **4-Pillar Vault**, switch to another active provider (e.g., **Groq** or **Google GenAI**), or select **Local Tier 0 FinBERT ($0 Offline)** from the model dropdown."
+                })
+                break
+        except Exception as e:
+            logger.error("LLM Execution Error on %s/%s: %s", cur_provider, cur_raw_id, e)
+            fallback = get_fallback_provider_candidate(cur_provider, cur_raw_id, client_headers, request.keys)
+            if fallback and attempt < max_attempts:
+                fb_provider, fb_raw_id, fb_key, fb_url = fallback
+                logger.info("Failing over from %s/%s (Exception: %s) to %s/%s", cur_provider, cur_raw_id, e, fb_provider, fb_raw_id)
+                yield emit_sse("delta", {
+                    "content": f"> ℹ️ **Autonomous Session Recovery**: Encountered error on `{cur_provider}/{cur_raw_id}` (`{str(e)[:100]}`). Seamlessly recovering session via active provider `{fb_provider.upper()} ({fb_raw_id})`...\n\n"
+                })
+                cur_provider = fb_provider
+                cur_raw_id = fb_raw_id
+                cur_key = fb_key
+                cur_endpoint = fb_url
+                cur_headers = {
+                    "Authorization": f"Bearer {cur_key}",
+                    "Content-Type": "application/json",
+                    "User-Agent": "AlphaEngine/2.0"
+                }
+                selected_model = f"{fb_provider}/{fb_raw_id}"
+                continue
+            else:
+                yield emit_sse("delta", {
+                    "content": f"> ❌ **Execution Error**: {str(e)}\n\n"
+                })
+                break
 
     # Telemetry and Cost Governance
     t_end = time.perf_counter()

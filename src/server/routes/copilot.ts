@@ -82,8 +82,8 @@ export async function discoverActiveModels(forceRefresh = false, incomingKeys?: 
           .filter((m: any) => {
             if (!m.supportedGenerationMethods?.includes("generateContent")) return false;
             const cleanId = (m.name || "").replace(/^models\//, "").toLowerCase();
-            // Exclude audio, speech, TTS, image generation, and known deprecated/sunset models
-            const nonChatKeywords = ["tts", "audio", "speech", "banana", "imagen", "image", "embedding", "aqa", "preview", "lyria", "transcribe", "gemini-2.5", "flash-latest", "pro-latest", "gemma-4"];
+            // Exclude audio, speech, TTS, image generation, and embeddings
+            const nonChatKeywords = ["tts", "audio", "speech", "banana", "imagen", "image", "embedding", "aqa", "preview-tts", "lyria", "transcribe"];
             return !nonChatKeywords.some((k) => cleanId.includes(k));
           })
           .forEach((m: any) => {
@@ -158,16 +158,13 @@ export async function discoverActiveModels(forceRefresh = false, incomingKeys?: 
       });
       if (res.ok) {
         const data = await res.json();
-        const verifiedActiveNim = [
-          "meta/llama-3.2-11b-vision-instruct",
-          "meta/llama-3.2-90b-vision-instruct",
-          "openai/gpt-oss-20b",
-          "nvidia/nemotron-3-super-120b-a12b",
-          "nvidia/nemotron-3.5-super-vl-120b-a12b"
-        ];
+        const nonChatNim = ["embed", "guard", "safety", "reward", "audio", "tts", "ocr", "ranking", "qa-1b"];
         const raw = data.data || [];
         raw
-          .filter((m: any) => verifiedActiveNim.includes(m.id))
+          .filter((m: any) => {
+            const mid = (m.id || "").toLowerCase();
+            return !nonChatNim.some((k) => mid.includes(k));
+          })
           .forEach((m: any) => {
             const rawId = m.id;
             models.push({
@@ -175,8 +172,8 @@ export async function discoverActiveModels(forceRefresh = false, incomingKeys?: 
               rawId: rawId,
               name: rawId,
               provider: "NVIDIA NIM",
-              tier: "Tier 1 NIM",
-              badge: "Verified Active",
+              tier: rawId.includes("ultra") || rawId.includes("70b") ? "Tier 1 High-Cap NIM" : "Tier 1 Fast NIM",
+              badge: "Live Discovered",
               costStr: "$0.70 / 1M tokens",
               icon: "🟢"
             });

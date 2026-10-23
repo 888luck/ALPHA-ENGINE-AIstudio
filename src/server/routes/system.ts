@@ -85,6 +85,7 @@ systemRouter.post("/api/vault/credentials", authMiddleware, (req, res) => {
     if (isClean(updates.nvidiaApiKey)) systemSettings.nvidiaApiKey = updates.nvidiaApiKey;
     if (isClean(updates.openaiApiKey)) systemSettings.openaiApiKey = updates.openaiApiKey;
     if (isClean(updates.anthropicApiKey)) systemSettings.anthropicApiKey = updates.anthropicApiKey;
+    if (isClean(updates.openrouterApiKey)) (systemSettings as any).openrouterApiKey = updates.openrouterApiKey;
     if (isClean(updates.customAiBaseUrl)) systemSettings.customAiBaseUrl = updates.customAiBaseUrl;
     if (isClean(updates.customAiModelName)) systemSettings.customAiModelName = updates.customAiModelName;
     if (updates.selectedAiProvider !== undefined) systemSettings.selectedAiProvider = updates.selectedAiProvider;
@@ -142,6 +143,7 @@ systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
     geminiApiKey,
     openaiApiKey,
     anthropicApiKey,
+    openrouterApiKey,
     nvidiaApiKey,
     customAiApiKey,
     customAiBaseUrl,
@@ -176,6 +178,7 @@ systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
   if (geminiApiKey !== undefined && !isMaskedString(geminiApiKey)) systemSettings.geminiApiKey = geminiApiKey;
   if (openaiApiKey !== undefined && !isMaskedString(openaiApiKey)) systemSettings.openaiApiKey = openaiApiKey;
   if (anthropicApiKey !== undefined && !isMaskedString(anthropicApiKey)) systemSettings.anthropicApiKey = anthropicApiKey;
+  if (openrouterApiKey !== undefined && !isMaskedString(openrouterApiKey)) (systemSettings as any).openrouterApiKey = openrouterApiKey;
   if (nvidiaApiKey !== undefined && !isMaskedString(nvidiaApiKey)) systemSettings.nvidiaApiKey = nvidiaApiKey;
   if (customAiApiKey !== undefined && !isMaskedString(customAiApiKey)) systemSettings.customAiApiKey = customAiApiKey;
   if (customAiBaseUrl !== undefined && !isMaskedString(customAiBaseUrl)) systemSettings.customAiBaseUrl = customAiBaseUrl;
