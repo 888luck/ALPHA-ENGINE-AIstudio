@@ -3,7 +3,8 @@ import Dashboard from "./components/Dashboard";
 import { LiveCockpit } from "./components/LiveCockpit";
 import { QuantResearchLab } from "./components/QuantResearchLab";
 import { CopilotPage } from "./pages/CopilotPage";
-import { Sun, Moon, Activity, Tag, Globe, HelpCircle, LayoutGrid, Home, ShieldAlert, Layers, Sliders, Sparkles } from "lucide-react";
+import { StrategyStudioPage } from "./pages/StrategyStudioPage";
+import { Sun, Moon, Activity, Tag, Globe, HelpCircle, LayoutGrid, Home, ShieldAlert, Layers, Sliders, Sparkles, SlidersHorizontal, ArrowLeft } from "lucide-react";
 
 export default function App() {
   // Safe default persistent theme
@@ -12,10 +13,11 @@ export default function App() {
     return (saved as "dark" | "light") || "dark";
   });
 
-  const [view, setView] = useState<"mission-control" | "blotter" | "risk" | "lab" | "config" | "copilot">(() => {
+  const [view, setView] = useState<"mission-control" | "blotter" | "risk" | "lab" | "config" | "copilot" | "studio">(() => {
     if (typeof window !== "undefined") {
       const path = window.location.pathname.toLowerCase();
       if (path === "/copilot" || path === "/chat") return "copilot";
+      if (path === "/studio" || path === "/strategy") return "studio";
     }
     const saved = localStorage.getItem("alpha_dashboard_view");
     return (saved as any) || "mission-control";
@@ -28,22 +30,26 @@ export default function App() {
       const path = window.location.pathname.toLowerCase();
       if (path === "/copilot" || path === "/chat") {
         setView("copilot");
+      } else if (path === "/studio" || path === "/strategy") {
+        setView("studio");
       } else {
         const saved = (localStorage.getItem("alpha_dashboard_view") as any) || "mission-control";
-        setView(saved === "copilot" ? "mission-control" : saved);
+        setView(saved === "copilot" || saved === "studio" ? "mission-control" : saved);
       }
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  const handleNavigate = (newView: "mission-control" | "blotter" | "risk" | "lab" | "config" | "copilot", target?: string) => {
+  const handleNavigate = (newView: "mission-control" | "blotter" | "risk" | "lab" | "config" | "copilot" | "studio", target?: string) => {
     setView(newView);
     localStorage.setItem("alpha_dashboard_view", newView);
     if (newView === "copilot") {
       window.history.pushState(null, "", "/copilot");
+    } else if (newView === "studio") {
+      window.history.pushState(null, "", "/studio");
     } else {
-      if (window.location.pathname === "/copilot" || window.location.pathname === "/chat") {
+      if (window.location.pathname === "/copilot" || window.location.pathname === "/chat" || window.location.pathname === "/studio") {
         window.history.pushState(null, "", "/");
       }
     }
@@ -379,6 +385,19 @@ export default function App() {
 
             <button
               type="button"
+              onClick={() => handleNavigate("studio")}
+              className={`px-3.5 py-2 rounded-lg transition-all duration-200 cursor-pointer text-xs font-mono tracking-wider font-bold flex items-center gap-2 ${
+                view === "studio"
+                  ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/30 font-black"
+                  : "text-emerald-400 hover:text-white hover:bg-emerald-500/10 border border-emerald-500/30"
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              <span>STRATEGY STUDIO</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => handleNavigate("config")}
               className={`px-3.5 py-2 rounded-lg transition-all duration-200 cursor-pointer text-xs font-mono tracking-wider font-bold flex items-center gap-2 ${
                 view === "config"
@@ -422,6 +441,7 @@ export default function App() {
         {view === "blotter" && <LiveCockpit systemState={systemState} onRefresh={() => {}} activeView="blotter" />}
         {view === "risk" && <LiveCockpit systemState={systemState} onRefresh={() => {}} activeView="risk" />}
         {view === "lab" && <QuantResearchLab />}
+        {view === "studio" && <StrategyStudioPage />}
         {view === "config" && <Dashboard onNavigate={handleNavigate} navTarget={navTarget} activeTabOverride="credentials" />}
       </main>
 
