@@ -257,7 +257,7 @@ researchRouter.post("/api/research/sweep", (req, res) => {
     "--end-date", String(end_date || "2026-06-16"),
   ];
 
-  execFile(py, args, { timeout: 45000 }, (error, stdout, stderr) => {
+  execFile(py, args, { timeout: 60000, maxBuffer: 50 * 1024 * 1024 }, (error, stdout, stderr) => {
     if (error) {
       console.error("[RESEARCH] Sweep error:", stderr || error.message);
       return res.status(500).json({ error: "Sweep failed", details: stderr || error.message });

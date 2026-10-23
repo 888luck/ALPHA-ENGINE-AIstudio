@@ -546,7 +546,7 @@ class AlphaBacktestingEngine:
                 "maxDrawdownPercent": dd,
                 "totalTrades": int(res.get("totalTrades", 0)),
                 "totalCommissions": float(res.get("totalCommissions", 0.0)),
-                "balanceHistory": res.get("balanceHistory", []),
+                "balanceHistory": res.get("balanceHistory", [])[::max(1, len(res.get("balanceHistory", [])) // 80)] if len(res.get("balanceHistory", [])) > 100 else res.get("balanceHistory", []),
                 "tradesList": res.get("tradesList", [])
             })
             
