@@ -682,11 +682,180 @@ class CopilotTools:
             "verified_at": datetime.now(timezone.utc).isoformat()
         }
 
+    @staticmethod
+    def run_quant_discovery(symbol: str = "ASML", timeframe: str = "1h") -> Dict[str, Any]:
+        """Runs Wald-Wolfowitz runs test, Hurst exponent, and Markov state transitions on historical broker bars."""
+        sym = (symbol or "ASML").upper().strip()
+        from backtester import AlphaBacktestingEngine
+        from quant_discovery import QuantDiscoveryEngine
+        engine = AlphaBacktestingEngine()
+        try:
+            bars = engine.generate_synthetic_history(sym, timeframe, "2026-05-01", "2026-06-16")
+        except Exception as e:
+            return {"status": "ERROR", "symbol": sym, "error": str(e)}
+        prices = [b["close"] for b in bars]
+        returns = [(prices[i] - prices[i - 1]) / prices[i - 1] for i in range(1, len(prices))] if len(prices) > 1 else []
+        runs = QuantDiscoveryEngine.wald_wolfowitz_runs_test(returns)
+        hurst = QuantDiscoveryEngine.calculate_hurst_exponent(prices)
+        markov = QuantDiscoveryEngine.markov_transition_matrix(returns)
+        h_val = hurst.get("hurst_exponent", 0.50)
+        is_trending = h_val > 0.55
+        is_mean_rev = h_val < 0.45
+        if is_trending:
+            regime = "PERSISTENT_TRENDING"
+            guidance = "Asset exhibits momentum persistence (Hurst > 0.55). Favour trend breakouts, wider trailing ATR stops (2.0x-2.6x), and extended hold bars."
+        elif is_mean_rev:
+            regime = "MEAN_REVERTING"
+            guidance = "Asset exhibits alternating mean-reversion (Hurst < 0.45). Favour tight stop ATR (1.2x-1.5x), fast tranche scaling, and breakeven lock."
+        else:
+            regime = "RANDOM_WALK"
+            guidance = "Asset return sequence is statistically indistinguishable from Geometric Brownian Motion (0.45 <= Hurst <= 0.55). Require strict OFI volume gate."
+        return {
+            "status": "SUCCESS",
+            "symbol": sym,
+            "timeframe": timeframe,
+            "total_bars": len(bars),
+            "regime": regime,
+            "guidance": guidance,
+            "hurst_exponent": hurst,
+            "runs_test": runs,
+            "markov_transitions": markov
+        }
+
+    @staticmethod
+    def run_strategy_sweep(symbol: str = "ASML", timeframe: str = "1h", capital: float = 100000.0, trials: int = 16) -> Dict[str, Any]:
+        """Runs systematic multi-candidate parameter sweep with Marcos López de Prado's Deflated Sharpe Ratio."""
+        sym = (symbol or "ASML").upper().strip()
+        from backtester import AlphaBacktestingEngine
+        engine = AlphaBacktestingEngine(starting_capital=float(capital))
+        return engine.run_parameter_sweep(
+            symbol=sym,
+            timeframe=timeframe,
+            start_date="2026-05-01",
+            end_date="2026-06-16",
+            capital_override=float(capital),
+            trials_count=int(trials)
+        )
+
+    @staticmethod
+    def run_strategy_backtest(
+        symbol: str = "ASML",
+        timeframe: str = "1h",
+        capital: float = 100000.0,
+        stop_atr: float = 1.8,
+        max_hold: int = 15,
+        partial_profit: bool = True,
+        breakeven_lock: bool = True,
+        ofi_filter: bool = True,
+        adaptive_stop: bool = True
+    ) -> Dict[str, Any]:
+        """Runs single simulation of the Alpha Strategy with audited DSR on verified broker bars."""
+        sym = (symbol or "ASML").upper().strip()
+        from backtester import AlphaBacktestingEngine
+        engine = AlphaBacktestingEngine(starting_capital=float(capital))
+        return engine.run_backtest(
+            symbol=sym,
+            timeframe=timeframe,
+            start_date="2026-05-01",
+            end_date="2026-06-16",
+            stop_atr=float(stop_atr),
+            partial_profit=bool(partial_profit),
+            breakeven_lock=bool(breakeven_lock),
+            max_hold=int(max_hold),
+            ofi_filter=bool(ofi_filter),
+            adaptive_stop=bool(adaptive_stop),
+            capital_override=float(capital)
+        )
+
+    @staticmethod
+    def save_strategy_to_vault(
+        name: str,
+        symbol: str,
+        timeframe: str,
+        parameters: Dict[str, Any],
+        metrics: Dict[str, Any],
+        balance_history: Optional[List[Any]] = None,
+        trades_list: Optional[List[Any]] = None
+    ) -> Dict[str, Any]:
+        """Atomically saves audited quantitative strategy to server-side strategy_vault.json."""
+        vault_path = os.path.join(STUDIO_DIR, "strategy_vault.json")
+        items = []
+        if os.path.exists(vault_path):
+            try:
+                with open(vault_path, "r", encoding="utf-8") as f:
+                    items = json.load(f)
+            except Exception:
+                items = []
+        new_entry = {
+            "id": f"EXP_{int(time.time()*1000):X}",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "name": name,
+            "symbol": symbol.upper(),
+            "timeframe": timeframe,
+            "parameters": parameters,
+            "metrics": metrics,
+            "balanceHistory": balance_history or [],
+            "tradesList": trades_list or []
+        }
+        items = [new_entry] + [i for i in items if i.get("id") != new_entry["id"]]
+        tmp_path = vault_path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(items, f, indent=2)
+        os.replace(tmp_path, vault_path)
+        return {"status": "SUCCESS", "message": f"Strategy '{name}' preserved to Experiment Vault.", "strategy": new_entry}
+
+    @staticmethod
+    def get_strategy_vault() -> Dict[str, Any]:
+        """Retrieves all preserved quantitative strategies from strategy_vault.json."""
+        vault_path = os.path.join(STUDIO_DIR, "strategy_vault.json")
+        items = []
+        if os.path.exists(vault_path):
+            try:
+                with open(vault_path, "r", encoding="utf-8") as f:
+                    items = json.load(f)
+            except Exception:
+                items = []
+        return {"status": "SUCCESS", "total_strategies": len(items), "strategies": items}
+
 def execute_tool_call(tool_name: str, tool_args: Dict[str, Any]) -> Dict[str, Any]:
     """Execute dynamic tool dispatching across IBKR socket and regulatory adapters."""
     name = tool_name.lower().strip()
     try:
-        if name in ["get_market_quote", "get_closing_price", "reqhistoricaldata", "reqmktdata"]:
+        if name in ["run_quant_discovery", "quant_discovery"]:
+            return CopilotTools.run_quant_discovery(
+                symbol=tool_args.get("symbol", "ASML"),
+                timeframe=tool_args.get("timeframe", "1h")
+            )
+        elif name in ["run_strategy_sweep", "parameter_sweep", "optimize_strategy"]:
+            return CopilotTools.run_strategy_sweep(
+                symbol=tool_args.get("symbol", "ASML"),
+                timeframe=tool_args.get("timeframe", "1h"),
+                capital=float(tool_args.get("capital", 100000.0)),
+                trials=int(tool_args.get("trials", 16))
+            )
+        elif name in ["run_strategy_backtest", "backtest"]:
+            return CopilotTools.run_strategy_backtest(
+                symbol=tool_args.get("symbol", "ASML"),
+                timeframe=tool_args.get("timeframe", "1h"),
+                capital=float(tool_args.get("capital", 100000.0)),
+                stop_atr=float(tool_args.get("stop_atr", 1.8)),
+                max_hold=int(tool_args.get("max_hold", 15)),
+                partial_profit=bool(tool_args.get("partial_profit", True)),
+                breakeven_lock=bool(tool_args.get("breakeven_lock", True)),
+                ofi_filter=bool(tool_args.get("ofi_filter", True)),
+                adaptive_stop=bool(tool_args.get("adaptive_stop", True))
+            )
+        elif name in ["save_strategy_to_vault", "save_experiment"]:
+            return CopilotTools.save_strategy_to_vault(
+                name=tool_args.get("name", "Audited Strategy"),
+                symbol=tool_args.get("symbol", "ASML"),
+                timeframe=tool_args.get("timeframe", "1h"),
+                parameters=tool_args.get("parameters", {}),
+                metrics=tool_args.get("metrics", {})
+            )
+        elif name in ["get_strategy_vault", "list_saved_strategies"]:
+            return CopilotTools.get_strategy_vault()
+        elif name in ["get_market_quote", "get_closing_price", "reqhistoricaldata", "reqmktdata"]:
             sym = tool_args.get("symbol") or tool_args.get("ticker") or tool_args.get("contract") or "EMR"
             if isinstance(sym, dict):
                 sym = sym.get("symbol", "EMR")
@@ -827,18 +996,25 @@ async def list_tools():
     """Lists available agent tools from tools_registry.json."""
     return {"status": "SUCCESS", "tools": load_tools_registry()}
 
-SYSTEM_PROMPT = """You are the AlphaEngine Institutional Trading Copilot, connected directly to the Frankfurt GCE Edge Node (10.156.0.2:4002), IBKR Direct Market Access (DMA) socket, and multi-source regulatory data feeds (SEC EDGAR, ClinicalTrials.gov, OpenFDA, U.S. EIA Energy).
+SYSTEM_PROMPT = """You are the AlphaEngine Institutional Trading Copilot and Autonomous Quantitative Strategy Optimizer, connected directly to the Frankfurt GCE Edge Node (10.156.0.2:4002), IBKR Direct Market Access (DMA) socket, and multi-source regulatory data feeds (SEC EDGAR, ClinicalTrials.gov, OpenFDA, U.S. EIA Energy).
 
-Operational Guidelines:
-1. When asked about market prices, quotes, forex rates, crypto, indices, or stocks: invoke `get_market_quote`. Contract specifications are dynamically inferred (e.g. 'EUR/USD' or 'EUR.USD' -> CASH IDEALPRO, 'BTC/USD' -> CRYPTO PAXOS, 'SPX' -> IND CBOE, 'NVDA' -> STK SMART).
-2. When asked about open positions, portfolio holdings, cash balances, or account metrics: invoke the appropriate account/position tool (`get_positions` or `get_account_summary`).
-3. When asked about SEC filings, company filings, or 8-K/10-K/10-Q forms: invoke `get_sec_filings`.
-4. When asked about biomedical catalysts, clinical trials, or FDA drug safety reports: invoke `get_clinical_trials` or `get_fda_safety_reports`.
-5. When asked about natural gas storage, crude oil, or energy telemetry: invoke `get_energy_telemetry`.
-6. STRICT ZERO-SYNTHETIC / ZERO-HALLUCINATION INVARIANT:
-   If a tool returns `status: "GATEWAY_OFFLINE"` or indicates that Interactive Brokers Gateway is offline, you MUST explicitly state that the Gateway is offline and live rates are currently unavailable. Under NO CIRCUMSTANCES should you fabricate, estimate, or hallucinate prices, quotes, or trade executions (e.g., do NOT invent a 1.0845 EUR/USD rate or mock fill). You must uphold institutional truth over speculation.
-7. For all general questions, conversational inquiries, financial analysis, institutional strategies, or IBKR relationship management questions: respond directly, professionally, and comprehensively without calling tools.
-8. Present data in clean Markdown tables and cite official edge nodes, timestamps, and accession numbers.
+Quantitative Strategy & Optimization Guidelines:
+1. When asked to test, optimize, analyze, or backtest trading strategies or parameters for any asset:
+   - Call `run_quant_discovery(symbol, timeframe)` to analyze the empirical price series using the Wald-Wolfowitz runs test (return direction independence) and Hurst exponent (distinguishing mean-reverting H < 0.45 from persistent trending H > 0.55).
+   - Call `run_strategy_sweep(symbol, timeframe, capital, trials)` to execute an autonomous multi-parameter optimization sweep across ATR stop cushions, hold durations, tranche scalers, and OFI filters, strictly audited under Marcos López de Prado's Deflated Sharpe Ratio (DSR) with selection bias penalty.
+   - Call `run_strategy_backtest` to run single simulations with specific parameters.
+   - Explain the quantitative rationale: why certain parameters won, how the DSR penalizes multiple trials (N), and what the trade blotter indicates about execution friction.
+2. When asked to preserve or save a strategy configuration: call `save_strategy_to_vault` or `get_strategy_vault`.
+
+Market Data & Operations Guidelines:
+3. When asked about market prices, quotes, forex rates, crypto, indices, or stocks: invoke `get_market_quote`. Contract specifications are dynamically inferred (e.g. 'EUR/USD' or 'EUR.USD' -> CASH IDEALPRO, 'BTC/USD' -> CRYPTO PAXOS, 'SPX' -> IND CBOE, 'NVDA' -> STK SMART).
+4. When asked about open positions, portfolio holdings, cash balances, or account metrics: invoke the appropriate account/position tool (`get_positions` or `get_account_summary`).
+5. When asked about SEC filings, company filings, or 8-K/10-K/10-Q forms: invoke `get_sec_filings`.
+6. When asked about biomedical catalysts, clinical trials, or FDA drug safety reports: invoke `get_clinical_trials` or `get_fda_safety_reports`.
+7. When asked about natural gas storage, crude oil, or energy telemetry: invoke `get_energy_telemetry`.
+8. STRICT ZERO-SYNTHETIC / ZERO-HALLUCINATION INVARIANT:
+   If a tool returns `status: "GATEWAY_OFFLINE"` or indicates that Interactive Brokers Gateway is offline, you MUST explicitly state that the Gateway is offline and live rates are currently unavailable. Under NO CIRCUMSTANCES should you fabricate, estimate, or hallucinate prices, quotes, or trade executions. You must uphold institutional truth over speculation.
+9. Present data in clean Markdown tables and cite official edge nodes, timestamps, and parameters.
 """
 
 def extract_provider_and_key(selected_model: str, client_headers: Dict[str, str], payload_keys: Optional[Dict[str, str]], raw_id_override: Optional[str] = None) -> tuple[str, str, str]:
@@ -862,6 +1038,10 @@ def extract_provider_and_key(selected_model: str, client_headers: Dict[str, str]
         raw_id = raw_id_override or mid[len("openai/"):]
         key = client_headers.get("x-openai-api-key") or keys.get("openai") or os.environ.get("OPENAI_API_KEY", "")
         return "openai", raw_id, key
+    elif mid.startswith("openrouter/"):
+        raw_id = raw_id_override or mid[len("openrouter/"):]
+        key = client_headers.get("x-openrouter-api-key") or keys.get("openrouter") or os.environ.get("OPENROUTER_API_KEY", "")
+        return "openrouter", raw_id, key
     elif mid.startswith("custom/"):
         raw_id = raw_id_override or mid[len("custom/"):]
         key = client_headers.get("x-custom-api-key") or keys.get("custom") or os.environ.get("CUSTOM_AI_API_KEY", "")
@@ -1057,6 +1237,134 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
                     }
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "run_quant_discovery",
+                "description": "Runs statistical null-hypothesis tests on an instrument's historical bars: Wald-Wolfowitz runs test for direction independence and Hurst Exponent (H) via diffusion scaling to identify mean-reverting (H < 0.45) vs trending (H > 0.55) vs random-walk (0.45 <= H <= 0.55) regimes.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {
+                            "type": "string",
+                            "description": "Ticker symbol (e.g., ASML, NVDA, SAP, XLE)"
+                        },
+                        "timeframe": {
+                            "type": "string",
+                            "description": "Bar interval: 5m, 15m, 1h, 1d (defaults to 1h)"
+                        }
+                    },
+                    "required": ["symbol"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "run_strategy_sweep",
+                "description": "Executes an autonomous multi-parameter quantitative exploration sweep across ATR stop cushions, hold durations, tranche scalers, and OFI filters. Strictly evaluates every candidate with Marcos López de Prado's Deflated Sharpe Ratio (DSR) adjusting for total trials (N) and returns the Pareto-optimal frontier.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {
+                            "type": "string",
+                            "description": "Ticker symbol (e.g., ASML, NVDA, SAP, XLE)"
+                        },
+                        "timeframe": {
+                            "type": "string",
+                            "description": "Bar interval: 5m, 15m, 1h, 1d (defaults to 1h)"
+                        },
+                        "capital": {
+                            "type": "number",
+                            "description": "Starting portfolio/strategy capital in USD (e.g. 5000, 25000, 100000)"
+                        },
+                        "trials": {
+                            "type": "integer",
+                            "description": "Number of parameter permutations to explore (e.g. 8, 16, 24). Defaults to 16."
+                        }
+                    },
+                    "required": ["symbol"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "run_strategy_backtest",
+                "description": "Runs a full single quantitative simulation of the Alpha Strategy on verified broker bars with exact capital, risk budget r, stop ATR multiplier, hold bars, and friction limits, returning audited trade blotter and equity curve.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {
+                            "type": "string",
+                            "description": "Ticker symbol (e.g. ASML, NVDA, SAP)"
+                        },
+                        "timeframe": {
+                            "type": "string",
+                            "description": "Bar interval: 5m, 15m, 1h, 1d"
+                        },
+                        "capital": {
+                            "type": "number",
+                            "description": "Starting capital in USD"
+                        },
+                        "stop_atr": {
+                            "type": "number",
+                            "description": "Stop-loss ATR multiplier (e.g. 1.5, 1.8, 2.2)"
+                        },
+                        "max_hold": {
+                            "type": "integer",
+                            "description": "Maximum holding period in bars before time-decay exit"
+                        },
+                        "partial_profit": {
+                            "type": "boolean",
+                            "description": "Whether to scale out 50% position at Target 1"
+                        },
+                        "breakeven_lock": {
+                            "type": "boolean",
+                            "description": "Whether to ratchet stop to breakeven after Target 1"
+                        },
+                        "ofi_filter": {
+                            "type": "boolean",
+                            "description": "Whether to gate entries with Order Flow Imbalance"
+                        }
+                    },
+                    "required": ["symbol"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "save_strategy_to_vault",
+                "description": "Persists an audited quantitative strategy and its backtest metrics to the deterministic atomic Experiment Vault.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Descriptive strategy name"
+                        },
+                        "symbol": {
+                            "type": "string",
+                            "description": "Ticker symbol"
+                        },
+                        "timeframe": {
+                            "type": "string",
+                            "description": "Bar timeframe"
+                        },
+                        "parameters": {
+                            "type": "object",
+                            "description": "Strategy configuration parameters"
+                        },
+                        "metrics": {
+                            "type": "object",
+                            "description": "Statistical performance metrics (Sharpe, DSR, PnL, Win Rate)"
+                        }
+                    },
+                    "required": ["name", "symbol", "parameters", "metrics"]
+                }
+            }
         }
     ]
 
@@ -1071,6 +1379,8 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
         endpoint_url = "https://integrate.api.nvidia.com/v1/chat/completions"
     elif provider == "openai":
         endpoint_url = "https://api.openai.com/v1/chat/completions"
+    elif provider == "openrouter":
+        endpoint_url = "https://openrouter.ai/api/v1/chat/completions"
     elif provider == "custom":
         base = os.environ.get("CUSTOM_AI_BASE_URL", "http://localhost:11434/v1")
         endpoint_url = f"{base}/chat/completions"
@@ -1143,6 +1453,7 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
                 yield emit_sse("tool_result", {
                     "tool": fn_name,
                     "status": "completed",
+                    "data": tool_result,
                     "summary": f"Retrieved {len(tool_result)} fields from edge adapter."
                 })
                 

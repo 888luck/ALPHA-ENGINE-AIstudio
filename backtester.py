@@ -57,7 +57,7 @@ class AlphaBacktestingEngine:
                      max_hold: int = 15, ofi_filter: bool = True, adaptive_stop: bool = True,
                      capital_override: float = None, risk_budget_pct: float = 0.01,
                      friction_ceiling_pct: float = 15.0, binary_blackout_hours: float = 0.0,
-                     trials_tested: int = 1) -> Dict[str, Any]:
+                     trials_tested: int = 1, bars: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Executes an algorithmic backtest over historical metrics with advanced institutional upgrades:
           - Adaptive Volatility ATR Stops: dynamic cushion to prevent premature stop-outs
@@ -67,7 +67,8 @@ class AlphaBacktestingEngine:
           - OFI Order Flow Imbalance direction filter: reject breakouts with discordant Level 2 order flows
           - Sanitized DRM Overrides: custom capital, risk budget r, friction ceiling, blackout window
         """
-        bars = self.generate_synthetic_history(symbol, timeframe, start_date, end_date)
+        if bars is None:
+            bars = self.generate_synthetic_history(symbol, timeframe, start_date, end_date)
         if len(bars) < 25:
             raise ValueError(f"Insufficient historical bars ({len(bars)} < 25 required) for {symbol} between {start_date} and {end_date}. Cannot compute 20-period indicators.")
 
@@ -433,6 +434,142 @@ class AlphaBacktestingEngine:
                 "totalSetupsEvaluated": total_setups_evaluated,
                 "totalTradesTaken": total_trades
             }
+        }
+
+    def run_parameter_sweep(
+        self,
+        symbol: str,
+        timeframe: str = "1h",
+        start_date: str = "2026-05-01",
+        end_date: str = "2026-06-16",
+        capital_override: float = 100000.0,
+        trials_count: int = 16
+    ) -> Dict[str, Any]:
+        """
+        Executes a multi-dimensional systematic parameter exploration sweep
+        testing combinations of ATR stops, hold bars, tranche scaling, breakeven ratchet,
+        and OFI gates against verified historical bars.
+        Marcos López de Prado's DSR strictly penalizes selection bias with N = total_trials.
+        """
+        # Master candidate permutations covering the quantitative search space
+        master_candidates = [
+            {"stop_atr": 1.2, "max_hold": 8, "partial_profit": True, "breakeven_lock": True, "ofi_filter": True, "adaptive_stop": True, "label": "Ultra-Tight Scalp (1.2x ATR / 8b hold)"},
+            {"stop_atr": 1.2, "max_hold": 10, "partial_profit": False, "breakeven_lock": False, "ofi_filter": True, "adaptive_stop": True, "label": "Direct Scalp (1.2x ATR / No Breakeven)"},
+            {"stop_atr": 1.4, "max_hold": 10, "partial_profit": True, "breakeven_lock": True, "ofi_filter": True, "adaptive_stop": True, "label": "Precision OFI Scalp (1.4x ATR / 10b hold)"},
+            {"stop_atr": 1.5, "max_hold": 12, "partial_profit": True, "breakeven_lock": True, "ofi_filter": True, "adaptive_stop": True, "label": "Conservative Intraday (1.5x ATR / 12b hold)"},
+            {"stop_atr": 1.5, "max_hold": 14, "partial_profit": False, "breakeven_lock": True, "ofi_filter": False, "adaptive_stop": True, "label": "Unfiltered Quick Swing (1.5x ATR / 14b hold)"},
+            {"stop_atr": 1.6, "max_hold": 8, "partial_profit": True, "breakeven_lock": True, "ofi_filter": True, "adaptive_stop": True, "label": "Fast Time-Decay (1.6x ATR / 8b hold)"},
+            {"stop_atr": 1.8, "max_hold": 15, "partial_profit": True, "breakeven_lock": True, "ofi_filter": True, "adaptive_stop": True, "label": "Institutional Balanced (1.8x ATR / 15b hold)"},
+            {"stop_atr": 1.8, "max_hold": 16, "partial_profit": False, "breakeven_lock": False, "ofi_filter": False, "adaptive_stop": False, "label": "Unfiltered Baseline (1.8x ATR / 16b hold)"},
+            {"stop_atr": 2.0, "max_hold": 16, "partial_profit": False, "breakeven_lock": True, "ofi_filter": True, "adaptive_stop": True, "label": "Intermediate Swing (2.0x ATR / Breakeven on)"},
+            {"stop_atr": 2.0, "max_hold": 18, "partial_profit": True, "breakeven_lock": False, "ofi_filter": True, "adaptive_stop": True, "label": "Deep Swing (2.0x ATR / No Breakeven Ratchet)"},
+            {"stop_atr": 2.2, "max_hold": 20, "partial_profit": True, "breakeven_lock": True, "ofi_filter": True, "adaptive_stop": True, "label": "Wide Momentum Runner (2.2x ATR / 20b hold)"},
+            {"stop_atr": 2.2, "max_hold": 24, "partial_profit": False, "breakeven_lock": False, "ofi_filter": True, "adaptive_stop": True, "label": "Deep Trend Capture (2.2x ATR / 24b hold)"},
+            {"stop_atr": 2.4, "max_hold": 26, "partial_profit": True, "breakeven_lock": False, "ofi_filter": True, "adaptive_stop": True, "label": "Extended Swing Runner (2.4x ATR / 26b hold)"},
+            {"stop_atr": 2.6, "max_hold": 22, "partial_profit": False, "breakeven_lock": True, "ofi_filter": False, "adaptive_stop": True, "label": "Wide Volatility Drift (2.6x ATR / 22b hold)"},
+            {"stop_atr": 2.6, "max_hold": 28, "partial_profit": True, "breakeven_lock": True, "ofi_filter": True, "adaptive_stop": True, "label": "Maximum Horizon Drift (2.6x ATR / 28b hold)"},
+            {"stop_atr": 1.3, "max_hold": 9, "partial_profit": True, "breakeven_lock": False, "ofi_filter": True, "adaptive_stop": True, "label": "Tight Tranche Scaler (1.3x ATR / 9b hold)"}
+        ]
+        
+        target_trials = min(len(master_candidates), max(4, trials_count))
+        selected_candidates = master_candidates[:target_trials]
+        
+        # Load verified historical bars ONCE for all candidate permutations
+        bars = self.generate_synthetic_history(symbol, timeframe, start_date, end_date)
+        
+        evaluated_candidates = []
+        for idx, cand in enumerate(selected_candidates):
+            c_engine = AlphaBacktestingEngine(starting_capital=capital_override if capital_override and capital_override > 0 else 100000.0)
+            res = c_engine.run_backtest(
+                symbol=symbol,
+                timeframe=timeframe,
+                start_date=start_date,
+                end_date=end_date,
+                stop_atr=cand["stop_atr"],
+                partial_profit=cand["partial_profit"],
+                breakeven_lock=cand["breakeven_lock"],
+                max_hold=cand["max_hold"],
+                ofi_filter=cand["ofi_filter"],
+                adaptive_stop=cand["adaptive_stop"],
+                capital_override=capital_override,
+                trials_tested=target_trials,
+                bars=bars
+            )
+            
+            pnl = float(res.get("totalPnL", 0.0))
+            dsr = float(res.get("deflatedSharpeRatio", 0.0))
+            sharpe = float(res.get("annualizedSharpe", 0.0))
+            dd = float(res.get("maxDrawdownPercent", 0.0))
+            win_rate = float(res.get("winRate", 0.0))
+            
+            # Institutional composite ranking score (penalizes drawdown and negative PnL, rewards DSR and Sharpe)
+            composite_score = round((dsr * 12.0) + (sharpe * 2.5) - (dd * 0.4) + (3.0 if pnl > 0 else -10.0), 3)
+            
+            evaluated_candidates.append({
+                "candidate_id": f"CAND_{idx+1:02d}",
+                "label": cand["label"],
+                "score": composite_score,
+                "parameters": {
+                    "stopAtrMultiplier": cand["stop_atr"],
+                    "maxHoldBars": cand["max_hold"],
+                    "partialProfit": cand["partial_profit"],
+                    "breakevenLock": cand["breakeven_lock"],
+                    "ofiFilter": cand["ofi_filter"],
+                    "adaptiveStop": cand["adaptive_stop"],
+                    "capitalOverride": capital_override
+                },
+                "metrics": {
+                    "totalPnL": pnl,
+                    "totalPnLPercent": float(res.get("totalPnLPercent", 0.0)),
+                    "winRate": win_rate,
+                    "profitFactor": float(res.get("profitFactor", 1.0)),
+                    "annualizedSharpe": sharpe,
+                    "deflatedSharpeRatio": dsr,
+                    "passesDsrHurdle": bool(res.get("passesDsrHurdle", False)),
+                    "maxDrawdownPercent": dd,
+                    "totalTrades": int(res.get("totalTrades", 0)),
+                    "totalCommissions": float(res.get("totalCommissions", 0.0))
+                },
+                "balanceHistory": res.get("balanceHistory", []),
+                "tradesList": res.get("tradesList", [])
+            })
+            
+        # Sort descending by composite score
+        evaluated_candidates.sort(key=lambda x: x["score"], reverse=True)
+        
+        # Mark ranks and optimal candidate
+        for rank, c in enumerate(evaluated_candidates):
+            c["rank"] = rank + 1
+            c["is_optimal"] = (rank == 0)
+            
+        optimal_config = evaluated_candidates[0] if evaluated_candidates else None
+        
+        # Filter Pareto frontier: non-dominated on (DSR, Sharpe, MaxDrawdown)
+        frontier = []
+        for c in evaluated_candidates:
+            dominated = False
+            for o in evaluated_candidates:
+                if (o["metrics"]["deflatedSharpeRatio"] >= c["metrics"]["deflatedSharpeRatio"] and
+                    o["metrics"]["annualizedSharpe"] >= c["metrics"]["annualizedSharpe"] and
+                    o["metrics"]["maxDrawdownPercent"] <= c["metrics"]["maxDrawdownPercent"] and
+                    (o["metrics"]["deflatedSharpeRatio"] > c["metrics"]["deflatedSharpeRatio"] or
+                     o["metrics"]["annualizedSharpe"] > c["metrics"]["annualizedSharpe"] or
+                     o["metrics"]["maxDrawdownPercent"] < c["metrics"]["maxDrawdownPercent"])):
+                    dominated = True
+                    break
+            if not dominated:
+                frontier.append(c)
+                
+        return {
+            "status": "SUCCESS",
+            "symbol": symbol.upper(),
+            "timeframe": timeframe,
+            "starting_capital": capital_override,
+            "total_trials_tested": target_trials,
+            "optimal_candidate": optimal_config,
+            "candidates": evaluated_candidates,
+            "frontier_count": len(frontier),
+            "frontier": frontier
         }
 
     def generate_synthetic_history(self, symbol: str, timeframe: str, start_date_str: str, end_date_str: str) -> List[Dict[str, Any]]:

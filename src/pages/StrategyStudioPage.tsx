@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Sparkles,
   Bot,
@@ -23,7 +23,12 @@ import {
   ChevronDown,
   Layers,
   Zap,
-  Info
+  Info,
+  Shield,
+  Search,
+  X,
+  Square,
+  Filter
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -34,6 +39,14 @@ import {
   Tooltip,
   CartesianGrid
 } from "recharts";
+import { ApiVaultModal } from "../components/ApiVaultModal";
+import {
+  getAllStoredVaultSettings,
+  persistVaultItem,
+  persistVaultBatch,
+  syncVaultToServer,
+  getStoredVaultValue
+} from "../utils/vaultStorage";
 
 export interface StrategyStudioExperiment {
   id: string;
@@ -51,7 +64,7 @@ export interface StrategyStudioExperiment {
     adaptiveStop: boolean;
     riskBudgetPct: number;
     frictionCeilingPct: number;
-    binaryBlackoutHours: number;
+    binaryBlackoutHours?: number;
   };
   metrics: {
     totalPnL: number;
@@ -69,28 +82,136 @@ export interface StrategyStudioExperiment {
   tradesList: any[];
 }
 
-interface ChatMessage {
+interface StudioChatMessage {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
   timestamp: string;
+  activeTools?: string[];
   actionTriggered?: string;
+  telemetry?: any;
 }
 
+interface ModelItem {
+  id: string;
+  rawId?: string;
+  name: string;
+  provider: string;
+  tier: string;
+  badge: string;
+  costStr: string;
+  icon: string;
+  isFree?: boolean;
+}
+
+const TIER0_OFFLINE_MODEL: ModelItem = {
+  id: "local/finbert-int8",
+  name: "INT8 ONNX FinBERT (CPU Offline)",
+  provider: "Local Tier 0",
+  tier: "Tier 0 Offline",
+  badge: "$0 Cost / <15ms",
+  costStr: "$0.00 (Offline)",
+  icon: "🛡️",
+  isFree: true
+};
+
 export function StrategyStudioPage() {
-  // Strategy Parameters & Studio State
-  const [symbol, setSymbol] = useState("XLE");
-  const [customTickerInput, setCustomTickerInput] = useState("XLE");
+  // =========================================================================
+  // 1. LLM Model Selection & 4-Pillar Vault Integration (Rule 6)
+  // =========================================================================
+  const [availableModels, setAvailableModels] = useState<ModelItem[]>([TIER0_OFFLINE_MODEL]);
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    return localStorage.getItem("alpha_copilot_model") || "local/finbert-int8";
+  });
+  const [isVaultOpen, setIsVaultOpen] = useState(false);
+  const [vaultSettings, setVaultSettings] = useState<any>(() => getAllStoredVaultSettings());
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [modelSearchQuery, setModelSearchQuery] = useState("");
+  const [selectedProviderFilter, setSelectedProviderFilter] = useState<string>("ALL");
+
+  const activeModelObj = useMemo(() => {
+    return availableModels.find((m) => m.id === selectedModel) || availableModels[0] || TIER0_OFFLINE_MODEL;
+  }, [availableModels, selectedModel]);
+
+  const fetchStatsAndModels = async (force = false) => {
+    try {
+      const url = force ? "/api/copilot/stats?refresh=1" : "/api/copilot/stats";
+      const gKey = vaultSettings.geminiApiKey || getStoredVaultValue("geminiApiKey");
+      const qKey = vaultSettings.customAiApiKey || getStoredVaultValue("customAiApiKey");
+      const nvKey = vaultSettings.nvidiaApiKey || getStoredVaultValue("nvidiaApiKey");
+      const oaKey = vaultSettings.openaiApiKey || getStoredVaultValue("openaiApiKey");
+      const orKey = vaultSettings.openrouterApiKey || getStoredVaultValue("openrouterApiKey");
+
+      const res = await fetch(url, {
+        headers: {
+          "x-gemini-api-key": gKey || "",
+          "x-groq-api-key": qKey || "",
+          "x-nvidia-api-key": nvKey || "",
+          "x-openai-api-key": oaKey || "",
+          "x-openrouter-api-key": orKey || ""
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.models_catalog) && data.models_catalog.length > 0) {
+          setAvailableModels(data.models_catalog);
+          if (data.models_catalog.length > 1 && selectedModel === "local/finbert-int8") {
+            const online = data.models_catalog.find((m: any) => m.id !== "local/finbert-int8");
+            if (online) setSelectedModel(online.id);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch models for Strategy Studio:", e);
+    }
+  };
+
+  const handleSaveSetting = async (key: string, value: any) => {
+    persistVaultItem(key, value);
+    setVaultSettings((prev: any) => ({ ...prev, [key]: value }));
+    try {
+      await fetch("/api/set-settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": "ALPHA_ADMIN_REVERT_992"
+        },
+        body: JSON.stringify({ [key]: value })
+      });
+      await fetchStatsAndModels(true);
+    } catch (e) {
+      console.warn("Could not persist setting:", e);
+    }
+  };
+
+  const handleSaveMultipleSettings = async (updates: Record<string, any>) => {
+    persistVaultBatch(updates);
+    setVaultSettings((prev: any) => ({ ...prev, ...updates }));
+    try {
+      await syncVaultToServer(updates);
+      await fetchStatsAndModels(true);
+    } catch (e) {
+      console.warn("Could not persist settings batch:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchStatsAndModels(true);
+    const interval = setInterval(() => fetchStatsAndModels(false), 20000);
+    return () => clearInterval(interval);
+  }, [vaultSettings]);
+
+  // =========================================================================
+  // 2. Strategy Parameters & Dynamic Instrument State
+  // =========================================================================
+  const [symbol, setSymbol] = useState("ASML");
+  const [customTickerInput, setCustomTickerInput] = useState("ASML");
   const [dynamicUniverse, setDynamicUniverse] = useState<Array<{ symbol: string; sector?: string }>>([
-    { symbol: "XLE", sector: "Energy Sector Trading Strategy" },
-    { symbol: "VLO", sector: "Energy Sector Trading Strategy" },
-    { symbol: "COP", sector: "Energy Sector Trading Strategy" },
     { symbol: "ASML", sector: "Euronext Semiconductor Leader" },
-    { symbol: "SAP", sector: "DAX 40 Enterprise Cloud" },
     { symbol: "NVDA", sector: "AI Accelerated Compute" },
+    { symbol: "SAP", sector: "DAX 40 Enterprise Cloud" },
     { symbol: "RWE", sector: "Euronext Clean Utilities" },
-    { symbol: "XLU", sector: "Utilities Structural Arbitrage" },
-    { symbol: "ICLN", sector: "Clean Energy Tech Imbalances" }
+    { symbol: "XLE", sector: "Energy Sector SPDR" }
   ]);
   const [resolvedInfo, setResolvedInfo] = useState<any>(null);
   const [resolvingSymbol, setResolvingSymbol] = useState(false);
@@ -107,32 +228,42 @@ export function StrategyStudioPage() {
   const [adaptiveStop, setAdaptiveStop] = useState(true);
   const [riskBudgetPct, setRiskBudgetPct] = useState(0.01);
   const [frictionCeiling, setFrictionCeiling] = useState(15.0);
-  const [binaryBlackout, setBinaryBlackout] = useState(0.0);
 
   // Active Strategy Details & Results
-  const [strategyName, setStrategyName] = useState("Alpha Adaptive OFI Breakout v1");
-  const [activeTab, setActiveTab] = useState<"performance" | "blotter" | "vault">("performance");
+  const [strategyName, setStrategyName] = useState("Alpha Adaptive OFI Breakout");
+  const [activeTab, setActiveTab] = useState<"performance" | "frontier" | "blotter" | "vault">("performance");
   const [loading, setLoading] = useState(false);
-  const [exploring, setExploring] = useState(false);
+  const [sweeping, setSweeping] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [baselineResult, setBaselineResult] = useState<any>(null);
+  const [sweepCandidates, setSweepCandidates] = useState<any[]>([]);
+  const [paretoFrontier, setParetoFrontier] = useState<any[]>([]);
+  const [discoveryData, setDiscoveryData] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
-  // Conversational Agent State
+  // =========================================================================
+  // 3. Conversational Agent SSE State
+  // =========================================================================
   const [chatInput, setChatInput] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>(() => [
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [activeTools, setActiveTools] = useState<string[]>([]);
+  const [messages, setMessages] = useState<StudioChatMessage[]>(() => [
     {
       id: "msg_init",
       role: "assistant",
       content:
-        "👋 Welcome to the **Institutional Strategy Studio**. I am your Strategy Optimization Agent.\n\nYou can direct me naturally with capital, risk, and asset parameters. For example:\n- *'run the same with 5000 strat capital'* \n- *'Optimize ASML for maximum Deflated Sharpe Ratio with low friction'* \n- *'Set Stop ATR to 1.5x and run a test on NVDA'* \n- *'Run test on TSLA with $25,000 capital and 12-bar hold'* \n\nAll instruments resolve dynamically via official IBKR contract specifications, with real-time risk sanitization.",
+        "👋 Welcome to the **Institutional Strategy Studio & Experiment Vault**.\n\nI am your quantitative reasoning agent wired directly into:\n- 🔬 **Wald-Wolfowitz Runs & Hurst Exponent Analysis** (`run_quant_discovery`)\n- ⚡ **16-Parameter Optimization Sweeps** audited under López de Prado's Deflated Sharpe Ratio (`run_strategy_sweep`)\n- 🏛️ **Verified Broker History & Direct TCP Sockets** (`run_strategy_backtest`)\n- 🔒 **Deterministic Local Experiment Vault** (`save_strategy_to_vault` / `get_strategy_vault`)\n\nAsk me anything: *'Run a 16-parameter sweep on ASML'*, *'Analyze the Hurst regime for NVDA'*, or *'Test with $25k capital and 1.5 ATR stop'*.",
       timestamp: new Date().toLocaleTimeString()
     }
   ]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Saved Experiments Vault (Local Storage / Rule 9)
+  // =========================================================================
+  // 4. Server Experiment Vault Sync (Rule 9)
+  // =========================================================================
   const [vault, setVault] = useState<StrategyStudioExperiment[]>(() => {
     try {
       const stored = localStorage.getItem("alpha_engine_strategy_vault");
@@ -142,39 +273,23 @@ export function StrategyStudioPage() {
     }
   });
 
-  // Dynamically load active universe from run-expectancy / dynamic baskets on mount
-  useEffect(() => {
-    const loadUniverse = async () => {
-      try {
-        const res = await fetch("/api/run-expectancy");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.baskets && Array.isArray(data.baskets)) {
-            const list: Array<{ symbol: string; sector?: string }> = [];
-            const seen = new Set<string>();
-            data.baskets.forEach((b: any) => {
-              (b.tickers || []).forEach((t: string) => {
-                if (!seen.has(t)) {
-                  seen.add(t);
-                  list.push({ symbol: t, sector: b.sector });
-                }
-              });
-            });
-            // Ensure core institutional tickers are present
-            ["XLE", "ASML", "SAP", "NVDA", "RWE", "VLO", "COP", "NEE"].forEach((t) => {
-              if (!seen.has(t)) {
-                seen.add(t);
-                list.push({ symbol: t, sector: "Core Dynamic Universe" });
-              }
-            });
-            setDynamicUniverse(list);
-          }
+  const fetchVaultStrategies = async () => {
+    try {
+      const res = await fetch("/api/vault/strategies");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.strategies)) {
+          setVault(data.strategies);
+          localStorage.setItem("alpha_engine_strategy_vault", JSON.stringify(data.strategies));
         }
-      } catch (err) {
-        console.warn("Failed to fetch dynamic universe:", err);
       }
-    };
-    loadUniverse();
+    } catch (e) {
+      console.warn("Could not load server strategy vault:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchVaultStrategies();
   }, []);
 
   // Universal Contract Resolver
@@ -204,12 +319,47 @@ export function StrategyStudioPage() {
     resolveContractForSymbol(symbol);
   }, [symbol]);
 
-  // Auto scroll chat
+  // Load dynamic universe
+  useEffect(() => {
+    const loadUniverse = async () => {
+      try {
+        const res = await fetch("/api/run-expectancy");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.baskets && Array.isArray(data.baskets)) {
+            const list: Array<{ symbol: string; sector?: string }> = [];
+            const seen = new Set<string>();
+            data.baskets.forEach((b: any) => {
+              (b.tickers || []).forEach((t: string) => {
+                if (!seen.has(t)) {
+                  seen.add(t);
+                  list.push({ symbol: t, sector: b.sector });
+                }
+              });
+            });
+            ["ASML", "NVDA", "SAP", "RWE", "XLE"].forEach((t) => {
+              if (!seen.has(t)) {
+                seen.add(t);
+                list.push({ symbol: t, sector: "Core Dynamic Universe" });
+              }
+            });
+            setDynamicUniverse(list);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch dynamic universe:", err);
+      }
+    };
+    loadUniverse();
+  }, []);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, exploring]);
+  }, [messages, sweeping, discovering, isGenerating]);
 
-  // Execute Simulation Core with capitalOverride
+  // =========================================================================
+  // 5. Execution Core: Single Simulation
+  // =========================================================================
   const executeSimulation = async (overrides?: Partial<{
     symbol: string;
     timeframe: string;
@@ -222,7 +372,6 @@ export function StrategyStudioPage() {
     adaptiveStop: boolean;
     riskBudgetPct: number;
     frictionCeilingPct: number;
-    binaryBlackoutHours: number;
   }>) => {
     const s = overrides?.symbol || symbol;
     const tf = overrides?.timeframe || timeframe;
@@ -235,7 +384,6 @@ export function StrategyStudioPage() {
     const adaptive = overrides?.adaptiveStop !== undefined ? overrides.adaptiveStop : adaptiveStop;
     const risk = overrides?.riskBudgetPct !== undefined ? overrides.riskBudgetPct : riskBudgetPct;
     const friction = overrides?.frictionCeilingPct !== undefined ? overrides.frictionCeilingPct : frictionCeiling;
-    const blackout = overrides?.binaryBlackoutHours !== undefined ? overrides.binaryBlackoutHours : binaryBlackout;
 
     const res = await fetch("/api/backtest", {
       method: "POST",
@@ -243,8 +391,8 @@ export function StrategyStudioPage() {
       body: JSON.stringify({
         symbol: s,
         timeframe: tf,
-        startDate: startDate,
-        endDate: endDate,
+        startDate,
+        endDate,
         capitalOverride: cap,
         stopAtrMultiplier: stop,
         partialProfit: partial,
@@ -254,7 +402,7 @@ export function StrategyStudioPage() {
         adaptiveStop: adaptive,
         riskBudgetPct: risk,
         frictionCeilingPct: friction,
-        binaryBlackoutHours: blackout
+        binaryBlackoutHours: 0
       })
     });
 
@@ -262,7 +410,6 @@ export function StrategyStudioPage() {
     return { ok: res.ok && data.success, data };
   };
 
-  // Run Manual Simulation
   const handleRunSimulation = async (overrides?: any) => {
     setLoading(true);
     setErrorMsg(null);
@@ -291,12 +438,13 @@ export function StrategyStudioPage() {
       const run = await executeSimulation(overrides);
       if (run.ok) {
         setResult(run.data);
+        setActiveTab("performance");
         setMessages((prev) => [
           ...prev,
           {
             id: "msg_" + Date.now(),
             role: "assistant",
-            content: `✅ **Simulation completed for ${run.data.symbol || activeSym} (${run.data.timeframe || activeTf})**:\n- **Starting Capital**: \`$${Number(run.data.startingCapital || activeCap).toLocaleString()}\`\n- **Net PnL**: \`+$${Number(run.data.totalPnL || 0).toFixed(2)}\` (${run.data.totalPnLPercent}%)\n- **Ending Equity**: \`$${Number(run.data.finalCapital || activeCap).toLocaleString()}\`\n- **Win Rate**: \`${run.data.winRate}%\` (${run.data.winningTrades}W / ${run.data.losingTrades}L)\n- **Profit Factor**: \`${run.data.profitFactor}\`\n- **Deflated Sharpe (DSR)**: \`${(Number(run.data.deflatedSharpeRatio || 0) * 100).toFixed(1)}%\`\n- **Max Drawdown**: \`-${run.data.maxDrawdownPercent}%\``,
+            content: `✅ **Single simulation completed for ${run.data.symbol || activeSym} (${run.data.timeframe || activeTf})**:\n- **Starting Capital**: \`$${Number(run.data.startingCapital || activeCap).toLocaleString()}\`\n- **Net PnL**: \`+$${Number(run.data.totalPnL || 0).toFixed(2)}\` (${run.data.totalPnLPercent}%)\n- **Ending Equity**: \`$${Number(run.data.finalCapital || activeCap).toLocaleString()}\`\n- **Win Rate**: \`${run.data.winRate}%\` (${run.data.winningTrades}W / ${run.data.losingTrades}L)\n- **Profit Factor**: \`${run.data.profitFactor}\`\n- **Annual Sharpe**: \`${run.data.annualizedSharpe}\`\n- **Deflated Sharpe (DSR)**: \`${(Number(run.data.deflatedSharpeRatio || 0) * 100).toFixed(1)}%\`\n- **Max Drawdown**: \`-${run.data.maxDrawdownPercent}%\``,
             timestamp: new Date().toLocaleTimeString(),
             actionTriggered: "RUN_SIMULATION"
           }
@@ -311,275 +459,366 @@ export function StrategyStudioPage() {
     }
   };
 
-  // Agent Multi-Parameter Optimization Sweep
-  const handleAgentExplore = async (customPrompt?: string, overrides?: any) => {
-    const q = customPrompt || chatInput || "Optimize strategy parameters";
-    setExploring(true);
+  // =========================================================================
+  // 6. Direct Parameter Sweep (16 Trials via research_controller.py)
+  // =========================================================================
+  const handleRunSweep = async () => {
+    setSweeping(true);
     setErrorMsg(null);
 
-    const activeCap = overrides?.capitalOverride !== undefined ? overrides.capitalOverride : capitalOverride;
-    const activeSym = overrides?.symbol || symbol;
-
-    // Add user message to conversation
     setMessages((prev) => [
       ...prev,
       {
-        id: "msg_user_" + Date.now(),
-        role: "user",
-        content: q,
-        timestamp: new Date().toLocaleTimeString()
-      },
-      {
-        id: "msg_agent_prog_" + Date.now(),
+        id: "msg_sweep_start_" + Date.now(),
         role: "assistant",
-        content: `🔍 **Starting Autonomous Optimization Sweep** for **${activeSym}** with **$${Number(activeCap).toLocaleString()}** Capital...\n- Analyzing parameter space: Stop ATR (1.4x - 2.4x), Max Hold (10 - 24 bars), Tranche Scaling, and OFI filters.\n- Testing against verified historical broker bars...`,
+        content: `⚡ **Initiating Autonomous 16-Parameter Sweep** for **${symbol}** (${timeframe}, $${capitalOverride.toLocaleString()})...\n- Exploring ATR cushions (1.2x - 2.6x), Hold horizons (8 - 28 bars), Tranche scaling, and OFI filters.\n- Applying Marcos López de Prado's Deflated Sharpe Ratio with selection bias penalty (N=16)...`,
         timestamp: new Date().toLocaleTimeString()
       }
     ]);
 
     try {
-      // 1. Ensure baseline exists
-      if (!baselineResult) {
-        const baseRun = await executeSimulation({
-          symbol: activeSym,
-          capitalOverride: activeCap,
-          stopAtrMultiplier: 1.8,
-          partialProfit: false,
-          breakevenLock: false,
-          adaptiveStop: false,
-          ofiFilter: false
-        });
-        if (baseRun.ok) {
-          setBaselineResult(baseRun.data);
-        }
+      const res = await fetch("/api/research/sweep", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol,
+          timeframe,
+          capital: capitalOverride,
+          trials: 16,
+          start_date: startDate,
+          end_date: endDate
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error(`Sweep API returned status ${res.status}`);
       }
 
-      // 2. Candidate grid
-      const candidates = [
-        { stopAtrMultiplier: 1.5, partialProfit: true, breakevenLock: true, adaptiveStop: true, ofiFilter: true, maxHoldBars: 12, label: "Tight Scalp / Quick Exit" },
-        { stopAtrMultiplier: 1.8, partialProfit: true, breakevenLock: true, adaptiveStop: true, ofiFilter: true, maxHoldBars: 15, label: "Institutional Balanced OFI" },
-        { stopAtrMultiplier: 2.2, partialProfit: true, breakevenLock: true, adaptiveStop: true, ofiFilter: true, maxHoldBars: 20, label: "Wide Runner / Momentum Drift" },
-        { stopAtrMultiplier: 2.0, partialProfit: true, breakevenLock: false, adaptiveStop: true, ofiFilter: true, maxHoldBars: 18, label: "Deep Swing (No Breakeven Ratchet)" }
-      ];
+      const sweepData = await res.json();
+      if (sweepData.status === "SUCCESS" && sweepData.best_candidate) {
+        setSweepCandidates(sweepData.candidates || []);
+        setParetoFrontier(sweepData.pareto_frontier || []);
+        setResult(sweepData.best_candidate);
+        setActiveTab("frontier");
 
-      let bestScore = -999;
-      let bestConfig = candidates[1];
-      let bestResult = null;
-
-      for (let i = 0; i < candidates.length; i++) {
-        const c = candidates[i];
-        const run = await executeSimulation({
-          ...c,
-          symbol: activeSym,
-          capitalOverride: activeCap
-        });
-        if (run.ok) {
-          const dsr = Number(run.data.deflatedSharpeRatio || 0);
-          const sharpe = Number(run.data.annualizedSharpe || 0);
-          const pnl = Number(run.data.totalPnL || 0);
-          const score = (dsr * 10) + (sharpe * 2) + (pnl > 0 ? 2 : -5);
-          if (score > bestScore) {
-            bestScore = score;
-            bestConfig = c;
-            bestResult = run.data;
-          }
+        const best = sweepData.best_candidate;
+        if (best.parameters) {
+          setStopAtr(best.parameters.stop_atr);
+          setMaxHoldBars(best.parameters.max_hold);
+          setPartialProfit(best.parameters.partial_profit);
+          setBreakevenLock(best.parameters.breakeven_lock);
+          setOfiFilter(best.parameters.ofi_filter);
         }
-      }
 
-      if (bestResult) {
-        // Apply optimal settings to state
-        setStopAtr(bestConfig.stopAtrMultiplier);
-        setPartialProfit(bestConfig.partialProfit);
-        setBreakevenLock(bestConfig.breakevenLock);
-        setAdaptiveStop(bestConfig.adaptiveStop);
-        setOfiFilter(bestConfig.ofiFilter);
-        setMaxHoldBars(bestConfig.maxHoldBars);
-        setResult(bestResult);
-        setStrategyName(`Agent Optimized: ${activeSym} Alpha Frontier`);
+        setStrategyName(`Optimal Sweep: ${symbol} (${best.label || "Frontier Leader"})`);
 
         setMessages((prev) => [
           ...prev,
           {
-            id: "msg_agent_done_" + Date.now(),
+            id: "msg_sweep_done_" + Date.now(),
             role: "assistant",
-            content: `🎯 **Frontier Optimization Succeeded!**\n\nI have identified the highest-expectancy configuration (**${bestConfig.label}**) on **$${Number(activeCap).toLocaleString()}** capital and loaded it into your studio:\n- **Starting Capital**: \`$${Number(bestResult.startingCapital || activeCap).toLocaleString()}\`\n- **Stop ATR**: \`${bestConfig.stopAtrMultiplier}x\`\n- **Max Hold Bars**: \`${bestConfig.maxHoldBars} bars\`\n- **Tranche Scaling**: \`Active (50% @ 2.5 ATR)\`\n- **Breakeven Ratchet**: \`${bestConfig.breakevenLock ? "Active (+1.0 ATR)" : "Off"}\`\n\n**Performance Metrics:**\n- 💰 **Net PnL**: \`+$${Number(bestResult.totalPnL || 0).toFixed(2)}\` (${bestResult.totalPnLPercent}%)\n- 🏆 **Deflated Sharpe (DSR)**: \`${(Number(bestResult.deflatedSharpeRatio || 0) * 100).toFixed(1)}%\`\n- 📈 **Annual Sharpe**: \`${bestResult.annualizedSharpe}\`\n- 🎯 **Win Rate**: \`${bestResult.winRate}%\` (${bestResult.winningTrades}W / ${bestResult.losingTrades}L)\n- 📉 **Max Drawdown**: \`-${bestResult.maxDrawdownPercent}%\`\n\n*Review the interactive curve and league table on the right, or click 'Save Experiment' to archive it.*`,
+            content: `🏆 **Optimization Sweep Complete (${sweepData.trials_tested} Permutations Evaluated)**!\n\n**Frontier Leader Identified:** \`${best.label}\`\n- **Parameters**: Stop ATR \`${best.parameters?.stop_atr}x\`, Hold \`${best.parameters?.max_hold} bars\`, Tranche \`${best.parameters?.partial_profit ? "ON" : "OFF"}\`, Breakeven \`${best.parameters?.breakeven_lock ? "ON" : "OFF"}\`\n- **Net PnL**: \`+$${Number(best.totalPnL || 0).toFixed(2)}\` (${best.totalPnLPercent}%)\n- **Annual Sharpe**: \`${best.annualizedSharpe}\`\n- **Deflated Sharpe (DSR, N=16)**: \`${(Number(best.deflatedSharpeRatio || 0) * 100).toFixed(1)}%\` (${best.passesDsrHurdle ? "✓ Passed 95% Hurdle" : "⚠️ Sub-hurdle"})\n- **Win Rate**: \`${best.winRate}%\` (${best.winningTrades}W / ${best.losingTrades}L)\n- **Max Drawdown**: \`-${best.maxDrawdownPercent}%\`\n\nAll 16 candidates are now charted in the **Pareto Frontier** tab. Click any candidate in the matrix to load its equity curve.`,
             timestamp: new Date().toLocaleTimeString(),
-            actionTriggered: "OPTIMIZATION_SWEEP_SUCCESS"
+            actionTriggered: "SWEEP_COMPLETE"
           }
         ]);
       } else {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: "msg_agent_fail_" + Date.now(),
-            role: "assistant",
-            content: "⚠️ The parameter sweep completed, but all candidate variations underperformed the current parameters. Existing values retained.",
-            timestamp: new Date().toLocaleTimeString()
-          }
-        ]);
+        throw new Error(sweepData.error || "Sweep returned no candidates");
       }
     } catch (e: any) {
-      setErrorMsg("Optimization sweep failed: " + e.message);
+      setErrorMsg("Sweep failed: " + e.message);
     } finally {
-      setExploring(false);
-      setChatInput("");
+      setSweeping(false);
     }
   };
 
-  // Conversational message submission handler
-  const handleSendChat = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const text = chatInput.trim();
-    if (!text || exploring) return;
+  // =========================================================================
+  // 7. Direct Quant Discovery (Wald-Wolfowitz + Hurst Exponent)
+  // =========================================================================
+  const handleRunDiscovery = async () => {
+    setDiscovering(true);
+    setErrorMsg(null);
 
-    setChatInput("");
-
-    // Show user message in chat
     setMessages((prev) => [
       ...prev,
       {
-        id: "msg_user_" + Date.now(),
-        role: "user",
-        content: text,
+        id: "msg_disc_start_" + Date.now(),
+        role: "assistant",
+        content: `🔬 **Running Empirical Microstructure Discovery** for **${symbol}**...\n- Computing Wald-Wolfowitz runs test for return sequence randomness.\n- Estimating Hurst exponent over rescaled range.\n- Calculating 2-state Markov transition matrix...`,
         timestamp: new Date().toLocaleTimeString()
       }
     ]);
 
-    let detectedCapital = capitalOverride;
-    let detectedRiskPct = riskBudgetPct;
-    let detectedFriction = frictionCeiling;
-    let detectedStopAtr = stopAtr;
-    let detectedHoldBars = maxHoldBars;
-    let detectedTimeframe = timeframe;
-    let detectedSymbol = symbol;
-
-    // 1. Call Institutional Risk Sanitizer Endpoint to extract capital and risk parameters
     try {
-      const sanRes = await fetch("/api/research/sanitize-risk", {
+      const res = await fetch("/api/research/discovery", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: text })
+        body: JSON.stringify({ symbol, timeframe, start_date: startDate, end_date: endDate })
       });
-      if (sanRes.ok) {
-        const sanData = await sanRes.json();
-        const rawCap = sanData.raw_parsed?.requested_capital;
-        const sanitizedCap = sanData.sanitized_parameters?.sanitized_capital;
-        if (sanitizedCap !== undefined && sanitizedCap !== null && sanitizedCap > 0) {
-          detectedCapital = Number(sanitizedCap);
-          setCapitalOverride(detectedCapital);
-        } else if (rawCap !== undefined && rawCap !== null && rawCap > 0) {
-          detectedCapital = Number(rawCap);
-          setCapitalOverride(detectedCapital);
-        }
 
-        const rawRisk = sanData.sanitized_parameters?.risk_per_trade_pct;
-        if (rawRisk !== undefined && rawRisk !== null && rawRisk > 0) {
-          detectedRiskPct = Number(rawRisk) / 100.0;
-          setRiskBudgetPct(detectedRiskPct);
-        }
+      if (!res.ok) throw new Error(`Discovery returned ${res.status}`);
+      const data = await res.json();
+      if (data.status === "SUCCESS") {
+        setDiscoveryData(data);
+        setActiveTab("frontier");
 
-        const rawFric = sanData.sanitized_parameters?.friction_ceiling_pct;
-        if (rawFric !== undefined && rawFric !== null && rawFric > 0) {
-          detectedFriction = Number(rawFric);
-          setFrictionCeiling(detectedFriction);
-        }
+        const hVal = data.quant_discovery?.hurst_exponent?.hurst_exponent || 0.5;
+        const runsZ = data.quant_discovery?.runs_test?.z_score || 0.0;
+        const pVal = data.quant_discovery?.runs_test?.p_value || 1.0;
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: "msg_disc_done_" + Date.now(),
+            role: "assistant",
+            content: `📊 **Empirical Discovery Findings for ${symbol}**:\n- **Regime Classification**: \`${data.regime}\`\n- **Hurst Exponent (H)**: \`${Number(hVal).toFixed(3)}\` (${hVal > 0.55 ? "Persistent Trend" : hVal < 0.45 ? "Mean-Reverting" : "Random Walk"})\n- **Wald-Wolfowitz Runs Test**: Z=\`${Number(runsZ).toFixed(2)}\`, p-value=\`${Number(pVal).toFixed(4)}\`\n- **Institutional Guidance**: ${data.guidance}`,
+            timestamp: new Date().toLocaleTimeString(),
+            actionTriggered: "DISCOVERY_COMPLETE"
+          }
+        ]);
+      } else {
+        throw new Error(data.error || "Discovery failed");
       }
-    } catch (err) {
-      console.warn("Risk sanitizer failed, falling back to local regex:", err);
-      const capMatch = text.match(/(?:with|\$|€|£)?\s*([0-9]{1,3}(?:,[0-9]{3})*|[0-9]+)\s*(?:k)?\s*(?:strat(?:egy)?\s*)?(?:capital|allocation)/i);
-      if (capMatch && capMatch[1]) {
-        let val = parseFloat(capMatch[1].replace(/,/g, ''));
-        if (capMatch[0].toLowerCase().includes('k')) val *= 1000;
-        if (val > 0) {
-          detectedCapital = val;
-          setCapitalOverride(val);
-        }
-      }
-    }
-
-    // 2. Dynamic Symbol Extraction
-    const words = text.split(/[\s,;.!?]+/);
-    for (const w of words) {
-      const cleanW = w.toUpperCase().replace(/[^A-Z]/g, '');
-      if (cleanW.length >= 2 && cleanW.length <= 5) {
-        const matchInUniverse = dynamicUniverse.find(u => u.symbol.toUpperCase() === cleanW);
-        if (matchInUniverse) {
-          detectedSymbol = matchInUniverse.symbol;
-          setSymbol(detectedSymbol);
-          setCustomTickerInput(detectedSymbol);
-          break;
-        } else if (/^[A-Z]{2,5}$/.test(cleanW) && !["WITH", "THAT", "SAME", "OVER", "FROM", "TEST", "HOLD", "STOP", "RISK", "RUN", "THE", "FOR", "AND"].includes(cleanW)) {
-          try {
-            const resolveRes = await fetch("/api/research/resolve", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ query: cleanW })
-            });
-            if (resolveRes.ok) {
-              const resData = await resolveRes.json();
-              if (resData.primary_contract?.symbol) {
-                detectedSymbol = resData.primary_contract.symbol;
-                setSymbol(detectedSymbol);
-                setCustomTickerInput(detectedSymbol);
-                setResolvedInfo(resData.primary_contract);
-                break;
-              }
-            }
-          } catch {}
-        }
-      }
-    }
-
-    // 3. Timeframe detection
-    const lower = text.toLowerCase();
-    if (lower.includes("5m") || lower.includes("5-min")) {
-      detectedTimeframe = "5m";
-      setTimeframe("5m");
-    } else if (lower.includes("15m") || lower.includes("15-min")) {
-      detectedTimeframe = "15m";
-      setTimeframe("15m");
-    } else if (lower.includes("1h") || lower.includes("1-hour") || lower.includes("hourly")) {
-      detectedTimeframe = "1h";
-      setTimeframe("1h");
-    }
-
-    // 4. Stop ATR detection
-    const stopMatch = text.match(/stop\s*(?:atr)?\s*(?:to|=)?\s*([0-9.]+)/i);
-    if (stopMatch && stopMatch[1]) {
-      detectedStopAtr = parseFloat(stopMatch[1]);
-      setStopAtr(detectedStopAtr);
-    }
-
-    // 5. Max Hold detection
-    const holdMatch = text.match(/(?:max\s*hold|hold)\s*(?:to|=)?\s*([0-9]+)/i);
-    if (holdMatch && holdMatch[1]) {
-      detectedHoldBars = parseInt(holdMatch[1], 10);
-      setMaxHoldBars(detectedHoldBars);
-    }
-
-    const currentOverrides = {
-      symbol: detectedSymbol,
-      timeframe: detectedTimeframe,
-      capitalOverride: detectedCapital,
-      riskBudgetPct: detectedRiskPct,
-      frictionCeilingPct: detectedFriction,
-      stopAtrMultiplier: detectedStopAtr,
-      maxHoldBars: detectedHoldBars
-    };
-
-    // Trigger exploration if query asks for optimization or exploration
-    if (lower.includes("optimize") || lower.includes("explore") || lower.includes("tune") || lower.includes("find")) {
-      await handleAgentExplore(text, currentOverrides);
-    } else {
-      await handleRunSimulation(currentOverrides);
+    } catch (e: any) {
+      setErrorMsg("Discovery error: " + e.message);
+    } finally {
+      setDiscovering(false);
     }
   };
 
-  // Save current strategy to local storage vault
-  const handleSaveToVault = () => {
+  // =========================================================================
+  // 8. Conversational Agent SSE Streaming (POST /api/copilot/chat)
+  // =========================================================================
+  const handleSendChat = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const text = chatInput.trim();
+    if (!text || isGenerating) return;
+
+    setChatInput("");
+    const userMsgId = "msg_user_" + Date.now();
+    const assistantMsgId = "msg_agent_" + Date.now();
+
+    const userMsg: StudioChatMessage = {
+      id: userMsgId,
+      role: "user",
+      content: text,
+      timestamp: new Date().toLocaleTimeString()
+    };
+
+    const initialAssistantMsg: StudioChatMessage = {
+      id: assistantMsgId,
+      role: "assistant",
+      content: "",
+      timestamp: new Date().toLocaleTimeString(),
+      activeTools: []
+    };
+
+    setMessages((prev) => [...prev, userMsg, initialAssistantMsg]);
+    setIsGenerating(true);
+    setActiveTools([]);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    let receivedAnyText = false;
+
+    try {
+      const slidingHistory = messages.filter((m) => m.id !== "msg_init").slice(-6);
+      const payloadMessages = [...slidingHistory, userMsg].map((m) => ({
+        role: m.role,
+        content: m.content
+      }));
+
+      const gKey = vaultSettings.geminiApiKey || getStoredVaultValue("geminiApiKey");
+      const qKey = vaultSettings.customAiApiKey || getStoredVaultValue("customAiApiKey");
+      const nvKey = vaultSettings.nvidiaApiKey || getStoredVaultValue("nvidiaApiKey");
+      const oaKey = vaultSettings.openaiApiKey || getStoredVaultValue("openaiApiKey");
+      const orKey = vaultSettings.openrouterApiKey || getStoredVaultValue("openrouterApiKey");
+
+      const res = await fetch("/api/copilot/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-gemini-api-key": gKey || "",
+          "x-groq-api-key": qKey || "",
+          "x-nvidia-api-key": nvKey || "",
+          "x-openai-api-key": oaKey || "",
+          "x-openrouter-api-key": orKey || ""
+        },
+        body: JSON.stringify({
+          messages: payloadMessages,
+          model: selectedModel,
+          rawId: activeModelObj.rawId || activeModelObj.id,
+          temperature: 0.2,
+          max_tokens: 2048,
+          system_context: `Active Strategy Studio Context: Symbol=${symbol}, Timeframe=${timeframe}, Capital=$${capitalOverride}, StopATR=${stopAtr}x, Hold=${maxHoldBars} bars.`
+        }),
+        signal: controller.signal
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+      }
+
+      if (!res.body) {
+        throw new Error("No response body received from Copilot chat stream.");
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || "";
+
+        for (const part of parts) {
+          if (!part.trim()) continue;
+          const lines = part.split("\n");
+          let eventType = "delta";
+          const dataLines: string[] = [];
+
+          for (const line of lines) {
+            if (line.startsWith("event: ")) {
+              eventType = line.slice(7).trim();
+            } else if (line.startsWith("data: ")) {
+              dataLines.push(line.slice(6));
+            } else if (line.startsWith("data:")) {
+              dataLines.push(line.slice(5));
+            } else if (dataLines.length > 0) {
+              dataLines.push(line);
+            }
+          }
+
+          const dataStr = dataLines.join("\n").trim();
+          if (!dataStr) continue;
+
+          if (eventType === "tool_call") {
+            try {
+              const parsed = JSON.parse(dataStr);
+              setActiveTools((prev) => [...prev, parsed.tool]);
+            } catch (e) {}
+          } else if (eventType === "tool_result") {
+            try {
+              const parsed = JSON.parse(dataStr);
+              const toolName = parsed.tool;
+              const toolData = parsed.data;
+
+              if (toolName === "run_strategy_sweep" && toolData?.best_candidate) {
+                setSweepCandidates(toolData.candidates || []);
+                setParetoFrontier(toolData.pareto_frontier || []);
+                setResult(toolData.best_candidate);
+                setActiveTab("frontier");
+
+                const best = toolData.best_candidate;
+                if (best.parameters) {
+                  setStopAtr(best.parameters.stop_atr);
+                  setMaxHoldBars(best.parameters.max_hold);
+                  setPartialProfit(best.parameters.partial_profit);
+                  setBreakevenLock(best.parameters.breakeven_lock);
+                  setOfiFilter(best.parameters.ofi_filter);
+                }
+                if (toolData.symbol) {
+                  setSymbol(toolData.symbol);
+                  setCustomTickerInput(toolData.symbol);
+                }
+                setStrategyName(`Optimal Sweep: ${toolData.symbol || symbol} (${best.label || "Frontier"})`);
+              } else if (toolName === "run_strategy_backtest" && toolData?.success) {
+                setResult(toolData);
+                setActiveTab("performance");
+                if (toolData.parameters) {
+                  setStopAtr(toolData.parameters.stop_atr || stopAtr);
+                  setMaxHoldBars(toolData.parameters.max_hold || maxHoldBars);
+                }
+                if (toolData.symbol) {
+                  setSymbol(toolData.symbol);
+                  setCustomTickerInput(toolData.symbol);
+                }
+              } else if (toolName === "run_quant_discovery" && toolData?.status === "SUCCESS") {
+                setDiscoveryData(toolData);
+                setActiveTab("frontier");
+                if (toolData.symbol) {
+                  setSymbol(toolData.symbol);
+                  setCustomTickerInput(toolData.symbol);
+                }
+              } else if (toolName === "save_strategy_to_vault" && toolData?.status === "SUCCESS") {
+                fetchVaultStrategies();
+              }
+            } catch (e) {
+              console.warn("Error processing tool_result in Strategy Studio:", e);
+            }
+          } else if (eventType === "delta") {
+            let chunk = "";
+            try {
+              const parsed = JSON.parse(dataStr);
+              chunk = typeof parsed === "string" ? parsed : (parsed.content || parsed.message || "");
+            } catch (e) {
+              chunk = dataStr;
+            }
+            if (chunk) {
+              receivedAnyText = true;
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMsgId ? { ...msg, content: msg.content + chunk } : msg
+                )
+              );
+            }
+          }
+        }
+      }
+
+      if (!receivedAnyText) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMsgId && !msg.content
+              ? {
+                  ...msg,
+                  content: `> ⚠️ **Provider Notice**: The selected model (\`${selectedModel}\`) returned no output. Please ensure the provider API key is active in the **4-Pillar Vault**, or select **Local Tier 0 FinBERT**.`
+                }
+              : msg
+          )
+        );
+      }
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMsgId
+              ? {
+                  ...msg,
+                  content: msg.content + `\n\n> ❌ **Execution Error**: ${err.message || "Failed to complete stream."}`
+                }
+              : msg
+          )
+        );
+      }
+    } finally {
+      setIsGenerating(false);
+      setActiveTools([]);
+      abortControllerRef.current = null;
+    }
+  };
+
+  const handleStopChat = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsGenerating(false);
+      setActiveTools([]);
+    }
+  };
+
+  // =========================================================================
+  // 9. Experiment Vault Save, Load, and Delete Handlers
+  // =========================================================================
+  const handleSaveToVault = async () => {
     if (!result) return;
     const newExperiment: StrategyStudioExperiment = {
-      id: "EXP_" + Date.now().toString(36).toUpperCase(),
+      id: "EXP_" + Date.now().toString(16).toUpperCase(),
       timestamp: new Date().toISOString(),
       name: strategyName || `${symbol} Strategy v${vault.length + 1}`,
       symbol,
@@ -593,8 +832,7 @@ export function StrategyStudioPage() {
         ofiFilter,
         adaptiveStop,
         riskBudgetPct,
-        frictionCeilingPct: frictionCeiling,
-        binaryBlackoutHours: binaryBlackout
+        frictionCeilingPct: frictionCeiling
       },
       metrics: {
         totalPnL: Number(result.totalPnL || result.netProfit || 0),
@@ -612,18 +850,28 @@ export function StrategyStudioPage() {
       tradesList: result.tradesList || []
     };
 
-    const updated = [newExperiment, ...vault];
+    // 1. Update client local storage
+    const updated = [newExperiment, ...vault.filter((v) => v.id !== newExperiment.id)];
     setVault(updated);
     try {
       localStorage.setItem("alpha_engine_strategy_vault", JSON.stringify(updated));
+    } catch (err) {}
+
+    // 2. Persist to server strategy vault (Rule 9)
+    try {
+      await fetch("/api/vault/strategies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newExperiment)
+      });
     } catch (err) {
-      console.error("Local storage error:", err);
+      console.warn("Could not save to server vault:", err);
     }
+
     setSaveSuccessMsg(`Saved "${newExperiment.name}" into Experiment Vault.`);
     setTimeout(() => setSaveSuccessMsg(null), 4000);
   };
 
-  // Reload experiment from vault
   const handleLoadExperiment = (exp: StrategyStudioExperiment) => {
     setStrategyName(exp.name);
     setSymbol(exp.symbol);
@@ -640,7 +888,6 @@ export function StrategyStudioPage() {
     setAdaptiveStop(exp.parameters.adaptiveStop);
     setRiskBudgetPct(exp.parameters.riskBudgetPct);
     setFrictionCeiling(exp.parameters.frictionCeilingPct);
-    setBinaryBlackout(exp.parameters.binaryBlackoutHours);
 
     setResult({
       success: true,
@@ -674,69 +921,182 @@ export function StrategyStudioPage() {
     ]);
   };
 
-
-
-  // Delete from vault
-  const handleDeleteExperiment = (id: string, e: React.MouseEvent) => {
+  const handleDeleteExperiment = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const updated = vault.filter((item) => item.id !== id);
     setVault(updated);
     try {
       localStorage.setItem("alpha_engine_strategy_vault", JSON.stringify(updated));
+      await fetch(`/api/vault/strategies/${id}`, { method: "DELETE" });
     } catch {}
   };
 
-  // Quick Query Chips
+  const handleSelectCandidate = (cand: any) => {
+    setResult(cand);
+    if (cand.parameters) {
+      setStopAtr(cand.parameters.stop_atr);
+      setMaxHoldBars(cand.parameters.max_hold);
+      setPartialProfit(cand.parameters.partial_profit);
+      setBreakevenLock(cand.parameters.breakeven_lock);
+      setOfiFilter(cand.parameters.ofi_filter);
+    }
+    setStrategyName(`${symbol} - ${cand.label || `Trial #${cand.trial_index + 1}`}`);
+    setActiveTab("performance");
+  };
+
+  // Quick Action Chips
   const quickChips = [
-    "run the same with 5000 strat capital",
-    "Run ASML with $5,000 capital and 1.8 ATR stop",
-    "Optimize XLE for maximum Deflated Sharpe",
-    "Explore NVDA breakout with $25,000 capital and 12-bar hold",
-    "Test SAP mean reversion with Breakeven ratchet"
+    `Run 16-parameter sweep on ${symbol}`,
+    `Analyze Hurst exponent & regime for ${symbol}`,
+    `Optimize with $25k capital and Deflated Sharpe hurdle`,
+    `Run single simulation with 2.2 ATR stop and 20 hold bars`,
+    `Preserve current strategy to Experiment Vault`
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-[#0c101c] border border-white/10 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+      {/* =========================================================================
+          Top Navigation & Header Controls
+          ========================================================================= */}
+      <div className="bg-[#0c101c] border border-white/10 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs bg-emerald-500/20 text-[#00ff88] border border-emerald-500/40 px-2.5 py-1 rounded-md font-mono font-bold flex items-center gap-1.5 shadow-sm">
               <Sparkles className="w-3.5 h-3.5 text-[#00ff88]" /> AGENTIC STRATEGY STUDIO
             </span>
             <span className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2.5 py-1 rounded-md font-mono font-bold">
-              VERIFIED IBKR BARS
+              VERIFIED BROKER BARS
             </span>
             <span className="text-xs text-slate-400 font-mono hidden sm:inline-block">
-              Zero Synthetic • Audited Deflated Sharpe
+              Marcos López de Prado DSR (N=16) • Multi-Permutation Pareto Frontier
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-black text-white font-mono mt-2 flex items-center gap-2">
             <SlidersHorizontal className="w-6 h-6 text-emerald-400" /> Quantitative Strategy Studio & Experiment Vault
           </h1>
-          <p className="text-xs sm:text-sm text-slate-300 font-sans mt-1">
+          <p className="text-xs sm:text-sm text-slate-300 font-sans mt-0.5">
             Direct autonomous agents to discover high-expectancy trading configurations, run parameter sweeps, and preserve audited strategy backtests.
           </p>
         </div>
 
-        {/* Top Action Buttons */}
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        {/* Top Control Plane: Model Dropdown + 4-Pillar Vault + Action Buttons */}
+        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto justify-end">
+          {/* Dynamic Model Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowModelDropdown(!showModelDropdown)}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900 border border-white/10 hover:border-white/20 text-xs font-mono text-white transition cursor-pointer"
+            >
+              <span>{activeModelObj.icon}</span>
+              <span className="font-bold max-w-[120px] truncate">{activeModelObj.name}</span>
+              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 font-bold">
+                {activeModelObj.badge}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+
+            {showModelDropdown && (
+              <div className="absolute right-0 mt-2 w-80 bg-slate-950 border border-white/15 rounded-xl shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95">
+                <div className="p-2 border-b border-white/10 mb-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-mono font-bold text-slate-300">ACTIVE LLM REASONER</span>
+                    <button
+                      onClick={() => {
+                        setShowModelDropdown(false);
+                        setIsVaultOpen(true);
+                      }}
+                      className="text-[10px] text-indigo-400 hover:text-indigo-300 font-mono flex items-center gap-1"
+                    >
+                      <Shield className="w-3 h-3" /> Manage Keys
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={modelSearchQuery}
+                    onChange={(e) => setModelSearchQuery(e.target.value)}
+                    placeholder="Search discovered models..."
+                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-2 py-1 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div className="max-h-60 overflow-y-auto space-y-1">
+                  {availableModels
+                    .filter((m) =>
+                      m.name.toLowerCase().includes(modelSearchQuery.toLowerCase()) ||
+                      m.provider.toLowerCase().includes(modelSearchQuery.toLowerCase())
+                    )
+                    .map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => {
+                          setSelectedModel(m.id);
+                          localStorage.setItem("alpha_copilot_model", m.id);
+                          setShowModelDropdown(false);
+                        }}
+                        className={`w-full text-left p-2 rounded-lg flex items-center justify-between font-mono text-xs transition cursor-pointer ${
+                          selectedModel === m.id
+                            ? "bg-emerald-500/20 text-[#00ff88] border border-emerald-500/40"
+                            : "hover:bg-white/5 text-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <span>{m.icon}</span>
+                          <span className="font-bold truncate">{m.name}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 shrink-0">{m.costStr}</span>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 4-Pillar Vault Button */}
           <button
-            onClick={handleRunSimulation}
-            disabled={loading || exploring}
-            className="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-mono text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20"
+            onClick={() => setIsVaultOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/40 hover:bg-indigo-600/30 text-indigo-300 font-mono text-xs font-bold transition cursor-pointer shadow-sm"
           >
-            {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-            RUN SIMULATION
+            <Shield className="w-3.5 h-3.5 text-indigo-400" />
+            4-PILLAR VAULT
+          </button>
+
+          {/* Single Simulation Button */}
+          <button
+            onClick={() => handleRunSimulation()}
+            disabled={loading || sweeping || discovering}
+            className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-mono text-xs font-bold px-3 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 border border-white/10"
+          >
+            {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+            SIMULATE
+          </button>
+
+          {/* 16-Trial Sweep Button */}
+          <button
+            onClick={handleRunSweep}
+            disabled={loading || sweeping || discovering}
+            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-mono text-xs font-bold px-3.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-emerald-600/20"
+          >
+            {sweeping ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+            16-TRIAL SWEEP
+          </button>
+
+          {/* Quant Discovery Button */}
+          <button
+            onClick={handleRunDiscovery}
+            disabled={loading || sweeping || discovering}
+            className="bg-cyan-700 hover:bg-cyan-600 disabled:opacity-50 text-white font-mono text-xs font-bold px-3 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 border border-cyan-500/30"
+          >
+            {discovering ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />}
+            DISCOVERY
           </button>
 
           {result && (
             <button
               onClick={handleSaveToVault}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer flex items-center gap-2 shadow-lg shadow-indigo-600/20"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold px-3 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-indigo-600/20"
             >
-              <Bookmark className="w-4 h-4" />
-              SAVE EXPERIMENT
+              <Bookmark className="w-3.5 h-3.5" />
+              SAVE
             </button>
           )}
         </div>
@@ -755,10 +1115,12 @@ export function StrategyStudioPage() {
         </div>
       )}
 
-      {/* Main Studio Two-Column Grid */}
+      {/* =========================================================================
+          Main Studio Grid: Conversational Agent (5 Cols) + Visualizer (7 Cols)
+          ========================================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Conversational Strategy Agent & Command Terminal (5 Cols) */}
-        <div className="lg:col-span-5 bg-[#0c101c] border border-white/10 rounded-2xl flex flex-col h-[740px] shadow-xl overflow-hidden">
+        {/* Left Column: Conversational Agent Terminal */}
+        <div className="lg:col-span-5 bg-[#0c101c] border border-white/10 rounded-2xl flex flex-col h-[760px] shadow-xl overflow-hidden">
           {/* Chat Header */}
           <div className="p-4 border-b border-white/10 bg-slate-900/60 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -768,18 +1130,44 @@ export function StrategyStudioPage() {
               <div>
                 <span className="text-xs font-mono font-bold text-white block">STRATEGY OPTIMIZER AGENT</span>
                 <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Frontier Search Engine Active
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  {isGenerating ? "Streaming Reasoning & Tools..." : "Pareto Frontier Engine Active"}
                 </span>
               </div>
             </div>
-            <button
-              onClick={() => setMessages([messages[0]])}
-              title="Reset conversation"
-              className="text-slate-400 hover:text-white p-1.5 rounded transition"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              {isGenerating && (
+                <button
+                  onClick={handleStopChat}
+                  title="Stop generation"
+                  className="text-rose-400 hover:text-rose-300 p-1.5 rounded transition bg-rose-500/10 border border-rose-500/30"
+                >
+                  <Square className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <button
+                onClick={() => setMessages([messages[0]])}
+                title="Reset conversation"
+                className="text-slate-400 hover:text-white p-1.5 rounded transition"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            </div>
           </div>
+
+          {/* Active Tool Indicators */}
+          {activeTools.length > 0 && (
+            <div className="px-4 py-2 bg-emerald-950/40 border-b border-emerald-500/30 flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-mono text-emerald-400 uppercase font-bold flex items-center gap-1">
+                <RefreshCw className="w-3 h-3 animate-spin text-[#00ff88]" /> Invoking Tool:
+              </span>
+              {activeTools.map((t, idx) => (
+                <span key={idx} className="text-[10px] bg-emerald-500/20 text-[#00ff88] border border-emerald-500/40 px-2 py-0.5 rounded font-mono font-bold">
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Chat Messages Log */}
           <div className="flex-1 p-4 overflow-y-auto space-y-4 font-mono text-xs">
@@ -804,32 +1192,34 @@ export function StrategyStudioPage() {
                         : "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                     }`}
                   >
-                    <div className="whitespace-pre-wrap font-mono">{m.content}</div>
+                    <div className="whitespace-pre-wrap font-mono">{m.content || "..."}</div>
                     <span className="text-[10px] opacity-40 block mt-1.5 text-right font-sans">{m.timestamp}</span>
                   </div>
                 </div>
               );
             })}
-            {exploring && (
+            {(sweeping || discovering) && (
               <div className="flex gap-3 items-start animate-in fade-in">
                 <div className="w-6 h-6 rounded-md bg-emerald-500/20 text-[#00ff88] flex items-center justify-center shrink-0 mt-0.5">
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                 </div>
                 <div className="p-3 rounded-2xl bg-slate-900/80 border border-emerald-500/30 text-emerald-300 font-mono text-xs">
-                  Agent running multi-candidate parameter sweeps across broker history...
+                  {sweeping ? "Executing 16-parameter sweep across verified broker bars..." : "Computing Wald-Wolfowitz & Hurst exponent..."}
                 </div>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Query Chips */}
+          {/* Quick Action Chips */}
           <div className="px-4 py-2 bg-black/40 border-t border-white/5 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
             {quickChips.map((chip, idx) => (
               <button
                 key={idx}
-                onClick={() => handleAgentExplore(chip)}
-                disabled={exploring}
+                onClick={() => {
+                  setChatInput(chip);
+                }}
+                disabled={isGenerating}
                 className="whitespace-nowrap px-2.5 py-1 rounded-md bg-white/5 hover:bg-emerald-500/20 hover:border-emerald-500/40 border border-white/10 text-[11px] font-mono text-slate-300 hover:text-[#00ff88] transition cursor-pointer shrink-0"
               >
                 {chip}
@@ -843,13 +1233,13 @@ export function StrategyStudioPage() {
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Direct agent (e.g. Optimize ASML for maximum Deflated Sharpe)..."
-              disabled={exploring}
+              placeholder="Direct agent (e.g. Run 16-parameter sweep on ASML)..."
+              disabled={isGenerating}
               className="flex-1 bg-black/70 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-emerald-500"
             />
             <button
               type="submit"
-              disabled={exploring || !chatInput.trim()}
+              disabled={isGenerating || !chatInput.trim()}
               className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl transition cursor-pointer flex items-center justify-center shadow-lg shadow-emerald-600/20"
             >
               <Send className="w-4 h-4" />
@@ -857,20 +1247,20 @@ export function StrategyStudioPage() {
           </form>
         </div>
 
-        {/* Right Column: Studio Controls, Visualizer, Blotter & Vault (7 Cols) */}
-        <div className="lg:col-span-7 space-y-6">
-          {/* Tactile Tuning Controls Matrix */}
+        {/* Right Column: Tactical Parameters & Results Visualizer */}
+        <div className="lg:col-span-7 space-y-5">
+          {/* Parameter Tuning Controls */}
           <div className="bg-[#0c101c] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <span className="text-xs font-mono uppercase font-bold text-slate-200 flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-emerald-400" /> Strategy Parameter & Friction Controls
               </span>
-              <span className="text-xs text-slate-400 font-mono">Real-Time Parameter Calibration</span>
+              <span className="text-xs text-slate-400 font-mono">Calibrated against IBKR Europe Rates</span>
             </div>
 
-            {/* Selector Row */}
+            {/* Selector Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-              {/* Dynamic Ticker Resolution Box */}
+              {/* Dynamic Ticker Resolution */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-[11px] text-slate-300 uppercase font-mono font-bold">
@@ -890,7 +1280,7 @@ export function StrategyStudioPage() {
                     value={customTickerInput}
                     onChange={(e) => setCustomTickerInput(e.target.value.toUpperCase())}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === "Enter") {
                         e.preventDefault();
                         if (customTickerInput.trim()) {
                           const s = customTickerInput.trim().toUpperCase();
@@ -906,7 +1296,7 @@ export function StrategyStudioPage() {
                         resolveContractForSymbol(s);
                       }
                     }}
-                    placeholder="Ticker (e.g. TSLA)..."
+                    placeholder="Ticker (e.g. ASML)..."
                     className="flex-1 bg-slate-900 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono uppercase font-bold focus:outline-none focus:border-emerald-500"
                   />
                   <select
@@ -923,7 +1313,7 @@ export function StrategyStudioPage() {
                         {u.symbol}
                       </option>
                     ))}
-                    {!dynamicUniverse.some(u => u.symbol === symbol) && (
+                    {!dynamicUniverse.some((u) => u.symbol === symbol) && (
                       <option value={symbol}>{symbol}</option>
                     )}
                   </select>
@@ -944,7 +1334,7 @@ export function StrategyStudioPage() {
                 </select>
               </div>
 
-              {/* Starting Capital with Quick Presets */}
+              {/* Starting Capital */}
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[11px] text-slate-300 uppercase font-mono font-bold">Capital ($)</label>
@@ -1012,41 +1402,6 @@ export function StrategyStudioPage() {
               </div>
             </div>
 
-            {/* Risk & Friction Limits */}
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-[11px] text-slate-300 uppercase font-mono font-bold">Capital Risk (r)</label>
-                  <span className="text-xs text-amber-400 font-mono font-bold">{(riskBudgetPct * 100).toFixed(2)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0.0025"
-                  max="0.02"
-                  step="0.0025"
-                  value={riskBudgetPct}
-                  onChange={(e) => setRiskBudgetPct(parseFloat(e.target.value))}
-                  className="w-full accent-amber-500 cursor-pointer"
-                />
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-[11px] text-slate-300 uppercase font-mono font-bold">Friction Ceiling</label>
-                  <span className="text-xs text-rose-400 font-mono font-bold">{frictionCeiling}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="5"
-                  max="25"
-                  step="1"
-                  value={frictionCeiling}
-                  onChange={(e) => setFrictionCeiling(parseFloat(e.target.value))}
-                  className="w-full accent-rose-500 cursor-pointer"
-                />
-              </div>
-            </div>
-
             {/* Friction Gating Checkboxes */}
             <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-white/5 text-xs font-mono">
               <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -1076,7 +1431,7 @@ export function StrategyStudioPage() {
                   onChange={(e) => setAdaptiveStop(e.target.checked)}
                   className="rounded bg-black border-white/20 text-emerald-500 focus:ring-0"
                 />
-                <span className="text-slate-300 font-semibold">Adaptive Volatility Sizing</span>
+                <span className="text-slate-300 font-semibold">Adaptive Stop Cushion</span>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -1086,26 +1441,34 @@ export function StrategyStudioPage() {
                   onChange={(e) => setOfiFilter(e.target.checked)}
                   className="rounded bg-black border-white/20 text-emerald-500 focus:ring-0"
                 />
-                <span className="text-slate-300 font-semibold">OFI Imbalance Gate</span>
+                <span className="text-slate-300 font-semibold">OFI Imbalance Gate (1.4x)</span>
               </label>
             </div>
           </div>
 
-          {/* Results Tab Navigation (Performance / Blotter / Vault) */}
+          {/* Results Tab Navigation (Performance / Pareto Frontier / Blotter / Vault) */}
           <div className="bg-[#0c101c] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2 bg-black/60 p-1 rounded-xl border border-white/10 text-xs font-mono">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2 bg-black/60 p-1 rounded-xl border border-white/10 text-xs font-mono flex-wrap">
                 <button
                   onClick={() => setActiveTab("performance")}
-                  className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 font-bold ${
+                  className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 font-bold cursor-pointer ${
                     activeTab === "performance" ? "bg-emerald-600 text-white shadow" : "text-slate-400 hover:text-white"
                   }`}
                 >
-                  <TrendingUp className="w-3.5 h-3.5" /> Performance & Equity Curve
+                  <TrendingUp className="w-3.5 h-3.5" /> Performance & Curve
+                </button>
+                <button
+                  onClick={() => setActiveTab("frontier")}
+                  className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 font-bold cursor-pointer ${
+                    activeTab === "frontier" ? "bg-emerald-600 text-white shadow" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-400" /> Pareto Frontier ({sweepCandidates.length || 0})
                 </button>
                 <button
                   onClick={() => setActiveTab("blotter")}
-                  className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 font-bold ${
+                  className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 font-bold cursor-pointer ${
                     activeTab === "blotter" ? "bg-emerald-600 text-white shadow" : "text-slate-400 hover:text-white"
                   }`}
                 >
@@ -1113,7 +1476,7 @@ export function StrategyStudioPage() {
                 </button>
                 <button
                   onClick={() => setActiveTab("vault")}
-                  className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 font-bold ${
+                  className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 font-bold cursor-pointer ${
                     activeTab === "vault" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-white"
                   }`}
                 >
@@ -1122,16 +1485,18 @@ export function StrategyStudioPage() {
               </div>
 
               {result && (
-                <span className="text-xs font-mono font-bold text-slate-300">
+                <span className="text-xs font-mono font-bold text-slate-300 truncate max-w-[200px]">
                   {strategyName}
                 </span>
               )}
             </div>
 
-            {/* TAB 1: Performance Curve & League Table */}
+            {/* =========================================================================
+                TAB 1: Performance Curve & League Table
+                ========================================================================= */}
             {activeTab === "performance" && result && (
               <div className="space-y-4 animate-in fade-in duration-200">
-                {/* Metrics Badges */}
+                {/* Metric Badges */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5 text-center font-mono text-xs">
                   <div className="bg-black/50 p-3 rounded-xl border border-white/5">
                     <span className="text-[10px] text-slate-400 block uppercase font-semibold">Net PnL</span>
@@ -1186,14 +1551,14 @@ export function StrategyStudioPage() {
                   </div>
                 </div>
 
-                {/* Equity Curve Recharts */}
+                {/* Equity Curve */}
                 <div className="bg-black/50 border border-white/10 rounded-xl p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-mono font-bold text-slate-200 uppercase flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-emerald-400" /> Compounded Equity Trajectory (${result.symbol})
+                      <TrendingUp className="w-4 h-4 text-emerald-400" /> Compounded Equity Trajectory ({result.symbol || symbol})
                     </span>
                     <span className="text-xs font-mono text-slate-400">
-                      ${Number(result.startingCapital || 100000).toLocaleString()} ➔ ${Number(result.finalCapital || 100000).toLocaleString()}
+                      ${Number(result.startingCapital || capitalOverride).toLocaleString()} ➔ ${Number(result.finalCapital || capitalOverride).toLocaleString()}
                     </span>
                   </div>
 
@@ -1210,10 +1575,10 @@ export function StrategyStudioPage() {
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.25} />
-                        <XAxis 
-                          dataKey="date" 
-                          stroke="#64748b" 
-                          fontSize={10} 
+                        <XAxis
+                          dataKey="date"
+                          stroke="#64748b"
+                          fontSize={10}
                           tickLine={false}
                           tickFormatter={(val) => {
                             if (!val) return "";
@@ -1221,11 +1586,11 @@ export function StrategyStudioPage() {
                             return parts[0] ? parts[0].slice(5) : val;
                           }}
                         />
-                        <YAxis 
-                          stroke="#64748b" 
-                          fontSize={10} 
+                        <YAxis
+                          stroke="#64748b"
+                          fontSize={10}
                           tickLine={false}
-                          domain={['dataMin - 500', 'dataMax + 500']}
+                          domain={["dataMin - 500", "dataMax + 500"]}
                           tickFormatter={(v) => `$${(v / 1000).toFixed(1)}k`}
                         />
                         <Tooltip
@@ -1239,87 +1604,151 @@ export function StrategyStudioPage() {
                           formatter={(val: any) => [`$${Number(val).toLocaleString()}`, "Equity"]}
                           labelFormatter={(lbl) => `Bar: ${lbl}`}
                         />
-                        <Area 
-                          type="monotone" 
-                          dataKey="equity" 
-                          stroke="#10b981" 
+                        <Area
+                          type="monotone"
+                          dataKey="equity"
+                          stroke="#10b981"
                           strokeWidth={2}
-                          fillOpacity={1} 
-                          fill="url(#studioEquityGradient)" 
+                          fillOpacity={1}
+                          fill="url(#studioEquityGradient)"
                         />
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
-
-                {/* Comparative League Table */}
-                {baselineResult && (
-                  <div className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold uppercase text-slate-300 flex items-center gap-2">
-                        <Award className="w-4 h-4 text-amber-400" /> Comparative League Table (Baseline vs. Tuned)
-                      </span>
-                      <span className="text-xs font-mono text-slate-400">Institutional Attribution</span>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left font-mono text-xs">
-                        <thead>
-                          <tr className="border-b border-white/10 text-slate-400">
-                            <th className="py-2 px-3">Variant</th>
-                            <th className="py-2 px-3 text-right">Trades</th>
-                            <th className="py-2 px-3 text-right">Win Rate</th>
-                            <th className="py-2 px-3 text-right">Profit Factor</th>
-                            <th className="py-2 px-3 text-right">Sharpe</th>
-                            <th className="py-2 px-3 text-right">DSR</th>
-                            <th className="py-2 px-3 text-right">Max DD</th>
-                            <th className="py-2 px-3 text-right">Net PnL</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5">
-                          <tr className="text-slate-400 bg-black/20">
-                            <td className="py-2.5 px-3 font-semibold text-slate-300">Baseline (Unfiltered 1.8 ATR)</td>
-                            <td className="py-2.5 px-3 text-right">{baselineResult.totalTrades || 0}</td>
-                            <td className="py-2.5 px-3 text-right">{baselineResult.winRate || 0}%</td>
-                            <td className="py-2.5 px-3 text-right">{baselineResult.profitFactor || "1.00"}</td>
-                            <td className="py-2.5 px-3 text-right">{baselineResult.annualizedSharpe || "0.00"}</td>
-                            <td className="py-2.5 px-3 text-right text-slate-400">
-                              {baselineResult.deflatedSharpeRatio ? `${(Number(baselineResult.deflatedSharpeRatio) * 100).toFixed(1)}%` : "N/A"}
-                            </td>
-                            <td className="py-2.5 px-3 text-right text-rose-400">-{baselineResult.maxDrawdownPercent || 0}%</td>
-                            <td className={`py-2.5 px-3 text-right font-bold ${
-                              Number(baselineResult.totalPnL || 0) >= 0 ? "text-emerald-400" : "text-rose-400"
-                            }`}>
-                              {Number(baselineResult.totalPnL || 0) >= 0 ? "+" : ""}${Number(baselineResult.totalPnL || 0).toFixed(2)}
-                            </td>
-                          </tr>
-
-                          <tr className="text-white bg-emerald-950/20 border-l-2 border-emerald-500">
-                            <td className="py-2.5 px-3 font-bold text-[#00ff88] flex items-center gap-1.5">
-                              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                              {strategyName} (Tuned)
-                            </td>
-                            <td className="py-2.5 px-3 text-right font-bold">{result.totalTrades || 0}</td>
-                            <td className="py-2.5 px-3 text-right font-bold text-white">{result.winRate || 0}%</td>
-                            <td className="py-2.5 px-3 text-right font-bold text-cyan-400">{result.profitFactor || "1.00"}</td>
-                            <td className="py-2.5 px-3 text-right font-bold text-emerald-400">{result.annualizedSharpe || "0.00"}</td>
-                            <td className="py-2.5 px-3 text-right font-bold text-[#00ff88]">
-                              {result.deflatedSharpeRatio ? `${(Number(result.deflatedSharpeRatio) * 100).toFixed(1)}%` : "N/A"}
-                            </td>
-                            <td className="py-2.5 px-3 text-right font-bold text-rose-400">-{result.maxDrawdownPercent || 0}%</td>
-                            <td className="py-2.5 px-3 text-right font-bold text-[#00ff88]">
-                              +{Number(result.totalPnL || 0).toFixed(2)}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
-            {/* TAB 2: Audited Trade Blotter */}
+            {/* =========================================================================
+                TAB 2: Pareto Frontier & Optimization Candidates Matrix
+                ========================================================================= */}
+            {activeTab === "frontier" && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                {/* Discovery Microstructure Card (if available) */}
+                {discoveryData && (
+                  <div className="bg-black/50 border border-cyan-500/30 rounded-xl p-4 space-y-2 font-mono text-xs">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <span className="font-bold text-cyan-300 flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-cyan-400" /> Empirical Microstructure Analysis ({discoveryData.symbol})
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        discoveryData.regime === "PERSISTENT_TRENDING" ? "bg-emerald-500/20 text-[#00ff88]" :
+                        discoveryData.regime === "MEAN_REVERTING" ? "bg-amber-500/20 text-amber-300" :
+                        "bg-slate-700 text-slate-300"
+                      }`}>
+                        {discoveryData.regime}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 pt-1 text-center">
+                      <div className="bg-slate-900/80 p-2 rounded-lg">
+                        <span className="text-[10px] text-slate-400 block">HURST EXPONENT (H)</span>
+                        <span className="font-bold text-emerald-400 text-sm">
+                          {Number(discoveryData.quant_discovery?.hurst_exponent?.hurst_exponent || 0.5).toFixed(3)}
+                        </span>
+                      </div>
+                      <div className="bg-slate-900/80 p-2 rounded-lg">
+                        <span className="text-[10px] text-slate-400 block">RUNS TEST (Z-SCORE)</span>
+                        <span className="font-bold text-cyan-400 text-sm">
+                          {Number(discoveryData.quant_discovery?.runs_test?.z_score || 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="bg-slate-900/80 p-2 rounded-lg">
+                        <span className="text-[10px] text-slate-400 block">MARKOV P(UP|UP)</span>
+                        <span className="font-bold text-white text-sm">
+                          {(Number(discoveryData.quant_discovery?.markov_transitions?.transition_matrix?.up_to_up || 0.5) * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-300 font-sans italic pt-1">{discoveryData.guidance}</p>
+                  </div>
+                )}
+
+                {/* Pareto Candidates Table */}
+                <div className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-3 font-mono text-xs">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="font-bold uppercase text-slate-200 flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-amber-400" /> Multi-Permutation Candidates Matrix ({sweepCandidates.length} Trials Tested)
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Selection Bias Penalty: N={sweepCandidates.length || 16} • Click any row to load
+                    </span>
+                  </div>
+
+                  {sweepCandidates.length === 0 ? (
+                    <div className="py-12 text-center text-xs text-slate-500">
+                      No sweep completed yet. Click <strong>16-TRIAL SWEEP</strong> above or direct the agent: <em>"Run 16-parameter sweep on {symbol}"</em>.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto max-h-96">
+                      <table className="w-full text-left">
+                        <thead className="sticky top-0 bg-slate-900 border-b border-white/10 text-slate-400">
+                          <tr>
+                            <th className="py-2 px-2.5">Trial / Label</th>
+                            <th className="py-2 px-2 text-right">Stop ATR</th>
+                            <th className="py-2 px-2 text-right">Hold</th>
+                            <th className="py-2 px-2 text-right">Win Rate</th>
+                            <th className="py-2 px-2 text-right">Sharpe</th>
+                            <th className="py-2 px-2 text-right">DSR</th>
+                            <th className="py-2 px-2 text-right">Max DD</th>
+                            <th className="py-2 px-2 text-right">Net PnL</th>
+                            <th className="py-2 px-2 text-center">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                          {sweepCandidates.map((c, idx) => {
+                            const isOptimal = paretoFrontier.some((pf) => pf.trial_index === c.trial_index);
+                            const isCurrent = result?.parameters?.stop_atr === c.parameters?.stop_atr &&
+                                              result?.parameters?.max_hold === c.parameters?.max_hold;
+                            return (
+                              <tr
+                                key={idx}
+                                onClick={() => handleSelectCandidate(c)}
+                                className={`transition cursor-pointer hover:bg-emerald-950/20 ${
+                                  isCurrent ? "bg-emerald-950/40 border-l-2 border-emerald-500 font-bold" : ""
+                                }`}
+                              >
+                                <td className="py-2 px-2.5 text-white flex items-center gap-1.5">
+                                  {isOptimal && <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />}
+                                  <span className="truncate max-w-[140px]">{c.label || `Candidate #${c.trial_index + 1}`}</span>
+                                </td>
+                                <td className="py-2 px-2 text-right text-slate-300">{c.parameters?.stop_atr}x</td>
+                                <td className="py-2 px-2 text-right text-slate-300">{c.parameters?.max_hold}b</td>
+                                <td className="py-2 px-2 text-right text-white">{c.winRate}%</td>
+                                <td className="py-2 px-2 text-right text-emerald-400">{c.annualizedSharpe}</td>
+                                <td className={`py-2 px-2 text-right font-bold ${
+                                  c.passesDsrHurdle ? "text-[#00ff88]" : "text-amber-400"
+                                }`}>
+                                  {(Number(c.deflatedSharpeRatio || 0) * 100).toFixed(1)}%
+                                </td>
+                                <td className="py-2 px-2 text-right text-rose-400">-{c.maxDrawdownPercent}%</td>
+                                <td className={`py-2 px-2 text-right font-bold ${
+                                  Number(c.totalPnL || 0) >= 0 ? "text-[#00ff88]" : "text-rose-400"
+                                }`}>
+                                  {Number(c.totalPnL || 0) >= 0 ? "+" : ""}${Number(c.totalPnL || 0).toFixed(2)}
+                                </td>
+                                <td className="py-2 px-2 text-center">
+                                  {isOptimal ? (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
+                                      PARETO
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-500">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* =========================================================================
+                TAB 3: Audited Trade Blotter
+                ========================================================================= */}
             {activeTab === "blotter" && (
               <div className="space-y-3 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between pb-2 border-b border-white/5">
@@ -1346,7 +1775,7 @@ export function StrategyStudioPage() {
                           <th className="py-2 px-3 text-right">Shares</th>
                           <th className="py-2 px-3 text-right">Entry</th>
                           <th className="py-2 px-3 text-right">Exit</th>
-                          <th className="py-2 px-3">Exit Attribution</th>
+                          <th className="py-2 px-3">Reason</th>
                           <th className="py-2 px-3 text-right">Fee</th>
                           <th className="py-2 px-3 text-right">Net PnL</th>
                         </tr>
@@ -1387,19 +1816,21 @@ export function StrategyStudioPage() {
               </div>
             )}
 
-            {/* TAB 3: Strategy Experiment Vault */}
+            {/* =========================================================================
+                TAB 4: Strategy Experiment Vault (Rule 9 Local + Server Persistence)
+                ========================================================================= */}
             {activeTab === "vault" && (
               <div className="space-y-3 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between pb-2 border-b border-white/5">
                   <span className="text-xs font-mono font-bold text-white uppercase flex items-center gap-2">
-                    <FolderOpen className="w-4 h-4 text-indigo-400" /> Strategy Experiment Vault ({vault.length} Experiments)
+                    <FolderOpen className="w-4 h-4 text-indigo-400" /> Preserved Strategy Experiment Vault ({vault.length} Audited Records)
                   </span>
-                  <span className="text-xs font-mono text-slate-400">Local Persistence Engine</span>
+                  <span className="text-xs font-mono text-slate-400">Deterministic Local Atomic Engine (Rule 9)</span>
                 </div>
 
                 {vault.length === 0 ? (
                   <div className="py-12 text-center text-xs text-slate-500 font-mono">
-                    No strategies saved yet. Run a simulation and click "Save Experiment".
+                    No strategies saved yet. Run a simulation or parameter sweep, then click "SAVE".
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
@@ -1457,7 +1888,7 @@ export function StrategyStudioPage() {
                         <div className="flex items-center justify-between text-[10px] text-indigo-400 font-mono font-semibold pt-1">
                           <span>Stop ATR: {exp.parameters.stopAtrMultiplier}x • Hold: {exp.parameters.maxHoldBars}b</span>
                           <span className="flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                            Reload <ArrowUpRight className="w-3 h-3" />
+                            Restore to Studio <ArrowUpRight className="w-3 h-3" />
                           </span>
                         </div>
                       </div>
@@ -1469,7 +1900,17 @@ export function StrategyStudioPage() {
           </div>
         </div>
       </div>
+
+      {/* 4-Pillar Vault Credentials Modal */}
+      <ApiVaultModal
+        isOpen={isVaultOpen}
+        onClose={() => setIsVaultOpen(false)}
+        settings={vaultSettings}
+        onSaveSetting={handleSaveSetting}
+        onSaveMultipleSettings={handleSaveMultipleSettings}
+      />
     </div>
   );
 }
+
 export default StrategyStudioPage;

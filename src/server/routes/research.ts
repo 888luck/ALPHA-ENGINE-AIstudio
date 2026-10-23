@@ -15,6 +15,22 @@ export function getPythonExecutable(): string {
   return "python3";
 }
 
+export function getResearchScriptPath(): string {
+  const local = path.join(process.cwd(), "research_controller.py");
+  if (fs.existsSync(local)) return local;
+  const inStudio = path.join(process.cwd(), "ALPHA-ENGINE-AIstudio", "research_controller.py");
+  if (fs.existsSync(inStudio)) return inStudio;
+  return local;
+}
+
+export function getStrategyVaultPath(): string {
+  const local = path.join(process.cwd(), "strategy_vault.json");
+  if (fs.existsSync(local)) return local;
+  const inStudio = path.join(process.cwd(), "ALPHA-ENGINE-AIstudio", "strategy_vault.json");
+  if (fs.existsSync(inStudio)) return inStudio;
+  return local;
+}
+
 // In-memory cache for market schedule (30-second TTL to avoid frequent child-process spawns)
 let cachedScheduleData: any = null;
 let cachedScheduleExpiry: number = 0;
@@ -27,7 +43,7 @@ export async function fetchMarketSchedule(): Promise<any> {
 
   return new Promise((resolve) => {
     const py = getPythonExecutable();
-    const scriptPath = path.join(process.cwd(), "research_controller.py");
+    const scriptPath = getResearchScriptPath();
 
     execFile(py, [scriptPath, "schedule"], { timeout: 15000 }, (error, stdout, stderr) => {
       if (error) {
@@ -81,7 +97,7 @@ researchRouter.post("/api/research/resolve", (req, res) => {
   }
 
   const py = getPythonExecutable();
-  const scriptPath = path.join(process.cwd(), "research_controller.py");
+  const scriptPath = getResearchScriptPath();
 
   execFile(py, [scriptPath, "resolve", "--query", query], (error, stdout, stderr) => {
     if (error) {
@@ -105,7 +121,7 @@ researchRouter.post("/api/research/sanitize-risk", (req, res) => {
   }
 
   const py = getPythonExecutable();
-  const scriptPath = path.join(process.cwd(), "research_controller.py");
+  const scriptPath = getResearchScriptPath();
 
   execFile(py, [scriptPath, "sanitize", "--prompt", prompt], (error, stdout, stderr) => {
     if (error) {
@@ -129,7 +145,7 @@ researchRouter.post("/api/research/analyze-pattern", (req, res) => {
   }
 
   const py = getPythonExecutable();
-  const scriptPath = path.join(process.cwd(), "research_controller.py");
+  const scriptPath = getResearchScriptPath();
   const tempInputPath = path.join(process.cwd(), "scratch", `research_input_${Date.now()}.json`);
 
   if (!fs.existsSync(path.join(process.cwd(), "scratch"))) {
@@ -163,7 +179,7 @@ researchRouter.post("/api/research/audit-dsr", (req, res) => {
   }
 
   const py = getPythonExecutable();
-  const scriptPath = path.join(process.cwd(), "research_controller.py");
+  const scriptPath = getResearchScriptPath();
   const tempInputPath = path.join(process.cwd(), "scratch", `audit_input_${Date.now()}.json`);
 
   if (!fs.existsSync(path.join(process.cwd(), "scratch"))) {
@@ -187,4 +203,160 @@ researchRouter.post("/api/research/audit-dsr", (req, res) => {
       res.status(500).json({ error: "Failed to parse audit JSON", raw: stdout });
     }
   });
+});
+
+// 5. POST /api/research/discovery - Empirical price series analysis (Hurst, Runs test, Markov)
+researchRouter.post("/api/research/discovery", (req, res) => {
+  const { symbol, timeframe, start_date, end_date } = req.body;
+  if (!symbol) {
+    return res.status(400).json({ error: "Missing required symbol parameter." });
+  }
+
+  const py = getPythonExecutable();
+  const scriptPath = getResearchScriptPath();
+  const args = [
+    scriptPath,
+    "discovery",
+    "--symbol", String(symbol).toUpperCase().trim(),
+    "--timeframe", String(timeframe || "1h"),
+    "--start-date", String(start_date || "2026-05-01"),
+    "--end-date", String(end_date || "2026-06-16"),
+  ];
+
+  execFile(py, args, { timeout: 30000 }, (error, stdout, stderr) => {
+    if (error) {
+      console.error("[RESEARCH] Discovery error:", stderr || error.message);
+      return res.status(500).json({ error: "Discovery failed", details: stderr || error.message });
+    }
+    try {
+      const data = JSON.parse(stdout);
+      res.json({ success: true, ...data });
+    } catch (e: any) {
+      res.status(500).json({ error: "Failed to parse discovery JSON", raw: stdout });
+    }
+  });
+});
+
+// 6. POST /api/research/sweep - Autonomous multi-parameter sweep with DSR audit
+researchRouter.post("/api/research/sweep", (req, res) => {
+  const { symbol, timeframe, capital, trials, start_date, end_date } = req.body;
+  if (!symbol) {
+    return res.status(400).json({ error: "Missing required symbol parameter." });
+  }
+
+  const py = getPythonExecutable();
+  const scriptPath = getResearchScriptPath();
+  const args = [
+    scriptPath,
+    "sweep",
+    "--symbol", String(symbol).toUpperCase().trim(),
+    "--timeframe", String(timeframe || "1h"),
+    "--capital", String(capital || 100000),
+    "--trials", String(trials || 16),
+    "--start-date", String(start_date || "2026-05-01"),
+    "--end-date", String(end_date || "2026-06-16"),
+  ];
+
+  execFile(py, args, { timeout: 45000 }, (error, stdout, stderr) => {
+    if (error) {
+      console.error("[RESEARCH] Sweep error:", stderr || error.message);
+      return res.status(500).json({ error: "Sweep failed", details: stderr || error.message });
+    }
+    try {
+      const data = JSON.parse(stdout);
+      res.json({ success: true, ...data });
+    } catch (e: any) {
+      res.status(500).json({ error: "Failed to parse sweep JSON", raw: stdout });
+    }
+  });
+});
+
+// 7. GET /api/vault/strategies - Retrieve all preserved quantitative strategies
+researchRouter.get("/api/vault/strategies", (req, res) => {
+  try {
+    const vaultPath = getStrategyVaultPath();
+    if (!fs.existsSync(vaultPath)) {
+      return res.json({ success: true, total: 0, strategies: [] });
+    }
+    const content = fs.readFileSync(vaultPath, "utf-8");
+    const strategies = JSON.parse(content);
+    return res.json({ success: true, total: strategies.length, strategies });
+  } catch (err: any) {
+    console.error("[VAULT] Read error:", err.message);
+    return res.status(500).json({ error: "Failed to read strategy vault", details: err.message });
+  }
+});
+
+// 8. POST /api/vault/strategies - Atomically save audited strategy (Rule 9)
+researchRouter.post("/api/vault/strategies", (req, res) => {
+  try {
+    const strategy = req.body;
+    if (!strategy || !strategy.name) {
+      return res.status(400).json({ error: "Missing strategy payload or name." });
+    }
+
+    const vaultPath = getStrategyVaultPath();
+    let items: any[] = [];
+    if (fs.existsSync(vaultPath)) {
+      try {
+        items = JSON.parse(fs.readFileSync(vaultPath, "utf-8"));
+      } catch (_) {
+        items = [];
+      }
+    }
+
+    const newEntry = {
+      id: strategy.id || `EXP_${Date.now().toString(16).toUpperCase()}`,
+      timestamp: new Date().toISOString(),
+      name: strategy.name,
+      symbol: (strategy.symbol || "UNKNOWN").toUpperCase(),
+      timeframe: strategy.timeframe || "1h",
+      parameters: strategy.parameters || {},
+      metrics: strategy.metrics || {},
+      balanceHistory: strategy.balanceHistory || [],
+      tradesList: strategy.tradesList || []
+    };
+
+    items = [newEntry, ...items.filter((i: any) => i.id !== newEntry.id)];
+
+    // Atomic write-and-replace (Rule 9)
+    const tmpPath = `${vaultPath}.tmp`;
+    fs.writeFileSync(tmpPath, JSON.stringify(items, null, 2), "utf-8");
+    fs.renameSync(tmpPath, vaultPath);
+
+    return res.json({ success: true, message: `Strategy '${strategy.name}' preserved to Experiment Vault.`, strategy: newEntry });
+  } catch (err: any) {
+    console.error("[VAULT] Save error:", err.message);
+    return res.status(500).json({ error: "Failed to save strategy to vault", details: err.message });
+  }
+});
+
+// 9. DELETE /api/vault/strategies/:id - Atomically delete strategy by ID
+researchRouter.delete("/api/vault/strategies/:id", (req, res) => {
+  try {
+    const { id } = req.params;
+    const vaultPath = getStrategyVaultPath();
+    if (!fs.existsSync(vaultPath)) {
+      return res.json({ success: true, message: "Vault empty, nothing to delete." });
+    }
+
+    let items: any[] = [];
+    try {
+      items = JSON.parse(fs.readFileSync(vaultPath, "utf-8"));
+    } catch (_) {
+      items = [];
+    }
+
+    items = items.filter((i: any) => i.id !== id);
+
+    // Atomic write-and-replace
+    const tmpPath = `${vaultPath}.tmp`;
+    fs.writeFileSync(tmpPath, JSON.stringify(items, null, 2), "utf-8");
+    fs.renameSync(tmpPath, vaultPath);
+
+    return res.json({ success: true, message: `Strategy ${id} removed from vault.`, total: items.length });
+  } catch (err: any) {
+    console.error("[VAULT] Delete error:", err.message);
+    return res.status(500).json({ error: "Failed to delete strategy from vault", details: err.message });
+  }
 });

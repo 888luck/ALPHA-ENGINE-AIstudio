@@ -20,6 +20,7 @@ from quant_discovery import QuantDiscoveryEngine
 from news_event_correlator import NewsEventCorrelator
 from institutional_auditor import InstitutionalBacktestAuditor
 from universe_models import NewsEvent
+from backtester import AlphaBacktestingEngine
 
 
 def handle_resolve(args) -> Dict[str, Any]:
@@ -180,6 +181,74 @@ def handle_schedule(args) -> Dict[str, Any]:
     }
 
 
+def handle_discovery(args) -> Dict[str, Any]:
+    symbol = args.symbol.upper()
+    timeframe = getattr(args, "timeframe", "1h") or "1h"
+    start_date = getattr(args, "start_date", "2026-05-01") or "2026-05-01"
+    end_date = getattr(args, "end_date", "2026-06-16") or "2026-06-16"
+
+    engine = AlphaBacktestingEngine()
+    try:
+        bars = engine.generate_synthetic_history(symbol, timeframe, start_date, end_date)
+    except Exception as e:
+        return {"status": "ERROR", "error": str(e)}
+
+    prices = [b["close"] for b in bars]
+    returns = [(prices[i] - prices[i - 1]) / prices[i - 1] for i in range(1, len(prices))] if len(prices) > 1 else []
+
+    runs_test = QuantDiscoveryEngine.wald_wolfowitz_runs_test(returns)
+    hurst = QuantDiscoveryEngine.calculate_hurst_exponent(prices)
+    markov = QuantDiscoveryEngine.markov_transition_matrix(returns)
+
+    # Determine regime recommendation
+    h_val = hurst.get("hurst_exponent", 0.50)
+    is_trending = h_val > 0.55
+    is_mean_rev = h_val < 0.45
+
+    if is_trending:
+        verdict = "PERSISTENT_TRENDING"
+        guidance = "Asset exhibits momentum persistence (Hurst > 0.55). Favour trend breakouts, wider trailing ATR stops (2.0x-2.6x), and extended hold bars."
+    elif is_mean_rev:
+        verdict = "MEAN_REVERTING"
+        guidance = "Asset exhibits alternating mean-reversion (Hurst < 0.45). Favour tight stop ATR (1.2x-1.5x), fast tranche scaling, and breakeven lock."
+    else:
+        verdict = "RANDOM_WALK"
+        guidance = "Asset return sequence is statistically indistinguishable from Geometric Brownian Motion (0.45 <= Hurst <= 0.55). Require strict OFI volume gate."
+
+    return {
+        "status": "SUCCESS",
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "total_bars": len(bars),
+        "regime": verdict,
+        "guidance": guidance,
+        "quant_discovery": {
+            "hurst_exponent": hurst,
+            "runs_test": runs_test,
+            "markov_transitions": markov
+        }
+    }
+
+
+def handle_sweep(args) -> Dict[str, Any]:
+    symbol = args.symbol.upper()
+    timeframe = getattr(args, "timeframe", "1h") or "1h"
+    capital = float(getattr(args, "capital", 100000.0) or 100000.0)
+    trials = int(getattr(args, "trials", 16) or 16)
+    start_date = getattr(args, "start_date", "2026-05-01") or "2026-05-01"
+    end_date = getattr(args, "end_date", "2026-06-16") or "2026-06-16"
+
+    engine = AlphaBacktestingEngine(starting_capital=capital)
+    return engine.run_parameter_sweep(
+        symbol=symbol,
+        timeframe=timeframe,
+        start_date=start_date,
+        end_date=end_date,
+        capital_override=capital,
+        trials_count=trials
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description="Alpha Engine Quantitative Research Lab Controller")
     subparsers = parser.add_subparsers(dest="command")
@@ -203,6 +272,22 @@ def main():
     # schedule
     subparsers.add_parser("schedule", help="Resolve authoritative exchange schedules and MOC cutoffs")
 
+    # discovery
+    p_disc = subparsers.add_parser("discovery", help="Run Wald-Wolfowitz, Hurst exponent, and Markov transitions on symbol")
+    p_disc.add_argument("--symbol", required=True, help="Ticker symbol")
+    p_disc.add_argument("--timeframe", default="1h", help="Timeframe (e.g. 1h, 15m)")
+    p_disc.add_argument("--start-date", default="2026-05-01")
+    p_disc.add_argument("--end-date", default="2026-06-16")
+
+    # sweep
+    p_swp = subparsers.add_parser("sweep", help="Run multi-parameter optimization sweep with DSR audit")
+    p_swp.add_argument("--symbol", required=True, help="Ticker symbol")
+    p_swp.add_argument("--timeframe", default="1h", help="Timeframe (e.g. 1h, 15m)")
+    p_swp.add_argument("--capital", type=float, default=100000.0, help="Starting capital")
+    p_swp.add_argument("--trials", type=int, default=16, help="Permutation count (default 16)")
+    p_swp.add_argument("--start-date", default="2026-05-01")
+    p_swp.add_argument("--end-date", default="2026-06-16")
+
     args = parser.parse_args()
 
     if args.command == "resolve":
@@ -215,6 +300,10 @@ def main():
         out = handle_audit(args)
     elif args.command == "schedule":
         out = handle_schedule(args)
+    elif args.command == "discovery":
+        out = handle_discovery(args)
+    elif args.command == "sweep":
+        out = handle_sweep(args)
     else:
         out = {"error": f"Unknown or missing command: {args.command}"}
 
