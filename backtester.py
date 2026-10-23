@@ -511,11 +511,17 @@ class AlphaBacktestingEngine:
                 "score": composite_score,
                 "parameters": {
                     "stopAtrMultiplier": cand["stop_atr"],
+                    "stop_atr": cand["stop_atr"],
                     "maxHoldBars": cand["max_hold"],
+                    "max_hold": cand["max_hold"],
                     "partialProfit": cand["partial_profit"],
+                    "partial_profit": cand["partial_profit"],
                     "breakevenLock": cand["breakeven_lock"],
+                    "breakeven_lock": cand["breakeven_lock"],
                     "ofiFilter": cand["ofi_filter"],
+                    "ofi_filter": cand["ofi_filter"],
                     "adaptiveStop": cand["adaptive_stop"],
+                    "adaptive_stop": cand["adaptive_stop"],
                     "capitalOverride": capital_override
                 },
                 "metrics": {
@@ -530,6 +536,16 @@ class AlphaBacktestingEngine:
                     "totalTrades": int(res.get("totalTrades", 0)),
                     "totalCommissions": float(res.get("totalCommissions", 0.0))
                 },
+                "totalPnL": pnl,
+                "totalPnLPercent": float(res.get("totalPnLPercent", 0.0)),
+                "winRate": win_rate,
+                "profitFactor": float(res.get("profitFactor", 1.0)),
+                "annualizedSharpe": sharpe,
+                "deflatedSharpeRatio": dsr,
+                "passesDsrHurdle": bool(res.get("passesDsrHurdle", False)),
+                "maxDrawdownPercent": dd,
+                "totalTrades": int(res.get("totalTrades", 0)),
+                "totalCommissions": float(res.get("totalCommissions", 0.0)),
                 "balanceHistory": res.get("balanceHistory", []),
                 "tradesList": res.get("tradesList", [])
             })
@@ -566,10 +582,13 @@ class AlphaBacktestingEngine:
             "timeframe": timeframe,
             "starting_capital": capital_override,
             "total_trials_tested": target_trials,
+            "trials_tested": target_trials,
             "optimal_candidate": optimal_config,
+            "best_candidate": optimal_config,
             "candidates": evaluated_candidates,
             "frontier_count": len(frontier),
-            "frontier": frontier
+            "frontier": frontier,
+            "pareto_frontier": frontier
         }
 
     def generate_synthetic_history(self, symbol: str, timeframe: str, start_date_str: str, end_date_str: str) -> List[Dict[str, Any]]:
