@@ -33,7 +33,7 @@ import {
   ReferenceLine
 } from "recharts";
 import { ApiVaultModal } from "./ApiVaultModal";
-import { persistVaultItem, persistVaultBatch, syncVaultToServer } from "../utils/vaultStorage";
+import { getStoredVaultValue, persistVaultItem, persistVaultBatch, syncVaultToServer } from "../utils/vaultStorage";
 
 
 

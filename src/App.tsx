@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Dashboard from "./components/Dashboard";
 import { LiveCockpit } from "./components/LiveCockpit";
 import { QuantResearchLab } from "./components/QuantResearchLab";
