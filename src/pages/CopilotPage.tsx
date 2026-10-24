@@ -368,10 +368,12 @@ Click any quick query below or type your request:`,
         content: m.content
       }));
 
-      const gKey = vaultSettings.geminiApiKey || getStoredVaultValue("geminiApiKey");
-      const qKey = vaultSettings.customAiApiKey || getStoredVaultValue("customAiApiKey");
-      const nvKey = vaultSettings.nvidiaApiKey || getStoredVaultValue("nvidiaApiKey");
-      const oaKey = vaultSettings.openaiApiKey || getStoredVaultValue("openaiApiKey");
+      const storedVault = getAllStoredVaultSettings();
+      const gKey = vaultSettings.geminiApiKey || storedVault.geminiApiKey || getStoredVaultValue("geminiApiKey") || "";
+      const qKey = vaultSettings.customAiApiKey || storedVault.customAiApiKey || getStoredVaultValue("customAiApiKey") || "";
+      const nvKey = vaultSettings.nvidiaApiKey || storedVault.nvidiaApiKey || getStoredVaultValue("nvidiaApiKey") || "";
+      const oaKey = vaultSettings.openaiApiKey || storedVault.openaiApiKey || getStoredVaultValue("openaiApiKey") || "";
+      const orKey = vaultSettings.openrouterApiKey || storedVault.openrouterApiKey || getStoredVaultValue("openrouterApiKey") || "";
 
       const res = await fetch("/api/copilot/chat", {
         method: "POST",
@@ -380,7 +382,8 @@ Click any quick query below or type your request:`,
           "x-gemini-api-key": gKey || "",
           "x-groq-api-key": qKey || "",
           "x-nvidia-api-key": nvKey || "",
-          "x-openai-api-key": oaKey || ""
+          "x-openai-api-key": oaKey || "",
+          "x-openrouter-api-key": orKey || ""
         },
         body: JSON.stringify({
           messages: payloadMessages,
@@ -388,7 +391,14 @@ Click any quick query below or type your request:`,
           rawId: activeModelObj.rawId || activeModelObj.id,
           temperature: 0.2,
           max_tokens: 2048,
-          daily_budget_ceiling: stats.daily_budget_ceiling_usd
+          daily_budget_ceiling: stats.daily_budget_ceiling_usd,
+          keys: {
+            gemini: gKey,
+            groq: qKey,
+            nvidia: nvKey,
+            openai: oaKey,
+            openrouter: orKey
+          }
         }),
         signal: controller.signal
       });

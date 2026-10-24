@@ -142,24 +142,25 @@ export function StrategyStudioPage() {
 
   const isModelConfigured = (m: ModelItem): boolean => {
     if (m.id.startsWith("local") || m.provider?.toLowerCase().includes("local")) return true;
+    const stored = getAllStoredVaultSettings();
     if (m.id.startsWith("google") || m.provider?.toLowerCase().includes("google")) {
-      const k = vaultSettings.geminiApiKey || getStoredVaultValue("geminiApiKey");
+      const k = vaultSettings.geminiApiKey || stored.geminiApiKey || getStoredVaultValue("geminiApiKey");
       return Boolean(k && k.trim() && !isMaskedString(k) && k.length > 15);
     }
     if (m.id.startsWith("groq") || m.provider?.toLowerCase().includes("groq")) {
-      const k = vaultSettings.customAiApiKey || getStoredVaultValue("customAiApiKey");
+      const k = vaultSettings.customAiApiKey || stored.customAiApiKey || getStoredVaultValue("customAiApiKey") || vaultSettings.groqApiKey || stored.groqApiKey || getStoredVaultValue("groqApiKey");
       return Boolean(k && k.trim() && !isMaskedString(k) && k.length > 5);
     }
     if (m.id.startsWith("nvidia") || m.provider?.toLowerCase().includes("nvidia")) {
-      const k = vaultSettings.nvidiaApiKey || getStoredVaultValue("nvidiaApiKey");
+      const k = vaultSettings.nvidiaApiKey || stored.nvidiaApiKey || getStoredVaultValue("nvidiaApiKey");
       return Boolean(k && k.trim() && !isMaskedString(k) && k.length > 15);
     }
     if (m.id.startsWith("openai") || m.provider?.toLowerCase().includes("openai")) {
-      const k = vaultSettings.openaiApiKey || getStoredVaultValue("openaiApiKey");
+      const k = vaultSettings.openaiApiKey || stored.openaiApiKey || getStoredVaultValue("openaiApiKey");
       return Boolean(k && k.trim() && !isMaskedString(k) && k.length > 15);
     }
     if (m.id.startsWith("openrouter") || m.provider?.toLowerCase().includes("openrouter")) {
-      const k = vaultSettings.openrouterApiKey || getStoredVaultValue("openrouterApiKey");
+      const k = vaultSettings.openrouterApiKey || stored.openrouterApiKey || getStoredVaultValue("openrouterApiKey");
       return Boolean(k && k.trim() && !isMaskedString(k) && k.length > 10);
     }
     return false;
@@ -1179,12 +1180,11 @@ export function StrategyStudioPage() {
                         <span>Recommended & Tested Active</span>
                       </div>
                       <div className="grid grid-cols-2 gap-1.5">
-                        {availableModels.filter(m => 
-                          m.id === "local/finbert-int8" || 
-                          m.id.includes("llama-3.2-11b-vision") || 
-                          m.id.includes("qwen3.8-27b") || 
-                          m.id.includes("gpt-oss-120b")
-                        ).map(m => {
+                        {(() => {
+                          const configured = availableModels.filter(m => isModelConfigured(m));
+                          const unconfigured = availableModels.filter(m => !isModelConfigured(m));
+                          return (configured.length >= 4 ? configured.slice(0, 4) : [...configured, ...unconfigured].slice(0, 4));
+                        })().map(m => {
                           const isConfigured = isModelConfigured(m);
                           return (
                             <button

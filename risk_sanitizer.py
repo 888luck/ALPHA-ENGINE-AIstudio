@@ -21,12 +21,12 @@ class RiskSanitizer:
     """
 
     # Master Institutional Ceilings (Non-Bypassable Firm Policy)
-    FIRM_MAX_CAPITAL_CEILING_USD = 10000000.0 # $10M institutional ceiling for portfolio and strategy simulations
-    FIRM_DEFAULT_SANDBOX_CAPITAL_USD = 100000.0
-    FIRM_MAX_TRADE_RISK_PCT = 5.0        # 5.0% maximum risk per trade ceiling
-    FIRM_DEFAULT_TRADE_RISK_PCT = 1.0    # 1.0% default institutional risk budget
-    FIRM_MAX_FRICTION_CEILING_PCT = 25.0 # 25.0% max friction allowed
-    FIRM_MIN_BINARY_BLACKOUT_HOURS = 0   # Blackout configurable by user
+    FIRM_MAX_CAPITAL_CEILING_USD = 10000.0 # $10,000 institutional ceiling for Gate 1
+    FIRM_DEFAULT_SANDBOX_CAPITAL_USD = 10000.0
+    FIRM_MAX_TRADE_RISK_PCT = 1.0        # 1.0% maximum risk per trade ceiling
+    FIRM_DEFAULT_TRADE_RISK_PCT = 0.25   # 0.25% default institutional risk budget
+    FIRM_MAX_FRICTION_CEILING_PCT = 15.0 # 15.0% max friction allowed
+    FIRM_MIN_BINARY_BLACKOUT_HOURS = 48  # Minimum 48 hours blackout before earnings/PDUFA
     FIRM_MAX_ADV_PARTICIPATION_PCT = 1.5 # 1.5% maximum ADV participation
 
     @classmethod
@@ -115,7 +115,8 @@ class RiskSanitizer:
     def sanitize_and_clamp_parameters(
         cls,
         user_inputs: Dict[str, Any],
-        fx_rate_to_usd: float = 1.08 # Approx EUR/USD rate for Gate 1 parity check
+        fx_rate_to_usd: float = 1.08, # Approx EUR/USD rate for Gate 1 parity check
+        max_capital_ceiling_usd: Optional[float] = None
     ) -> Dict[str, Any]:
         """
         Clamps user parameters to ensure they never breach the institutional master envelope.
@@ -132,14 +133,16 @@ class RiskSanitizer:
         else:
             capital = raw_capital
 
+        effective_ceiling = max_capital_ceiling_usd or cls.FIRM_MAX_CAPITAL_CEILING_USD
+
         # Gate 1 Check: Capital Ceiling ($10,000 USD equivalent)
         capital_usd = capital * fx_rate_to_usd if currency == "EUR" else capital
-        max_allowed_local = cls.FIRM_MAX_CAPITAL_CEILING_USD / (fx_rate_to_usd if currency == "EUR" else 1.0)
+        max_allowed_local = effective_ceiling / (fx_rate_to_usd if currency == "EUR" else 1.0)
 
-        if capital_usd > cls.FIRM_MAX_CAPITAL_CEILING_USD:
+        if capital_usd > effective_ceiling:
             audit_trail.append(
                 f"[GATE 1 CLAMP] Requested capital {currency} {capital:,.2f} exceeds firm institutional ceiling "
-                f"(${cls.FIRM_MAX_CAPITAL_CEILING_USD:,.2f} USD). Clamped to {currency} {max_allowed_local:,.2f}."
+                f"(${effective_ceiling:,.2f} USD). Clamped to {currency} {max_allowed_local:,.2f}."
             )
             capital = round(max_allowed_local, 2)
             is_clamped = True

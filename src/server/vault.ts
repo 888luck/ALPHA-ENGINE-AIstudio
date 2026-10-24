@@ -110,7 +110,7 @@ export function loadVaultCredentials(): VaultCredentials {
 
   return {
     // Pillar 1: Brokerage
-    ibkrAccountNumber: getVal("IBKR_ACCOUNT_NUMBER", "DUE263010"),
+    ibkrAccountNumber: getVal("IBKR_ACCOUNT_NUMBER", ""),
     ibkrLiveAccountNumber: getVal("IBKR_LIVE_ACCOUNT_NUMBER", ""),
     ibkrPaperAccountNumber: getVal("IBKR_PAPER_ACCOUNT_NUMBER", ""),
     ibkrHost: edgeHost,

@@ -10,7 +10,7 @@ const SETTINGS_FILE_PATH = path.join(process.cwd(), "system_settings.json");
 export const db_fs = null; // Deprecated and permanently disabled per Universal Institutional Principles
 
 export let systemSettings: SystemSettings = {
-  ibkrAccountNumber: "DUE263010",
+  ibkrAccountNumber: process.env.IBKR_ACCOUNT_NUMBER || "",
   ibkrHost: process.env.EDGE_NODE_IP || "127.0.0.1",
   ibkrPort: 4002,
   ibkrClientId: 10,

@@ -305,7 +305,7 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
                 {isLocked ? "ROUTER HARD-LOCKED" : isLive ? "🔴 LIVE CAPITAL AT RISK" : "🟡 PAPER SIMULATION"}
               </span>
               <span className="text-xs text-slate-300 font-mono font-bold">
-                IBKR IE: {riskStatus?.accountNumber || systemState?.settings?.ibkrAccountNumber || (riskStatus?.tradingMode === "LIVE" ? "LIVE_CONFIG" : "DUE263010")}
+                IBKR IE: {riskStatus?.accountNumber || systemState?.settings?.ibkrAccountNumber || (riskStatus?.tradingMode === "LIVE" ? "LIVE_CONFIG" : "PAPER_CONFIG")}
               </span>
             </div>
             <div className="text-xs sm:text-sm text-slate-300 font-sans mt-0.5">

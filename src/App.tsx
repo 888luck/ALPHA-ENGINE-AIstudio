@@ -101,9 +101,14 @@ export default function App() {
     });
   };
 
+  const isTogglingRef = useRef(false);
+  const [isTogglingMode, setIsTogglingMode] = useState(false);
+  const [modeToggleToast, setModeToggleToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
   // Fetch initial state for launchpad badges
   useEffect(() => {
     const fetchState = async () => {
+      if (isTogglingRef.current) return;
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
@@ -117,6 +122,8 @@ export default function App() {
           throw new Error(`Server responded with status: ${res.status}`);
         }
         
+        if (isTogglingRef.current) return;
+
         const data = await res.json();
         if (riskData) {
           data.tcpLatencyMs = riskData.tcpLatencyMs;
@@ -138,9 +145,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const [isTogglingMode, setIsTogglingMode] = useState(false);
-  const [modeToggleToast, setModeToggleToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-
   const handleToggleTradingMode = async () => {
     if (isTogglingMode) return;
     const currentMode = systemState?.settings?.tradingMode || "PAPER";
@@ -150,7 +154,7 @@ export default function App() {
     // Eliminate hardcoded mock account IDs - look up configured accounts
     const configuredLive = systemState?.settings?.ibkrLiveAccountNumber || getStoredVaultValue("ibkrLiveAccountNumber");
     const configuredPaper = systemState?.settings?.ibkrPaperAccountNumber || getStoredVaultValue("ibkrPaperAccountNumber");
-    const existingAccount = systemState?.settings?.ibkrAccountNumber || getStoredVaultValue("ibkrAccountNumber") || "DU263010";
+    const existingAccount = systemState?.settings?.ibkrAccountNumber || getStoredVaultValue("ibkrAccountNumber") || "";
     const targetAccount = nextMode === "LIVE" 
       ? (configuredLive || existingAccount) 
       : (configuredPaper || existingAccount);
@@ -162,6 +166,7 @@ export default function App() {
       if (!confirmed) return;
     }
 
+    isTogglingRef.current = true;
     setIsTogglingMode(true);
     setModeToggleToast(null);
     const previousState = systemState;
@@ -241,6 +246,7 @@ export default function App() {
       setTimeout(() => setModeToggleToast(null), 7000);
     } finally {
       setIsTogglingMode(false);
+      isTogglingRef.current = false;
     }
   };
 

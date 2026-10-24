@@ -115,7 +115,7 @@ export default function Dashboard({ onNavigate, navTarget, activeTabOverride }: 
   const [isVaultOpen, setIsVaultOpen] = useState<boolean>(false);
 
   // Form states for Settings tab
-  const [editAccount, setEditAccount] = useState("DUE263010");
+  const [editAccount, setEditAccount] = useState(getStoredVaultValue("ibkrAccountNumber") || "");
   const [editPort, setEditPort] = useState(4002);
   const [editClientId, setEditClientId] = useState(1);
   const [editDecisionMaker, setEditDecisionMaker] = useState("ALGO_DEC_992");

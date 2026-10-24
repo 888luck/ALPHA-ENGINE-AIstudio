@@ -139,9 +139,7 @@ systemRouter.post("/api/system/toggle-lane", authMiddleware, async (req, res) =>
     if (req.body.ibkrLiveAccountNumber) systemSettings.ibkrLiveAccountNumber = req.body.ibkrLiveAccountNumber;
     if (req.body.ibkrPaperAccountNumber) systemSettings.ibkrPaperAccountNumber = req.body.ibkrPaperAccountNumber;
 
-    // Atomically write risk_limits.json
-    const riskLimitsPath = path.join(process.cwd(), "risk_limits.json");
-    const riskLimitsTmp = `${riskLimitsPath}.tmp.${Date.now()}`;
+    // Atomically write risk_limits.json across local process and root parent dirs
     const riskLimitsPayload = {
       tradingMode: targetMode,
       ibkrPort: targetPort,
@@ -150,11 +148,20 @@ systemRouter.post("/api/system/toggle-lane", authMiddleware, async (req, res) =>
       dailyMaxLossCutoff: systemSettings.dailyMaxLossCutoff,
       updated_at: new Date().toISOString()
     };
-    try {
-      fs.writeFileSync(riskLimitsTmp, JSON.stringify(riskLimitsPayload, null, 2), "utf-8");
-      fs.renameSync(riskLimitsTmp, riskLimitsPath);
-    } catch (err: any) {
-      console.warn("[SYSTEM] Error writing risk_limits.json:", err.message);
+    const targetDirs = [process.cwd()];
+    const parentDir = path.join(process.cwd(), "..");
+    if (fs.existsSync(path.join(parentDir, "AGENTS.md")) || fs.existsSync(path.join(parentDir, "local_edge_node.py"))) {
+      targetDirs.push(parentDir);
+    }
+    for (const d of targetDirs) {
+      const rlPath = path.join(d, "risk_limits.json");
+      const rlTmp = `${rlPath}.tmp.${Date.now()}`;
+      try {
+        fs.writeFileSync(rlTmp, JSON.stringify(riskLimitsPayload, null, 2), "utf-8");
+        fs.renameSync(rlTmp, rlPath);
+      } catch (err: any) {
+        console.warn(`[SYSTEM] Error writing risk_limits.json in ${d}:`, err.message);
+      }
     }
 
     saveVaultCredentials({
@@ -232,9 +239,15 @@ systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
       systemSettings.ibkrPort = tm === "LIVE" ? 4001 : 4002;
     }
   }
-  if (ibkrAccountNumber !== undefined) systemSettings.ibkrAccountNumber = ibkrAccountNumber;
   if (ibkrLiveAccountNumber !== undefined) systemSettings.ibkrLiveAccountNumber = ibkrLiveAccountNumber;
   if (ibkrPaperAccountNumber !== undefined) systemSettings.ibkrPaperAccountNumber = ibkrPaperAccountNumber;
+  if (ibkrAccountNumber !== undefined) {
+    systemSettings.ibkrAccountNumber = ibkrAccountNumber;
+  } else if (systemSettings.tradingMode === "LIVE" && systemSettings.ibkrLiveAccountNumber) {
+    systemSettings.ibkrAccountNumber = systemSettings.ibkrLiveAccountNumber;
+  } else if (systemSettings.tradingMode === "PAPER" && systemSettings.ibkrPaperAccountNumber) {
+    systemSettings.ibkrAccountNumber = systemSettings.ibkrPaperAccountNumber;
+  }
   if (ibkrHost !== undefined) systemSettings.ibkrHost = ibkrHost;
   if (ibkrPort !== undefined) systemSettings.ibkrPort = Number(ibkrPort);
   if (ibkrClientId !== undefined) systemSettings.ibkrClientId = Number(ibkrClientId);
@@ -267,21 +280,29 @@ systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
   if (patentsApiKey !== undefined && !isMaskedString(patentsApiKey)) systemSettings.patentsApiKey = patentsApiKey;
   if (secUserAgent !== undefined && !isMaskedString(secUserAgent)) systemSettings.secUserAgent = secUserAgent;
 
-  // Atomically persist risk_limits.json
-  const riskLimitsPath = path.join(process.cwd(), "risk_limits.json");
-  const riskLimitsTmp = `${riskLimitsPath}.tmp.${Date.now()}`;
-  try {
-    fs.writeFileSync(riskLimitsTmp, JSON.stringify({
-      tradingMode: systemSettings.tradingMode,
-      ibkrPort: systemSettings.ibkrPort,
-      ibkrAccountNumber: systemSettings.ibkrAccountNumber,
-      dailyCapitalCeiling: systemSettings.dailyCapitalCeiling,
-      dailyMaxLossCutoff: systemSettings.dailyMaxLossCutoff,
-      updated_at: new Date().toISOString()
-    }, null, 2), "utf-8");
-    fs.renameSync(riskLimitsTmp, riskLimitsPath);
-  } catch (err: any) {
-    console.warn("[SYSTEM] Error writing risk_limits.json:", err.message);
+  // Atomically persist risk_limits.json across local and parent workspace
+  const rlSettingsPayload = {
+    tradingMode: systemSettings.tradingMode,
+    ibkrPort: systemSettings.ibkrPort,
+    ibkrAccountNumber: systemSettings.ibkrAccountNumber,
+    dailyCapitalCeiling: systemSettings.dailyCapitalCeiling,
+    dailyMaxLossCutoff: systemSettings.dailyMaxLossCutoff,
+    updated_at: new Date().toISOString()
+  };
+  const targetDirsList = [process.cwd()];
+  const parentDirPath = path.join(process.cwd(), "..");
+  if (fs.existsSync(path.join(parentDirPath, "AGENTS.md")) || fs.existsSync(path.join(parentDirPath, "local_edge_node.py"))) {
+    targetDirsList.push(parentDirPath);
+  }
+  for (const d of targetDirsList) {
+    const riskLimitsPath = path.join(d, "risk_limits.json");
+    const riskLimitsTmp = `${riskLimitsPath}.tmp.${Date.now()}`;
+    try {
+      fs.writeFileSync(riskLimitsTmp, JSON.stringify(rlSettingsPayload, null, 2), "utf-8");
+      fs.renameSync(riskLimitsTmp, riskLimitsPath);
+    } catch (err: any) {
+      console.warn(`[SYSTEM] Error writing risk_limits.json in ${d}:`, err.message);
+    }
   }
 
   saveVaultCredentials(req.body);

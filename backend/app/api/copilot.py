@@ -1039,6 +1039,8 @@ def extract_provider_and_key(selected_model: str, client_headers: Dict[str, str]
         parts = raw_id.split("/")
         if len(parts) > 1 and parts[0] == "nvidia" and parts[1] == "nvidia":
             raw_id = "/".join(parts[1:])
+        elif "/" not in raw_id:
+            raw_id = f"nvidia/{raw_id}"
         key = client_headers.get("x-nvidia-api-key") or keys.get("nvidia") or os.environ.get("NVIDIA_API_KEY") or os.environ.get("NVIDIA_INFERENCE_API_KEY", "")
         return "nvidia", raw_id, key
     elif mid.startswith("openai/"):
@@ -1072,8 +1074,11 @@ def get_fallback_provider_candidate(current_provider: str, current_model: str, c
 
     # 1. Groq Cloud (verified active LPU)
     groq_key = client_headers.get("x-groq-api-key") or keys.get("groq") or os.environ.get("GROQ_API_KEY", "")
-    if groq_key and len(groq_key.strip()) > 5 and "MY_" not in groq_key and current_provider != "groq":
-        return "groq", "openai/gpt-oss-20b", groq_key.strip(), "https://api.groq.com/openai/v1/chat/completions"
+    if groq_key and len(groq_key.strip()) > 5 and "MY_" not in groq_key:
+        if current_provider != "groq":
+            return "groq", "openai/gpt-oss-20b", groq_key.strip(), "https://api.groq.com/openai/v1/chat/completions"
+        elif current_model == "openai/gpt-oss-20b":
+            return "groq", "llama-3.3-70b-versatile", groq_key.strip(), "https://api.groq.com/openai/v1/chat/completions"
 
     # 2. Google GenAI (official OpenAI-compatible endpoint)
     gemini_key = client_headers.get("x-gemini-api-key") or keys.get("gemini") or os.environ.get("GEMINI_API_KEY", "")
