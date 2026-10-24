@@ -46,7 +46,8 @@ import {
   persistVaultItem,
   persistVaultBatch,
   syncVaultToServer,
-  getStoredVaultValue
+  getStoredVaultValue,
+  isMaskedString
 } from "../utils/vaultStorage";
 
 export interface StrategyStudioExperiment {
@@ -138,6 +139,31 @@ export function StrategyStudioPage() {
   const activeModelObj = useMemo(() => {
     return availableModels.find((m) => m.id === selectedModel) || availableModels[0] || TIER0_OFFLINE_MODEL;
   }, [availableModels, selectedModel]);
+
+  const isModelConfigured = (m: ModelItem): boolean => {
+    if (m.id.startsWith("local") || m.provider?.toLowerCase().includes("local")) return true;
+    if (m.id.startsWith("google") || m.provider?.toLowerCase().includes("google")) {
+      const k = vaultSettings.geminiApiKey || getStoredVaultValue("geminiApiKey");
+      return Boolean(k && k.trim() && !isMaskedString(k) && k.length > 15);
+    }
+    if (m.id.startsWith("groq") || m.provider?.toLowerCase().includes("groq")) {
+      const k = vaultSettings.customAiApiKey || getStoredVaultValue("customAiApiKey");
+      return Boolean(k && k.trim() && !isMaskedString(k) && k.length > 5);
+    }
+    if (m.id.startsWith("nvidia") || m.provider?.toLowerCase().includes("nvidia")) {
+      const k = vaultSettings.nvidiaApiKey || getStoredVaultValue("nvidiaApiKey");
+      return Boolean(k && k.trim() && !isMaskedString(k) && k.length > 15);
+    }
+    if (m.id.startsWith("openai") || m.provider?.toLowerCase().includes("openai")) {
+      const k = vaultSettings.openaiApiKey || getStoredVaultValue("openaiApiKey");
+      return Boolean(k && k.trim() && !isMaskedString(k) && k.length > 15);
+    }
+    if (m.id.startsWith("openrouter") || m.provider?.toLowerCase().includes("openrouter")) {
+      const k = vaultSettings.openrouterApiKey || getStoredVaultValue("openrouterApiKey");
+      return Boolean(k && k.trim() && !isMaskedString(k) && k.length > 10);
+    }
+    return false;
+  };
 
   const filteredModels = useMemo(() => {
     return availableModels.filter((m) => {
@@ -703,11 +729,20 @@ export function StrategyStudioPage() {
         content: m.content
       }));
 
-      const gKey = vaultSettings.geminiApiKey || getStoredVaultValue("geminiApiKey");
-      const qKey = vaultSettings.customAiApiKey || getStoredVaultValue("customAiApiKey");
-      const nvKey = vaultSettings.nvidiaApiKey || getStoredVaultValue("nvidiaApiKey");
-      const oaKey = vaultSettings.openaiApiKey || getStoredVaultValue("openaiApiKey");
-      const orKey = vaultSettings.openrouterApiKey || getStoredVaultValue("openrouterApiKey");
+      const storedVault = getAllStoredVaultSettings();
+      const gKey = vaultSettings.geminiApiKey || storedVault.geminiApiKey || getStoredVaultValue("geminiApiKey") || "";
+      const qKey = vaultSettings.customAiApiKey || storedVault.customAiApiKey || getStoredVaultValue("customAiApiKey") || "";
+      const nvKey = vaultSettings.nvidiaApiKey || storedVault.nvidiaApiKey || getStoredVaultValue("nvidiaApiKey") || "";
+      const oaKey = vaultSettings.openaiApiKey || storedVault.openaiApiKey || getStoredVaultValue("openaiApiKey") || "";
+      const orKey = vaultSettings.openrouterApiKey || storedVault.openrouterApiKey || getStoredVaultValue("openrouterApiKey") || "";
+
+      const keysPayload = {
+        gemini: gKey,
+        groq: qKey,
+        nvidia: nvKey,
+        openai: oaKey,
+        openrouter: orKey
+      };
 
       const res = await fetch("/api/copilot/chat", {
         method: "POST",
@@ -725,6 +760,7 @@ export function StrategyStudioPage() {
           rawId: activeModelObj.rawId || activeModelObj.id,
           temperature: 0.2,
           max_tokens: 2048,
+          keys: keysPayload,
           system_context: `Active Strategy Studio Context: Symbol=${symbol}, Timeframe=${timeframe}, Capital=$${capitalOverride}, StopATR=${stopAtr}x, Hold=${maxHoldBars} bars.`
         }),
         signal: controller.signal
@@ -1148,28 +1184,40 @@ export function StrategyStudioPage() {
                           m.id.includes("llama-3.2-11b-vision") || 
                           m.id.includes("qwen3.8-27b") || 
                           m.id.includes("gpt-oss-120b")
-                        ).map(m => (
-                          <button
-                            key={`rec-${m.id}`}
-                            type="button"
-                            onClick={() => {
-                              setSelectedModel(m.id);
-                              localStorage.setItem("alpha_copilot_model", m.id);
-                              setShowModelDropdown(false);
-                            }}
-                            className={`p-1.5 rounded-lg border text-left flex items-center gap-1.5 transition cursor-pointer ${
-                              selectedModel === m.id
-                                ? "bg-[#00ff88]/20 border-[#00ff88] text-white"
-                                : "bg-white/5 hover:bg-white/10 border-white/10 text-slate-300"
-                            }`}
-                          >
-                            <span className="text-xs">{m.icon}</span>
-                            <div className="truncate min-w-0">
-                              <div className="text-[10px] font-bold truncate text-white">{m.name.split("/").pop()}</div>
-                              <div className="text-[9px] text-[#00ff88]">{m.badge}</div>
-                            </div>
-                          </button>
-                        ))}
+                        ).map(m => {
+                          const isConfigured = isModelConfigured(m);
+                          return (
+                            <button
+                              key={`rec-${m.id}`}
+                              type="button"
+                              onClick={() => {
+                                setSelectedModel(m.id);
+                                localStorage.setItem("alpha_copilot_model", m.id);
+                                setShowModelDropdown(false);
+                              }}
+                              className={`p-1.5 rounded-lg border text-left flex items-center gap-1.5 transition cursor-pointer ${
+                                selectedModel === m.id
+                                  ? "bg-[#00ff88]/20 border-[#00ff88] text-white"
+                                  : isConfigured
+                                  ? "bg-white/5 hover:bg-white/10 border-white/10 text-slate-300"
+                                  : "bg-white/5 hover:bg-white/10 border-amber-500/20 text-slate-400 opacity-80"
+                              }`}
+                            >
+                              <span className="text-xs">{m.icon}</span>
+                              <div className="truncate min-w-0 flex-1">
+                                <div className="text-[10px] font-bold truncate text-white flex items-center justify-between">
+                                  <span className="truncate">{m.name.split("/").pop()}</span>
+                                  {isConfigured ? (
+                                    <span className="text-[8px] bg-emerald-500/20 text-[#00ff88] border border-emerald-500/40 px-1 py-0.2 rounded font-mono font-bold shrink-0 ml-1">READY</span>
+                                  ) : (
+                                    <span className="text-[8px] bg-amber-500/10 text-amber-300 border border-amber-500/30 px-1 py-0.2 rounded font-mono font-medium shrink-0 ml-1">KEY REQ</span>
+                                  )}
+                                </div>
+                                <div className="text-[9px] text-[#00ff88]">{m.badge}</div>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1181,43 +1229,57 @@ export function StrategyStudioPage() {
                         No models matching "{modelSearchQuery}"
                       </div>
                     ) : (
-                      filteredModels.map((m) => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedModel(m.id);
-                            localStorage.setItem("alpha_copilot_model", m.id);
-                            setShowModelDropdown(false);
-                            setModelSearchQuery("");
-                          }}
-                          className={`w-full text-left p-2 rounded-lg flex items-start gap-2.5 transition cursor-pointer ${
-                            selectedModel === m.id
-                              ? "bg-[#00ff88]/15 border border-[#00ff88]/40 text-white"
-                              : "hover:bg-white/5 text-slate-300"
-                          }`}
-                        >
-                          <span className="text-base shrink-0">{m.icon}</span>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-bold text-white truncate flex items-center justify-between">
-                              <span className="truncate" title={m.name}>{m.name}</span>
-                              <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                                {(m.isFree || m.id.includes(":free")) && (
-                                  <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.2 rounded font-mono font-bold">
-                                    FREE
-                                  </span>
-                                )}
-                                {selectedModel === m.id && <Check className="w-3.5 h-3.5 text-[#00ff88] shrink-0" />}
+                      filteredModels.map((m) => {
+                        const isConfigured = isModelConfigured(m);
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedModel(m.id);
+                              localStorage.setItem("alpha_copilot_model", m.id);
+                              setShowModelDropdown(false);
+                              setModelSearchQuery("");
+                            }}
+                            className={`w-full text-left p-2 rounded-lg flex items-start gap-2.5 transition cursor-pointer ${
+                              selectedModel === m.id
+                                ? "bg-[#00ff88]/15 border border-[#00ff88]/40 text-white"
+                                : isConfigured
+                                ? "hover:bg-white/5 text-slate-300"
+                                : "hover:bg-white/5 text-slate-400 opacity-80"
+                            }`}
+                          >
+                            <span className="text-base shrink-0">{m.icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-bold text-white truncate flex items-center justify-between">
+                                <span className="truncate" title={m.name}>{m.name}</span>
+                                <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                  {isConfigured ? (
+                                    <span className="text-[9px] bg-emerald-500/20 text-[#00ff88] border border-emerald-500/40 px-1.5 py-0.2 rounded font-mono font-bold flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-[#00ff88]" /> KEY ACTIVE
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9px] bg-amber-500/10 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-mono font-medium">
+                                      NEEDS KEY
+                                    </span>
+                                  )}
+                                  {(m.isFree || m.id.includes(":free")) && (
+                                    <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.2 rounded font-mono font-bold">
+                                      FREE
+                                    </span>
+                                  )}
+                                  {selectedModel === m.id && <Check className="w-3.5 h-3.5 text-[#00ff88] shrink-0" />}
+                                </div>
+                              </div>
+                              <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                <span className="text-indigo-400 font-bold">{m.provider}</span>
+                                <span>•</span>
+                                <span className="text-slate-300">{m.costStr}</span>
                               </div>
                             </div>
-                            <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                              <span className="text-indigo-400 font-bold">{m.provider}</span>
-                              <span>•</span>
-                              <span className="text-slate-300">{m.costStr}</span>
-                            </div>
-                          </div>
-                        </button>
-                      ))
+                          </button>
+                        );
+                      })
                     )}
                   </div>
                 </div>

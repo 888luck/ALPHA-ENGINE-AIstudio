@@ -4,7 +4,8 @@ import { LiveCockpit } from "./components/LiveCockpit";
 import { QuantResearchLab } from "./components/QuantResearchLab";
 import { CopilotPage } from "./pages/CopilotPage";
 import { StrategyStudioPage } from "./pages/StrategyStudioPage";
-import { Sun, Moon, Activity, Tag, Globe, HelpCircle, LayoutGrid, Home, ShieldAlert, Layers, Sliders, Sparkles, SlidersHorizontal, ArrowLeft } from "lucide-react";
+import { Sun, Moon, Activity, Tag, Globe, HelpCircle, LayoutGrid, Home, ShieldAlert, Layers, Sliders, Sparkles, SlidersHorizontal, ArrowLeft, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
+import { getStoredVaultValue } from "./utils/vaultStorage";
 
 export default function App() {
   // Safe default persistent theme
@@ -137,11 +138,23 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  const [isTogglingMode, setIsTogglingMode] = useState(false);
+  const [modeToggleToast, setModeToggleToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
   const handleToggleTradingMode = async () => {
+    if (isTogglingMode) return;
     const currentMode = systemState?.settings?.tradingMode || "PAPER";
     const nextMode = currentMode === "LIVE" ? "PAPER" : "LIVE";
     const nextPort = nextMode === "LIVE" ? 4001 : 4002;
     
+    // Eliminate hardcoded mock account IDs - look up configured accounts
+    const configuredLive = systemState?.settings?.ibkrLiveAccountNumber || getStoredVaultValue("ibkrLiveAccountNumber");
+    const configuredPaper = systemState?.settings?.ibkrPaperAccountNumber || getStoredVaultValue("ibkrPaperAccountNumber");
+    const existingAccount = systemState?.settings?.ibkrAccountNumber || getStoredVaultValue("ibkrAccountNumber") || "DU263010";
+    const targetAccount = nextMode === "LIVE" 
+      ? (configuredLive || existingAccount) 
+      : (configuredPaper || existingAccount);
+
     if (nextMode === "LIVE") {
       const confirmed = window.confirm(
         "⚠️ CAUTION: Switching to LIVE PRODUCTION (Port 4001).\n\nReal capital will be at risk under direct IBKR DMA execution. Proceed?"
@@ -149,32 +162,85 @@ export default function App() {
       if (!confirmed) return;
     }
 
+    setIsTogglingMode(true);
+    setModeToggleToast(null);
+    const previousState = systemState;
+
+    // Immediate optimistic visual feedback
+    setSystemState((prev: any) => ({
+      ...prev,
+      settings: {
+        ...prev?.settings,
+        tradingMode: nextMode,
+        ibkrPort: nextPort,
+        ibkrAccountNumber: targetAccount
+      }
+    }));
+
     try {
-      const res = await fetch("/api/set-settings", {
+      const adminKey = localStorage.getItem("alpha_operator_admin_key") || "ALPHA_ADMIN_REVERT_992";
+      let res = await fetch("/api/system/toggle-lane", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": localStorage.getItem("alpha_operator_admin_key") || "ALPHA_ADMIN_REVERT_992"
+          "x-admin-key": adminKey
         },
         body: JSON.stringify({
-          tradingMode: nextMode,
-          ibkrPort: nextPort,
-          ibkrAccountNumber: nextMode === "LIVE" ? "U8129384" : "DUE263010"
+          mode: nextMode,
+          port: nextPort,
+          accountNumber: targetAccount
         })
       });
-      if (res.ok) {
-        setSystemState((prev: any) => ({
-          ...prev,
-          settings: {
-            ...prev?.settings,
+
+      if (!res.ok) {
+        res = await fetch("/api/set-settings", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-key": adminKey
+          },
+          body: JSON.stringify({
             tradingMode: nextMode,
             ibkrPort: nextPort,
-            ibkrAccountNumber: nextMode === "LIVE" ? "U8129384" : "DUE263010"
-          }
-        }));
+            ibkrAccountNumber: targetAccount
+          })
+        });
       }
-    } catch (err) {
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.settings) {
+          setSystemState((prev: any) => ({
+            ...prev,
+            settings: {
+              ...prev?.settings,
+              ...data.settings,
+              tradingMode: nextMode,
+              ibkrPort: nextPort,
+              ibkrAccountNumber: targetAccount
+            }
+          }));
+        }
+        setModeToggleToast({
+          type: "success",
+          message: `Switched execution lane to ${nextMode} (Port ${nextPort}) [Account: ${targetAccount}]`
+        });
+        setTimeout(() => setModeToggleToast(null), 5000);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server responded with ${res.status}`);
+      }
+    } catch (err: any) {
       console.error("Failed to toggle trading mode:", err);
+      // Revert optimistic update on failure
+      setSystemState(previousState);
+      setModeToggleToast({
+        type: "error",
+        message: `Failed to switch to ${nextMode}: ${err.message || "Network or authorization error"}`
+      });
+      setTimeout(() => setModeToggleToast(null), 7000);
+    } finally {
+      setIsTogglingMode(false);
     }
   };
 
@@ -218,16 +284,28 @@ export default function App() {
           </span>
           <button
             type="button"
+            disabled={isTogglingMode}
             onClick={handleToggleTradingMode}
-            className={`px-3 py-1 rounded-md text-xs font-mono font-black border transition cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95 ${
+            className={`px-3 py-1 rounded-md text-xs font-mono font-black border transition cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-60 ${
               systemState?.settings?.tradingMode === "LIVE"
                 ? "bg-amber-500 hover:bg-amber-400 text-black border-amber-300"
                 : "bg-rose-600 hover:bg-rose-500 text-white border-rose-400"
             }`}
             title="Click to toggle execution lane between PAPER (4002) and LIVE (4001)"
           >
-            🔄 SWITCH TO {systemState?.settings?.tradingMode === "LIVE" ? "PAPER (4002)" : "LIVE (4001)"}
+            {isTogglingMode ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <span>🔄</span>}
+            {isTogglingMode ? "SWITCHING..." : `SWITCH TO ${systemState?.settings?.tradingMode === "LIVE" ? "PAPER (4002)" : "LIVE (4001)"}`}
           </button>
+          {modeToggleToast && (
+            <span className={`px-2.5 py-1 rounded text-xs font-mono font-bold flex items-center gap-1.5 animate-in fade-in ${
+              modeToggleToast.type === "success" 
+                ? "bg-emerald-950/90 text-[#00ff88] border border-emerald-500/50" 
+                : "bg-rose-950/90 text-rose-300 border border-rose-500/50"
+            }`}>
+              {modeToggleToast.type === "success" ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+              {modeToggleToast.message}
+            </span>
+          )}
           {systemState?.settings?.tradingMode === "LIVE" && (
             <button
               type="button"

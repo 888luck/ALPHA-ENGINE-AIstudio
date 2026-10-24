@@ -122,7 +122,22 @@ export async function loadPersistentSettings() {
     systemSettings.ibkrPort = vaultCreds.ibkrPort || systemSettings.ibkrPort;
     systemSettings.ibkrClientId = vaultCreds.ibkrClientId || systemSettings.ibkrClientId;
     systemSettings.ibkrAccountNumber = vaultCreds.ibkrAccountNumber || systemSettings.ibkrAccountNumber;
+    systemSettings.ibkrLiveAccountNumber = vaultCreds.ibkrLiveAccountNumber || systemSettings.ibkrLiveAccountNumber;
+    systemSettings.ibkrPaperAccountNumber = vaultCreds.ibkrPaperAccountNumber || systemSettings.ibkrPaperAccountNumber;
     systemSettings.tradingMode = vaultCreds.tradingMode || systemSettings.tradingMode;
+
+    const riskLimitsPath = path.join(process.cwd(), "risk_limits.json");
+    if (fs.existsSync(riskLimitsPath)) {
+      try {
+        const rl = JSON.parse(fs.readFileSync(riskLimitsPath, "utf-8"));
+        if (rl && rl.tradingMode) {
+          systemSettings.tradingMode = rl.tradingMode;
+          if (rl.ibkrPort) systemSettings.ibkrPort = Number(rl.ibkrPort);
+          if (rl.ibkrAccountNumber) systemSettings.ibkrAccountNumber = rl.ibkrAccountNumber;
+        }
+      } catch (e) {}
+    }
+
     console.log("[VAULT] 12-Factor vault credentials successfully synchronized into runtime state.");
   } catch (err: any) {
     console.warn("[SETTINGS] Error loading settings from disk:", err.message);

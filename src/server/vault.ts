@@ -15,6 +15,8 @@ import path from "path";
 export interface VaultCredentials {
   // Pillar 1: Brokerage (IBKR IE)
   ibkrAccountNumber: string;
+  ibkrLiveAccountNumber?: string;
+  ibkrPaperAccountNumber?: string;
   ibkrHost: string;
   ibkrPort: number;
   ibkrClientId: number;
@@ -109,6 +111,8 @@ export function loadVaultCredentials(): VaultCredentials {
   return {
     // Pillar 1: Brokerage
     ibkrAccountNumber: getVal("IBKR_ACCOUNT_NUMBER", "DUE263010"),
+    ibkrLiveAccountNumber: getVal("IBKR_LIVE_ACCOUNT_NUMBER", ""),
+    ibkrPaperAccountNumber: getVal("IBKR_PAPER_ACCOUNT_NUMBER", ""),
     ibkrHost: edgeHost,
     ibkrPort: Number(getVal("IBKR_PORT", "4002")) || 4002,
     ibkrClientId: Number(getVal("IBKR_CLIENT_ID", "10")) || 10,
@@ -220,6 +224,8 @@ export function saveVaultCredentials(updates: Partial<VaultCredentials>): VaultC
   // Map updates to standard environment variable keys
   const envMap: Record<string, string> = {
     IBKR_ACCOUNT_NUMBER: merged.ibkrAccountNumber,
+    IBKR_LIVE_ACCOUNT_NUMBER: merged.ibkrLiveAccountNumber || "",
+    IBKR_PAPER_ACCOUNT_NUMBER: merged.ibkrPaperAccountNumber || "",
     IBKR_HOST: merged.ibkrHost,
     IBKR_PORT: String(merged.ibkrPort),
     IBKR_CLIENT_ID: String(merged.ibkrClientId),

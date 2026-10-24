@@ -379,11 +379,12 @@ copilotRouter.post("/api/copilot/chat", (req, res) => {
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
 
-  const geminiKey = (req.headers["x-gemini-api-key"] as string) || systemSettings.geminiApiKey || process.env.GEMINI_API_KEY || "";
-  const groqKey = (req.headers["x-groq-api-key"] as string) || systemSettings.customAiApiKey || process.env.GROQ_API_KEY || "";
-  const nvidiaKey = (req.headers["x-nvidia-api-key"] as string) || systemSettings.nvidiaApiKey || process.env.NVIDIA_API_KEY || process.env.NVIDIA_INFERENCE_API_KEY || "";
-  const openaiKey = (req.headers["x-openai-api-key"] as string) || systemSettings.openaiApiKey || process.env.OPENAI_API_KEY || "";
-  const openrouterKey = (req.headers["x-openrouter-api-key"] as string) || (systemSettings as any).openrouterApiKey || process.env.OPENROUTER_API_KEY || "";
+  const reqKeys = (req.body && typeof req.body.keys === "object") ? req.body.keys : {};
+  const geminiKey = (req.headers["x-gemini-api-key"] as string) || reqKeys.gemini || systemSettings.geminiApiKey || process.env.GEMINI_API_KEY || "";
+  const groqKey = (req.headers["x-groq-api-key"] as string) || reqKeys.groq || systemSettings.customAiApiKey || process.env.GROQ_API_KEY || "";
+  const nvidiaKey = (req.headers["x-nvidia-api-key"] as string) || reqKeys.nvidia || systemSettings.nvidiaApiKey || process.env.NVIDIA_API_KEY || process.env.NVIDIA_INFERENCE_API_KEY || "";
+  const openaiKey = (req.headers["x-openai-api-key"] as string) || reqKeys.openai || systemSettings.openaiApiKey || process.env.OPENAI_API_KEY || "";
+  const openrouterKey = (req.headers["x-openrouter-api-key"] as string) || reqKeys.openrouter || (systemSettings as any).openrouterApiKey || process.env.OPENROUTER_API_KEY || "";
 
   const childEnv = {
     ...process.env,

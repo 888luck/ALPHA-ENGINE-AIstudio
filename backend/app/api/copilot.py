@@ -1072,18 +1072,18 @@ def get_fallback_provider_candidate(current_provider: str, current_model: str, c
 
     # 1. Groq Cloud (verified active LPU)
     groq_key = client_headers.get("x-groq-api-key") or keys.get("groq") or os.environ.get("GROQ_API_KEY", "")
-    if groq_key and len(groq_key.strip()) > 10 and "MY_" not in groq_key and current_provider != "groq":
+    if groq_key and len(groq_key.strip()) > 5 and "MY_" not in groq_key and current_provider != "groq":
         return "groq", "openai/gpt-oss-20b", groq_key.strip(), "https://api.groq.com/openai/v1/chat/completions"
 
     # 2. Google GenAI (official OpenAI-compatible endpoint)
     gemini_key = client_headers.get("x-gemini-api-key") or keys.get("gemini") or os.environ.get("GEMINI_API_KEY", "")
-    if gemini_key and len(gemini_key.strip()) > 20 and "MY_" not in gemini_key and current_provider != "google":
+    if gemini_key and len(gemini_key.strip()) > 15 and "MY_" not in gemini_key and current_provider != "google":
         return "google", "gemini-2.5-flash", gemini_key.strip(), "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 
     # 3. NVIDIA NIM active alternative model
     nvidia_key = client_headers.get("x-nvidia-api-key") or keys.get("nvidia") or os.environ.get("NVIDIA_API_KEY") or os.environ.get("NVIDIA_INFERENCE_API_KEY", "")
     if nvidia_key and len(nvidia_key.strip()) > 15 and "MY_" not in nvidia_key:
-        if current_model != "nvidia/nemotron-3.5-lightning-30b-a3b":
+        if current_provider != "nvidia" or "nemotron-3.5-lightning-30b-a3b" not in current_model:
             return "nvidia", "nvidia/nemotron-3.5-lightning-30b-a3b", nvidia_key.strip(), "https://integrate.api.nvidia.com/v1/chat/completions"
 
     # 4. OpenRouter Hub
@@ -1111,10 +1111,12 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
 
     provider, raw_model_id, api_key = extract_provider_and_key(selected_model, client_headers, request.keys, request.raw_id)
 
-    # 1. Tier 0 Local CPU Model ($0 cost, offline ONNX)
-    if provider == "local" or selected_model == "local/finbert-int8":
+    async def stream_local_finbert(req: ChatRequest, st: Dict[str, Any], cl: float, start_t: float, custom_notice: Optional[str] = None):
+        if custom_notice:
+            yield emit_sse("delta", {"content": custom_notice})
+            
         last_msg = ""
-        for m in reversed(request.messages):
+        for m in reversed(req.messages):
             if m.role == "user":
                 last_msg = m.content
                 break
@@ -1134,7 +1136,7 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
             f"- **Sentiment Inference**: Positive: `{pos_pct}%` | Negative: `{neg_pct}%` | Neutral: `{neu_pct}%`\n"
             f"- **Engine**: `{nec.tier0_engine}` | Model: `ProsusAI/finbert` INT8\n"
             f"- **Zero-Egress Invariant**: Executed entirely on local CPU with zero network egress or API tokens consumed.\n\n"
-            f"To access live Interactive Brokers DMA telemetry, SEC filings, or FDA regulatory catalysts, select an online LLM from the model dropdown or open the **4-Pillar Vault**."
+            f"To access live Interactive Brokers DMA telemetry, SEC filings, or FDA regulatory catalysts, configure provider API keys in the **4-Pillar Vault**."
         )
         for word in reply.split(" "):
             yield emit_sse("delta", {"content": word + " "})
@@ -1149,24 +1151,38 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
             "prompt_tokens": len(last_msg) // 4,
             "completion_tokens": len(reply) // 4,
             "total_tokens": (len(last_msg) + len(reply)) // 4,
-            "latency_ms": int((t_end - t_start) * 1000),
+            "latency_ms": int((t_end - start_t) * 1000),
             "cost_usd": 0.00000,
-            "daily_spent_usd": round(state["total_cost_usd"], 5),
-            "daily_requests": state["total_requests"] + 1,
+            "daily_spent_usd": round(st["total_cost_usd"], 5),
+            "daily_requests": st["total_requests"] + 1,
             "daily_quota": 999999,
             "circuit_breaker_active": False
         })
         yield emit_sse("done", {"status": "finished"})
+
+    # 1. Tier 0 Local CPU Model ($0 cost, offline ONNX)
+    if provider == "local" or selected_model == "local/finbert-int8":
+        async for chunk in stream_local_finbert(request, state, ceiling, t_start):
+            yield chunk
         return
 
-    # 2. Check Provider API Key
-    if not api_key or len(api_key.strip()) < 10 or "MY_" in api_key:
-        yield emit_sse("delta", {
-            "content": f"> ⚠️ **Provider Unconfigured**: No active API key found for **{provider.upper()}** (`{raw_model_id}`).\n\n"
-                       f"Please open the **4-Pillar Connection & Feed Vault** to configure your API key for this provider, or switch to the **INT8 ONNX FinBERT (CPU Offline)** model for instant zero-cost analysis.\n\n"
-        })
-        yield emit_sse("done", {"status": "error_unconfigured"})
-        return
+    # 2. Check Provider API Key & Smart Routing (Zero Dead-Ends)
+    if not api_key or len(api_key.strip()) < 5 or "MY_" in api_key:
+        fallback = get_fallback_provider_candidate(provider, raw_model_id, client_headers, request.keys)
+        if fallback:
+            fb_provider, fb_raw_id, fb_key, fb_url = fallback
+            yield emit_sse("delta", {
+                "content": f"> ℹ️ [Auto-routed via active {fb_provider.upper()} ({fb_raw_id}) because {provider.upper()} key is unconfigured]\n\n"
+            })
+            provider = fb_provider
+            raw_model_id = fb_raw_id
+            api_key = fb_key
+            selected_model = f"{fb_provider}/{fb_raw_id}"
+        else:
+            notice = f"> ℹ️ [Auto-routed via Local Tier 0 FinBERT because {provider.upper()} key is unconfigured]\n\n"
+            async for chunk in stream_local_finbert(request, state, ceiling, t_start, custom_notice=notice):
+                yield chunk
+            return
 
     # 3. Clean Verified Tool Schemas
     tools_payload = [
@@ -1562,6 +1578,7 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
                                 yield emit_sse("delta", {"content": delta_content})
                         except Exception:
                             continue
+                execution_success = True
             else:
                 # No tool call made - stream direct conversational output
                 if content_res:
@@ -1569,8 +1586,9 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
                     for i, w in enumerate(words):
                         yield emit_sse("delta", {"content": w + (" " if i < len(words) - 1 else "")})
                         time.sleep(0.008)
-
-            execution_success = True
+                    execution_success = True
+                else:
+                    raise RuntimeError(f"Provider {cur_provider}/{cur_raw_id} returned empty message content.")
 
         except urllib.error.HTTPError as he:
             err_body = he.read().decode("utf-8") if he.fp else str(he)
@@ -1607,11 +1625,12 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
                 selected_model = f"{fb_provider}/{fb_raw_id}"
                 continue
             else:
-                yield emit_sse("delta", {
-                    "content": f"> ⚠️ **Provider Error ({he.code})**: {clean_msg}\n\n"
-                               f"Please verify your credentials in the **4-Pillar Vault**, switch to another active provider (e.g., **Groq** or **Google GenAI**), or select **Local Tier 0 FinBERT ($0 Offline)** from the model dropdown."
-                })
-                break
+                notice = (
+                    f"> ℹ️ [Auto-routed via Local Tier 0 FinBERT due to upstream HTTP {he.code} error: {clean_msg[:120]}]\n\n"
+                )
+                async for chunk in stream_local_finbert(request, state, ceiling, t_start, custom_notice=notice):
+                    yield chunk
+                return
         except Exception as e:
             logger.error("LLM Execution Error on %s/%s: %s", cur_provider, cur_raw_id, e)
             fallback = get_fallback_provider_candidate(cur_provider, cur_raw_id, client_headers, request.keys)
@@ -1633,10 +1652,18 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
                 selected_model = f"{fb_provider}/{fb_raw_id}"
                 continue
             else:
-                yield emit_sse("delta", {
-                    "content": f"> ❌ **Execution Error**: {str(e)}\n\n"
-                })
-                break
+                notice = (
+                    f"> ℹ️ [Auto-routed via Local Tier 0 FinBERT due to execution error: {str(e)[:100]}]\n\n"
+                )
+                async for chunk in stream_local_finbert(request, state, ceiling, t_start, custom_notice=notice):
+                    yield chunk
+                return
+
+    if not execution_success:
+        notice = "> ℹ️ [Auto-routed via Local Tier 0 FinBERT because upstream provider produced no valid response]\n\n"
+        async for chunk in stream_local_finbert(request, state, ceiling, t_start, custom_notice=notice):
+            yield chunk
+        return
 
     # Telemetry and Cost Governance
     t_end = time.perf_counter()
@@ -1710,7 +1737,15 @@ if __name__ == "__main__":
             raw = sys.stdin.read()
             data = json.loads(raw) if raw.strip() else {}
             req = ChatRequest(**data)
-            async for chunk in generate_copilot_stream(req, {}):
+            keys = req.keys or data.get("keys") or {}
+            client_headers = {
+                "x-gemini-api-key": keys.get("gemini", "") or "",
+                "x-groq-api-key": keys.get("groq", "") or "",
+                "x-nvidia-api-key": keys.get("nvidia", "") or "",
+                "x-openai-api-key": keys.get("openai", "") or "",
+                "x-openrouter-api-key": keys.get("openrouter", "") or "",
+            }
+            async for chunk in generate_copilot_stream(req, client_headers):
                 sys.stdout.write(chunk)
                 sys.stdout.flush()
         asyncio.run(run_stdin())

@@ -117,9 +117,79 @@ systemRouter.post("/api/vault/credentials", authMiddleware, (req, res) => {
   }
 });
 
+systemRouter.post("/api/system/toggle-lane", authMiddleware, async (req, res) => {
+  try {
+    const currentMode = systemSettings.tradingMode || "PAPER";
+    const targetMode = req.body.mode 
+      ? (String(req.body.mode).toUpperCase() === "LIVE" ? "LIVE" : "PAPER") 
+      : (currentMode === "LIVE" ? "PAPER" : "LIVE");
+    const targetPort = req.body.port ? Number(req.body.port) : (targetMode === "LIVE" ? 4001 : 4002);
+
+    systemSettings.tradingMode = targetMode;
+    systemSettings.ibkrPort = targetPort;
+
+    if (req.body.accountNumber) {
+      systemSettings.ibkrAccountNumber = req.body.accountNumber;
+    } else if (targetMode === "LIVE" && systemSettings.ibkrLiveAccountNumber) {
+      systemSettings.ibkrAccountNumber = systemSettings.ibkrLiveAccountNumber;
+    } else if (targetMode === "PAPER" && systemSettings.ibkrPaperAccountNumber) {
+      systemSettings.ibkrAccountNumber = systemSettings.ibkrPaperAccountNumber;
+    }
+
+    if (req.body.ibkrLiveAccountNumber) systemSettings.ibkrLiveAccountNumber = req.body.ibkrLiveAccountNumber;
+    if (req.body.ibkrPaperAccountNumber) systemSettings.ibkrPaperAccountNumber = req.body.ibkrPaperAccountNumber;
+
+    // Atomically write risk_limits.json
+    const riskLimitsPath = path.join(process.cwd(), "risk_limits.json");
+    const riskLimitsTmp = `${riskLimitsPath}.tmp.${Date.now()}`;
+    const riskLimitsPayload = {
+      tradingMode: targetMode,
+      ibkrPort: targetPort,
+      ibkrAccountNumber: systemSettings.ibkrAccountNumber,
+      dailyCapitalCeiling: systemSettings.dailyCapitalCeiling,
+      dailyMaxLossCutoff: systemSettings.dailyMaxLossCutoff,
+      updated_at: new Date().toISOString()
+    };
+    try {
+      fs.writeFileSync(riskLimitsTmp, JSON.stringify(riskLimitsPayload, null, 2), "utf-8");
+      fs.renameSync(riskLimitsTmp, riskLimitsPath);
+    } catch (err: any) {
+      console.warn("[SYSTEM] Error writing risk_limits.json:", err.message);
+    }
+
+    saveVaultCredentials({
+      tradingMode: targetMode,
+      ibkrPort: targetPort,
+      ibkrAccountNumber: systemSettings.ibkrAccountNumber
+    });
+
+    await persistSettings();
+
+    edgeBridge.syncSettings({
+      tradingMode: targetMode,
+      ibkrPort: targetPort,
+      ibkrAccountNumber: systemSettings.ibkrAccountNumber
+    }).catch((err: any) => {
+      console.warn("[TCP BRIDGE] Notice: Edge sync deferred or offline:", err.message);
+    });
+
+    res.json({
+      success: true,
+      tradingMode: targetMode,
+      ibkrPort: targetPort,
+      accountNumber: systemSettings.ibkrAccountNumber,
+      settings: getMaskedSettings(systemSettings)
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
   const { 
     ibkrAccountNumber, 
+    ibkrLiveAccountNumber,
+    ibkrPaperAccountNumber,
     ibkrHost,
     ibkrPort, 
     ibkrClientId, 
@@ -155,8 +225,16 @@ systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
     secUserAgent
   } = req.body;
 
-  if (req.body.tradingMode !== undefined) systemSettings.tradingMode = req.body.tradingMode;
+  if (req.body.tradingMode !== undefined) {
+    const tm = String(req.body.tradingMode).toUpperCase() === "LIVE" ? "LIVE" : "PAPER";
+    systemSettings.tradingMode = tm;
+    if (ibkrPort === undefined) {
+      systemSettings.ibkrPort = tm === "LIVE" ? 4001 : 4002;
+    }
+  }
   if (ibkrAccountNumber !== undefined) systemSettings.ibkrAccountNumber = ibkrAccountNumber;
+  if (ibkrLiveAccountNumber !== undefined) systemSettings.ibkrLiveAccountNumber = ibkrLiveAccountNumber;
+  if (ibkrPaperAccountNumber !== undefined) systemSettings.ibkrPaperAccountNumber = ibkrPaperAccountNumber;
   if (ibkrHost !== undefined) systemSettings.ibkrHost = ibkrHost;
   if (ibkrPort !== undefined) systemSettings.ibkrPort = Number(ibkrPort);
   if (ibkrClientId !== undefined) systemSettings.ibkrClientId = Number(ibkrClientId);
@@ -189,9 +267,33 @@ systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
   if (patentsApiKey !== undefined && !isMaskedString(patentsApiKey)) systemSettings.patentsApiKey = patentsApiKey;
   if (secUserAgent !== undefined && !isMaskedString(secUserAgent)) systemSettings.secUserAgent = secUserAgent;
 
+  // Atomically persist risk_limits.json
+  const riskLimitsPath = path.join(process.cwd(), "risk_limits.json");
+  const riskLimitsTmp = `${riskLimitsPath}.tmp.${Date.now()}`;
+  try {
+    fs.writeFileSync(riskLimitsTmp, JSON.stringify({
+      tradingMode: systemSettings.tradingMode,
+      ibkrPort: systemSettings.ibkrPort,
+      ibkrAccountNumber: systemSettings.ibkrAccountNumber,
+      dailyCapitalCeiling: systemSettings.dailyCapitalCeiling,
+      dailyMaxLossCutoff: systemSettings.dailyMaxLossCutoff,
+      updated_at: new Date().toISOString()
+    }, null, 2), "utf-8");
+    fs.renameSync(riskLimitsTmp, riskLimitsPath);
+  } catch (err: any) {
+    console.warn("[SYSTEM] Error writing risk_limits.json:", err.message);
+  }
+
   saveVaultCredentials(req.body);
   persistSettings();
   invalidateModelsCache();
+
+  edgeBridge.syncSettings({
+    tradingMode: systemSettings.tradingMode,
+    ibkrPort: systemSettings.ibkrPort,
+    ibkrAccountNumber: systemSettings.ibkrAccountNumber
+  }).catch(() => {});
+
   res.json({ success: true, settings: getMaskedSettings(systemSettings) });
 });
 

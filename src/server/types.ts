@@ -37,6 +37,8 @@ export interface HistoricalLog {
 
 export interface SystemSettings {
   ibkrAccountNumber: string;
+  ibkrLiveAccountNumber?: string;
+  ibkrPaperAccountNumber?: string;
   ibkrHost?: string;
   ibkrPort: number;
   ibkrClientId: number;
