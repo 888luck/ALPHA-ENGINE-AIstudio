@@ -25,10 +25,12 @@ class ConnectionManager(EWrapper, EClient):
     Supports multi-threaded heartbeats, environment isolation assertions (PAPER vs LIVE),
     account callbacks, Level 2 depth, short locate/borrow tracking, and direct order transmission.
     """
-    def __init__(self, trading_mode: str = "PAPER"):
+    def __init__(self, trading_mode: Optional[str] = None):
         EClient.__init__(self, wrapper=self)
         self.is_connected = False
-        self.trading_mode = trading_mode.upper()  # "PAPER" | "LIVE" | "BACKTEST"
+        import os
+        resolved_mode = trading_mode or os.getenv("TRADING_MODE", "LIVE" if os.getenv("IBKR_PORT") == "4001" else "PAPER")
+        self.trading_mode = resolved_mode.upper()  # "PAPER" | "LIVE" | "BACKTEST"
         self.account_summary: Dict[str, Any] = {}
         self.active_positions: Dict[str, Any] = {}
         self.level2_depth: Dict[str, Dict[int, Any]] = {}  # ticker -> level depth map
@@ -62,8 +64,8 @@ class ConnectionManager(EWrapper, EClient):
         
         # Auto-reconnection with Exponential Backoff
         self.auto_reconnect_enabled: bool = True
-        self._host: str = "127.0.0.1"
-        self._port: int = 4002
+        self._host: str = os.getenv("IBKR_HOST", "127.0.0.1")
+        self._port: int = 4001 if self.trading_mode == "LIVE" else int(os.getenv("IBKR_PORT", 4002))
         self._client_id: int = 10
         self._reconnect_delay: float = 2.0
         self._max_reconnect_delay: float = 60.0
@@ -73,6 +75,10 @@ class ConnectionManager(EWrapper, EClient):
         self._host = host
         self._port = port
         self._client_id = client_id
+        if port == 4001:
+            self.trading_mode = "LIVE"
+        elif port == 4002:
+            self.trading_mode = "PAPER"
         print(f"[CONNECTION] Connecting to IBKR Gateway at {host}:{port} (Mode: {self.trading_mode})...")
         
         self._handshake_time_received = False
@@ -140,7 +146,7 @@ class ConnectionManager(EWrapper, EClient):
         Guarantees that nightly TWS/Gateway resets (23:45 - 00:45 EST) or ISP hiccups
         do not crash the engine.
         """
-        if self._is_reconnecting:
+        if self._is_reconnecting or self.is_connected:
             return
         self._is_reconnecting = True
         print(f"[AUTO-RECONNECT] Initiating reconnect loop for {self._host}:{self._port}...")
@@ -157,6 +163,9 @@ class ConnectionManager(EWrapper, EClient):
                 except Exception:
                     pass
                 
+                # Rotate client id on retries to bypass lingering broker socket locks (Code 326)
+                if attempt > 1:
+                    self._client_id = ((self._client_id + 1) % 90) + 10
                 self.connect(self._host, self._port, self._client_id)
                 
                 # Handshake on reconnect
@@ -218,8 +227,11 @@ class ConnectionManager(EWrapper, EClient):
                 self.disconnect()
                 self.is_connected = False
                 return
-            elif self.trading_mode == "LIVE" and acc.startswith("DU"):
-                print(f"[WARNING] Mode is LIVE but detected Paper Account {acc}. Real capital is not deployed on DU accounts.")
+            elif self.trading_mode == "LIVE":
+                if acc.startswith("DU"):
+                    print(f"[WARNING] Mode is LIVE but detected Paper Account {acc}. Real capital is not deployed on DU accounts.")
+                else:
+                    print(f"[IBKR ACCOUNTS] Verified Live DMA Account active: {acc}")
 
     def currentTime(self, time_val: int):
         self._handshake_time_received = True
@@ -239,6 +251,10 @@ class ConnectionManager(EWrapper, EClient):
         # IBKR Connectivity Code Handling
         if errorCode == 1100: # Connectivity between IB and TWS lost
             print("[GATEWAY ALERT] IBKR Connectivity Lost (Code 1100). Socket marked offline.")
+            self.is_connected = False
+        elif errorCode == 326: # Client ID already in use
+            self._client_id = ((self._client_id + 1) % 90) + 10
+            print(f"[GATEWAY ALERT] Client ID collision (Code 326). Rotated to client ID {self._client_id}.")
             self.is_connected = False
             if self.auto_reconnect_enabled and not self._is_reconnecting:
                 threading.Thread(target=self._reconnect_worker, name="IBKR_Reconnect_Thread", daemon=True).start()
@@ -274,16 +290,27 @@ class ConnectionManager(EWrapper, EClient):
         contract.exchange = exchange
         contract.currency = currency
         
-        # Official European Venue Routing
-        if sym_clean in ["SAP", "RWE"]:
-            contract.exchange = "IBIS"
-            contract.currency = "EUR"
-        elif sym_clean in ["ENGI", "SGO", "AIR", "TTE", "MC"]:
-            contract.exchange = "SBF"
-            contract.currency = "EUR"
-        elif sym_clean in ["ASML"]:
-            contract.exchange = "AEB"
-            contract.currency = "EUR"
+        # European Venue Routing: Only enforce European exchanges when EUR is explicitly targeted or European exchange passed
+        if currency == "EUR" or exchange in ["IBIS", "SBF", "AEB"]:
+            if sym_clean in ["SAP", "RWE"]:
+                contract.exchange = "IBIS"
+                contract.currency = "EUR"
+            elif sym_clean in ["ENGI", "SGO", "AIR", "TTE", "MC"]:
+                contract.exchange = "SBF"
+                contract.currency = "EUR"
+            elif sym_clean in ["ASML"]:
+                contract.exchange = "AEB"
+                contract.currency = "EUR"
+        elif currency == "USD":
+            # Cross-listed US ADRs / major US equities: preserve SMART routing with primaryExchange anchor
+            if sym_clean in ["TTE", "SAP", "ASML", "RWE", "CAT", "BA", "IBM", "DIS", "JPM", "GE", "XOM"]:
+                contract.exchange = "SMART"
+                contract.currency = "USD"
+                contract.primaryExchange = "NYSE" if sym_clean in ["TTE", "SAP", "CAT", "BA", "IBM", "DIS", "JPM", "GE", "XOM"] else "NASDAQ"
+            elif sym_clean in ["NVDA", "AAPL", "MSFT", "GOOG", "GOOGL", "AMZN", "META", "TSLA", "CUE", "ONWD"]:
+                contract.exchange = "SMART"
+                contract.currency = "USD"
+                contract.primaryExchange = "NASDAQ"
         return contract
 
     def create_market_order(self, action: str, quantity: float) -> Any:
@@ -303,6 +330,8 @@ class ConnectionManager(EWrapper, EClient):
 
     def accountSummary(self, reqId: int, account: str, tag: str, value: str, currency: str):
         """Processes account values (e.g. NetLiquidation, MaintMarginReq) needed for risk screening."""
+        self.account_summary["account"] = account
+        self.account_summary["currency"] = currency
         try:
             self.account_summary[tag] = float(value)
         except (ValueError, TypeError):
@@ -586,9 +615,12 @@ class ConnectionManager(EWrapper, EClient):
                 keep_up = bool(arguments.get("keepUpToDate", False))
                 chart_opts = arguments.get("chartOptions", [])
 
+                # Adaptive timeout: 25s for historical bars, else default timeout
+                req_timeout = float(arguments.get("timeout", 25.0 if method_name in ["reqHistoricalData", "get_historical_bars"] else timeout))
+
                 self.historical_data_buffer[req_id] = []
                 self.reqHistoricalData(req_id, contract, "", dur, barsize, what, use_rth, fmt_date, keep_up, chart_opts)
-                event.wait(timeout)
+                event.wait(req_timeout)
 
                 res = self._request_results.get(req_id)
                 if isinstance(res, dict) and res.get("status") == "ERROR":
@@ -610,7 +642,8 @@ class ConnectionManager(EWrapper, EClient):
                         "change": chg,
                         "change_percent": f"{chg_pct:+.2f}%",
                         "recent_5day_closes": [b.get("close") for b in bars[-5:]],
-                        "bars": bars[-5:],
+                        "bars": bars if method_name in ["reqHistoricalData", "get_historical_bars"] else bars[-5:],
+                        "total_bars": len(bars),
                         "source": "Interactive Brokers Pro Official Tape",
                         "verified_at": datetime.datetime.now(timezone.utc).isoformat()
                     }

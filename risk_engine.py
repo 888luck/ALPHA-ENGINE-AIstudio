@@ -401,8 +401,16 @@ class DRMMiddleware:
     def unlock_router(self, operator_key: str = "") -> bool:
         """Manual router unlocking requiring explicit authorization against OPERATOR_ADMIN_KEY."""
         import os
-        admin_key = os.environ.get("OPERATOR_ADMIN_KEY", "ALPHA_ADMIN_REVERT_992")
-        if not operator_key or operator_key != admin_key:
+        configured_keys = {
+            k for k in [
+                os.environ.get("OPERATOR_ADMIN_KEY"),
+                os.environ.get("ADMIN_OPERATOR_KEY"),
+                os.environ.get("ADMIN_KEY"),
+            ]
+            if k
+        }
+        allowed_keys = configured_keys if configured_keys else {"ALPHA_ADMIN_REVERT_992"}
+        if not operator_key or operator_key not in allowed_keys:
             print(f"[SECURITY ALERT] Unauthorized attempt to unlock router with key: '{operator_key}'! Unlock rejected.")
             return False
         self.router_locked = False

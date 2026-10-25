@@ -2,21 +2,25 @@ import express from "express";
 import { SystemSettings } from "../types";
 
 export const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const operatorKey = process.env.OPERATOR_ADMIN_KEY || "ALPHA_ADMIN_REVERT_992";
+  const configuredKeys = [
+    process.env.OPERATOR_ADMIN_KEY,
+    process.env.ADMIN_OPERATOR_KEY,
+    process.env.ADMIN_KEY
+  ].filter(Boolean) as string[];
+
+  // Fallback to ALPHA_ADMIN_REVERT_992 ONLY if no custom operator key has been configured in the environment
+  const allowedKeys = new Set(
+    configuredKeys.length > 0 ? configuredKeys : ["ALPHA_ADMIN_REVERT_992"]
+  );
+
   const authHeader = (req.headers["authorization"] || req.headers["Authorization"] || "") as string;
   const token = authHeader.startsWith("Bearer ") ? authHeader.substring(7).trim() : authHeader.trim();
   const xKey = ((req.headers["x-admin-key"] || req.headers["X-Admin-Key"] || req.body?.operator_key || req.body?.admin_key || req.query?.operator_key || req.query?.admin_key || "") as string).trim();
 
-  const allowedKeys = new Set([
-    operatorKey,
-    "ALPHA_ADMIN_REVERT_992",
-    process.env.ADMIN_KEY
-  ].filter(Boolean) as string[]);
+  // Authenticated key extraction (strictly require provided credentials, zero public fallback)
+  const suppliedKey = xKey || token;
 
-  // Seamless fallback to ALPHA_ADMIN_REVERT_992 so requests from UI are authorized
-  const suppliedKey = xKey || token || "ALPHA_ADMIN_REVERT_992";
-
-  if (allowedKeys.has(suppliedKey)) {
+  if (suppliedKey && allowedKeys.has(suppliedKey)) {
     return next();
   }
 

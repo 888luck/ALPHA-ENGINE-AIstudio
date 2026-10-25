@@ -108,22 +108,35 @@ The Copilot (`CopilotPage.tsx`, `src/server/routes/copilot.ts`, `backend/app/api
   - `reqPositions` / `reqAccountSummary`: Inspects live exposure and margin headroom.
   - `get_sec_filings`, `get_clinical_trials`, `get_fda_safety_reports`, `get_energy_telemetry`: Fetches orthogonal regulatory filings and clinical readouts.
   - `submit_order`: Dispatches validated bracket orders across Direct TCP Bridge port 4005.
+* **Multi-Model Resilience & Provider Governance:**
+  - **OpenRouter Reasoning Token Extraction:** Dynamically extracts reasoning tokens from `message.reasoning`, `message.reasoning_content`, and `message.reasoning_details` for reasoning LLMs (Nemotron, DeepSeek R1, etc.).
+  - **Dynamic Groq TPM Headroom Clamping:** Automatically calculates prompt token sizes and restricts Groq completions to strictly fit under the 8,000 TPM (`x-ratelimit-limit-tokens: 8000`) quota, completely eliminating `HTTP 413` errors.
+  - **Sliding Context Window Compaction:** Compacts previous multi-turn messages exceeding 1200 characters down to 1000 characters while preserving the active query intact.
+  - **4-Tier Provider Failover Pipeline:** NVIDIA NIM $\rightarrow$ OpenRouter $\rightarrow$ Groq Cloud $\rightarrow$ Google GenAI with stateful provider exhaustion before falling back.
+  - **Deterministic Local Quantitative Sizing Fallback ($0 CPU):** Automatically computes exact 1% capital risk constraint, ATR-based dollar risk, position sizing, IBKR fractional share feasibility, and friction metrics when equity queries are received.
 
 ---
 
-## 🧪 4. Quant Lab & GCE Companion
+## 🧪 4. Quant Lab, Strategy Studio & GCE Companion
 
-The Quant Lab (`GcpCompanion.tsx`, `src/server/routes/backtest.ts`, `backtester.py`) provides the quantitative research and backtesting environment:
+The Quant Lab & Strategy Studio (`StrategyStudioPage.tsx`, `GcpCompanion.tsx`, `src/server/routes/backtest.ts`, `backtester.py`) provides the quantitative research, regime discovery, and backtesting environment:
 
 1. **AI Intelligence & LLM Critic-Verifier Consensus:** Multi-model consensus voting on event catalysts and sector impacts.
-2. **Universe Manager:** Dynamic candidate basket generation (`dynamic_baskets.json`) filtering high-momentum, volume-expanding stocks.
-3. **Audit Dashboard & Institutional Backtester:**
+2. **Dynamic Lookback Horizons & User Time Brackets:**
+   - Exposes `days`, `start_date`, and `end_date` parameters across `run_quant_discovery`, `run_strategy_sweep`, and `run_strategy_backtest`.
+   - Supports natural language time ranges (e.g. 30 days, 90 days, 180 days, 1 year) without artificial ~210-bar caps.
+   - Pacing-compliant IBKR historical duration formatting (`{days} D`, `1 Y`) with adaptive socket timeouts: `max(25.0, min(65.0, days_diff * 0.15))`.
+   - Primary Exchange Disambiguation (`NYSE` for NYSE symbols like `CAT`, `BA`, `IBM`, `DIS`, `JPM`, `GE`, `XOM`, and `NASDAQ` for tech equities) preventing SMART router ambiguities.
+3. **Deflated Sharpe Ratio (DSR) 16-Trial Parameter Sweep:**
+   - Performs multi-parameter sweeps (ATR stop multipliers, hold durations, OFI filters, tranche scaling) with Bailey & López de Prado DSR auditing to penalize selection bias and data-mining overfit.
+4. **Universe Manager & Audit Dashboard:**
+   - Dynamic candidate basket generation (`dynamic_baskets.json`) filtering high-momentum, volume-expanding stocks.
    - Evaluates strategies against authentic historical bars pulled from IBKR Pro Tape or verified local caches (zero synthetic random-walk fabrication).
    - Generates Recharts equity curves, Profit Factor, Sharpe Ratio, Maximum Favorable Excursion (MFE), and gate rejection attribution (Gate 1 Capital, Gate 2 Friction, Gate 5 Blackout).
-4. **Custom Strategy Framework (User & LLM Co-Authoring):**
+5. **Custom Strategy Framework (User & LLM Co-Authoring):**
    - Pluggable strategy loader (`custom_strategy_loader.py`) allowing the user and Copilot to design, code, and hot-reload custom strategies (e.g. Mean Reversion, Statistical Arbitrage, Pairs Trading, News Sentiment Momentum).
    - Mandatory DRM risk clamping: All custom strategies strictly adhere to the 1.8 ATR stop-loss, 15% friction filter, and capital ceilings before reaching the broker router.
-5. **GCE Operations & Topology Matrix:** Real-time console emulation for Method B Headless Docker + IBC runtime setups and Frankfurt latency matrix monitoring.
+6. **GCE Operations & Topology Matrix:** Real-time console emulation for Method B Headless Docker + IBC runtime setups and Frankfurt latency matrix monitoring.
 
 ---
 
@@ -131,11 +144,11 @@ The Quant Lab (`GcpCompanion.tsx`, `src/server/routes/backtest.ts`, `backtester.
 
 | File Path | Role & Operational Responsibility |
 | :--- | :--- |
-| **`main.py`** | Edge node root entrypoint; initializes daemons, risk gates, and registers the synchronous `ibkr_dispatcher` callback on the TCP Bridge. |
-| **`connection.py`** | IBKR `EClient`/`EWrapper` manager; features `execute_synchronous_request` with thread-safe `Event` callback synchronization. |
+| **`main.py`** | Edge node root entrypoint; initializes daemons, risk gates, premarket calibration, and registers the synchronous `ibkr_dispatcher` callback on the TCP Bridge. |
+| **`connection.py`** | IBKR `EClient`/`EWrapper` manager; features `execute_synchronous_request`, primary exchange routing, and atomic reconnect loop guards. |
 | **`edge_bridge.py`** | Direct TCP Bridge server on port `4005`; handles remote order routing, quote retrieval, and generic `DISPATCH_IBKR` execution. |
 | **`alpha_strategy.py`** | Quantitative breakout strategy (SMA-20 trend congruence, OFI order flow imbalance, 1.8 ATR stop, 15% friction filter). |
-| **`backtester.py`** | Historical backtester; queries real historical bars via Direct TCP Bridge (port `4005`) or verified local caches (zero synthetic fallback). |
+| **`backtester.py`** | Historical backtester; queries real historical bars via Direct TCP Bridge (port `4005`), formats dynamic lookback durations, and applies adaptive timeouts. |
 | **`ha_manager.py`** | High-Availability failover coordinator; uses atomic local file lease (`ha_leader_lock.json`) and OS PID validation. |
 | **`tca_engine.py`** | Transaction Cost Analysis engine; benchmarks arrival prices, slippage, and MiFID-II efficiency into `tca_executions.json`. |
 | **`reasoning_auditor.py`** | Attribution engine; evaluates prediction hit rates and MFE, persisting daily lessons learned into `audit_history.json`. |
@@ -143,7 +156,10 @@ The Quant Lab (`GcpCompanion.tsx`, `src/server/routes/backtest.ts`, `backtester.
 | **`tools_registry.json`** | Unified catalog containing 78 callable tools across 10 categories cached with a 24-hour TTL. |
 | **`server.ts`** | Production Express + Vite server on port `3000`; mounts modular routers (`/api/diagnostics`, `/api/copilot`, `/api/v1/tools/registry`, etc.). |
 | **`src/pages/CopilotPage.tsx`** | Copilot frontend with multi-model dropdown, tool telemetry, token budgeting, and interactive chat. |
+| **`src/pages/StrategyStudioPage.tsx`** | Quantitative Strategy Studio; hosts discovery runs, 16-trial DSR sweeps, equity curves, and experiment vault persistence. |
 | **`src/components/GcpCompanion.tsx`** | Quant Lab UI; hosts AI intelligence consensus, universe manager, and backtesting dashboard. |
 | **`src/components/ApiVaultModal.tsx`** | 4-Pillar Vault modal with live test probes, badge reflection, and credential synchronization. |
+| **`CHANGELOG.md`** | Authoritative institutional evolution and version history ledger. |
 | **`deploy_to_gcp.sh`** | Clean GCP deployment automation for Frankfurt Compute Engine VM (Zero Firebase / Zero Firestore). |
 | **`AGENTS.md`** | Immutable institutional rules and architecture guidelines for AI agents and developers. |
+

@@ -6,6 +6,7 @@ import { CopilotPage } from "./pages/CopilotPage";
 import { StrategyStudioPage } from "./pages/StrategyStudioPage";
 import { Sun, Moon, Activity, Tag, Globe, HelpCircle, LayoutGrid, Home, ShieldAlert, Layers, Sliders, Sparkles, SlidersHorizontal, ArrowLeft, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
 import { getStoredVaultValue } from "./utils/vaultStorage";
+import { getAdminHeaders } from "./utils/auth";
 
 export default function App() {
   // Safe default persistent theme
@@ -70,7 +71,10 @@ export default function App() {
     setTriggering2FA(true);
     setTrigger2FAMsg("Dispatching signal...");
     try {
-      const res = await fetch("/api/gateway/trigger-login", { method: "POST" });
+      const res = await fetch("/api/gateway/trigger-login", {
+        method: "POST",
+        headers: getAdminHeaders()
+      });
       const data = await res.json();
       if (data.success) {
         setTrigger2FAMsg("📲 2FA Sent! Check phone.");
@@ -183,13 +187,9 @@ export default function App() {
     }));
 
     try {
-      const adminKey = localStorage.getItem("alpha_operator_admin_key") || "ALPHA_ADMIN_REVERT_992";
       let res = await fetch("/api/system/toggle-lane", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-key": adminKey
-        },
+        headers: getAdminHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           mode: nextMode,
           port: nextPort,
@@ -200,10 +200,7 @@ export default function App() {
       if (!res.ok) {
         res = await fetch("/api/set-settings", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-admin-key": adminKey
-          },
+          headers: getAdminHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({
             tradingMode: nextMode,
             ibkrPort: nextPort,

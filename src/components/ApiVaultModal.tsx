@@ -33,6 +33,7 @@ import {
   syncVaultToServer,
   getAllStoredVaultSettings
 } from "../utils/vaultStorage";
+import { getAdminHeaders } from "../utils/auth";
 
 interface ApiVaultModalProps {
   isOpen: boolean;
@@ -108,7 +109,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
 
       // 1. Fetch centralized server-side credentials (for seamless access across any machine)
       fetch("/api/vault/credentials", {
-        headers: { "x-admin-key": "ALPHA_ADMIN_REVERT_992" }
+        headers: getAdminHeaders()
       })
         .then((r) => r.json())
         .then((creds) => {
@@ -260,7 +261,7 @@ export const ApiVaultModal: React.FC<ApiVaultModalProps> = ({
   const handleAutoFillVerifiedAiKeys = async () => {
     try {
       const res = await fetch("/api/vault/credentials", {
-        headers: { "x-admin-key": "ALPHA_ADMIN_REVERT_992" }
+        headers: getAdminHeaders()
       });
       if (res.ok) {
         const data = await res.json();

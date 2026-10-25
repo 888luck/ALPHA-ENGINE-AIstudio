@@ -6,6 +6,8 @@
 // page refreshes, tab closures, and Cloud Run scale-to-zero container recycles.
 // ==============================================================================
 
+import { getAdminHeaders } from "./auth";
+
 const MASTER_KEY = "alpha_engine_settings";
 
 const KEY_MAPPINGS: Record<string, string[]> = {
@@ -176,10 +178,7 @@ export async function syncVaultToServer(updates?: Record<string, any>): Promise<
   try {
     const res = await fetch("/api/set-settings", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-key": "ALPHA_ADMIN_REVERT_992"
-      },
+      headers: getAdminHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(cleanPayload)
     });
     return res.ok;

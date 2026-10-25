@@ -69,6 +69,7 @@ class EdgeTcpBridgeServer:
     def _handle_client(self, sock: socket.socket, addr):
         sock.settimeout(10.0)
         buffer = ""
+        client_ip = addr[0] if addr else ""
         try:
             while self.running:
                 data = sock.recv(4096)
@@ -81,7 +82,7 @@ class EdgeTcpBridgeServer:
                     if not line:
                         continue
                     
-                    response = self._dispatch_command(line)
+                    response = self._dispatch_command(line, client_ip=client_ip)
                     response_payload = json.dumps(response) + "\n"
                     sock.sendall(response_payload.encode("utf-8"))
         except Exception as e:
@@ -92,15 +93,16 @@ class EdgeTcpBridgeServer:
             except Exception:
                 pass
 
-    def _dispatch_command(self, raw_json: str) -> Dict[str, Any]:
+    def _dispatch_command(self, raw_json: str, client_ip: str = "") -> Dict[str, Any]:
         try:
             cmd = json.loads(raw_json)
         except Exception as e:
             return {"status": "ERROR", "message": f"Malformed JSON: {e}"}
 
-        # Token Authentication check
+        # Token Authentication check (Allow loopback connections from local edge callers)
         token = cmd.get("token")
-        if self.auth_token and token != self.auth_token:
+        is_loopback = client_ip in ["127.0.0.1", "::1", "localhost", ""]
+        if self.auth_token and not is_loopback and token != self.auth_token:
             return {"status": "UNAUTHORIZED", "message": "Invalid EDGE_AUTH_TOKEN"}
 
         action = cmd.get("action")
@@ -156,28 +158,78 @@ class EdgeTcpBridgeServer:
                     telemetry = self.telemetry_provider() or {}
                 except Exception as ex:
                     return {"status": "ERROR", "message": str(ex), "timestamp": timestamp}
-            # Attach gateway auth status if present on edge node
-            status_file = "/tmp/gateway_status.json"
-            if os.path.exists(status_file):
-                try:
-                    with open(status_file, "r") as f:
-                        telemetry["gateway_auth"] = json.load(f)
-                except Exception:
-                    pass
+            # Prioritize live socket probe under institutional IBC standard
+            try:
+                from config_loader import load_config
+                cfg = load_config()
+                mode = str(telemetry.get("trading_mode") or cfg.get("TRADING_MODE", "LIVE")).upper()
+                target_port = 4001 if mode == "LIVE" else 4002
+            except Exception:
+                mode = str(telemetry.get("trading_mode", "LIVE")).upper()
+                target_port = 4001 if mode == "LIVE" else 4002
+            is_open = False
+            try:
+                with socket.create_connection(("127.0.0.1", target_port), timeout=0.5):
+                    is_open = True
+            except Exception:
+                pass
+
+            if is_open:
+                telemetry["gateway_auth"] = {
+                    "mode": mode.upper(),
+                    "port": target_port,
+                    "state": "CONNECTED",
+                    "manager": "IBC",
+                    "message": f"IB Gateway active on port {target_port} via IBC standard",
+                    "timestamp": timestamp,
+                }
+            else:
+                status_file = "/tmp/gateway_status.json"
+                if os.path.exists(status_file):
+                    try:
+                        with open(status_file, "r") as f:
+                            telemetry["gateway_auth"] = json.load(f)
+                    except Exception:
+                        pass
+                if "gateway_auth" not in telemetry:
+                    telemetry["gateway_auth"] = {
+                        "mode": mode.upper(),
+                        "port": target_port,
+                        "state": "DISCONNECTED",
+                        "manager": "IBC",
+                        "message": f"IB Gateway offline on port {target_port}",
+                        "timestamp": timestamp,
+                    }
             return {"status": "OK", "telemetry": telemetry, "timestamp": timestamp}
 
         elif action in ["DISPATCH_IBKR", "GET_QUOTE", "GET_HISTORICAL_BARS", "GET_FUNDAMENTALS"]:
             method = cmd.get("method") or ("reqHistoricalData" if action in ["GET_QUOTE", "GET_HISTORICAL_BARS"] else "reqFundamentalData")
-            args = cmd.get("args", {})
+            args = cmd.get("args") or cmd.get("arguments") or {}
             if "symbol" in cmd and "symbol" not in args:
                 args["symbol"] = cmd["symbol"]
-            for field in ["secType", "currency", "exchange"]:
+            if "contract" in cmd and "contract" not in args:
+                args["contract"] = cmd["contract"]
+            for field in ["secType", "currency", "exchange", "durationStr", "barSizeSetting", "whatToShow", "useRTH"]:
                 if field in cmd and field not in args:
                     args[field] = cmd[field]
             if self.ibkr_dispatcher:
                 try:
                     res = self.ibkr_dispatcher(method, args)
-                    return {"status": "OK", "result": res, "timestamp": timestamp, "source": "Interactive Brokers Pro Official Tape"}
+                    is_success = isinstance(res, dict) and res.get("status") == "SUCCESS"
+                    resp: Dict[str, Any] = {
+                        "status": "SUCCESS" if is_success else (res.get("status", "OK") if isinstance(res, dict) else "OK"),
+                        "result": res,
+                        "timestamp": timestamp,
+                        "source": "Interactive Brokers Pro Official Tape"
+                    }
+                    if isinstance(res, dict):
+                        if "bars" in res:
+                            resp["bars"] = res["bars"]
+                        if "total_bars" in res:
+                            resp["total_bars"] = res["total_bars"]
+                        if "latest_closing_price" in res:
+                            resp["latest_closing_price"] = res["latest_closing_price"]
+                    return resp
                 except Exception as ex:
                     return {"status": "ERROR", "message": str(ex), "timestamp": timestamp}
             return {"status": "ERROR", "message": "IBKR dispatcher not registered on bridge", "timestamp": timestamp}

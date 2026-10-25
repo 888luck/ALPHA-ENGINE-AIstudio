@@ -77,6 +77,7 @@ import {
   syncVaultToServer,
   getStoredVaultValue
 } from "../utils/vaultStorage";
+import { getAdminHeaders } from "../utils/auth";
 
 // Offline default model (local CPU ONNX embedded in container)
 const TIER0_OFFLINE_MODEL: ModelItem = {
@@ -104,15 +105,14 @@ export function CopilotPage({ onNavigateHome }: { onNavigateHome?: () => void })
     setTradingMode(nextMode);
     localStorage.setItem("alpha_trading_mode", nextMode);
     try {
-      const adminKey = localStorage.getItem("alpha_operator_admin_key") || "ALPHA_ADMIN_REVERT_992";
       await fetch("/api/set-settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        headers: getAdminHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ tradingMode: nextMode, ibkrPort: nextPort })
       });
       await fetch("/api/risk/settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        headers: getAdminHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ tradingMode: nextMode })
       });
       if (typeof window !== "undefined") {
@@ -129,10 +129,7 @@ export function CopilotPage({ onNavigateHome }: { onNavigateHome?: () => void })
     try {
       await fetch("/api/set-settings", {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "x-admin-key": "ALPHA_ADMIN_REVERT_992"
-        },
+        headers: getAdminHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ [key]: value }),
       });
       await fetchStatsAndModels(true);
@@ -273,7 +270,7 @@ Click any quick query below or type your request:`,
   useEffect(() => {
     // 1. Fetch centralized server credentials (guarantees access from any machine worldwide)
     fetch("/api/vault/credentials", {
-      headers: { "x-admin-key": "ALPHA_ADMIN_REVERT_992" }
+      headers: getAdminHeaders()
     })
       .then((r) => r.json())
       .then((creds) => {

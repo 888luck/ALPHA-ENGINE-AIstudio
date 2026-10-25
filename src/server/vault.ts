@@ -128,7 +128,7 @@ export function loadVaultCredentials(): VaultCredentials {
     edgeTcpPort: edgePort,
     edgeAuthToken: getVal("EDGE_AUTH_TOKEN", "ALPHA_EDGE_SECRET_2026"),
     tradingMode: (getVal("TRADING_MODE", "PAPER").toUpperCase() === "LIVE" ? "LIVE" : "PAPER"),
-    adminOperatorKey: getVal("ADMIN_OPERATOR_KEY", "ALPHA_ADMIN_REVERT_992"),
+    adminOperatorKey: getVal("OPERATOR_ADMIN_KEY") || getVal("ADMIN_OPERATOR_KEY", "ALPHA_ADMIN_REVERT_992"),
 
     // Pillar 3: AI Model Providers
     geminiApiKey: getVal("GEMINI_API_KEY", ""),
@@ -242,6 +242,7 @@ export function saveVaultCredentials(updates: Partial<VaultCredentials>): VaultC
     EDGE_AUTH_TOKEN: merged.edgeAuthToken,
     TRADING_MODE: merged.tradingMode,
     ADMIN_OPERATOR_KEY: merged.adminOperatorKey,
+    OPERATOR_ADMIN_KEY: merged.adminOperatorKey,
 
     GEMINI_API_KEY: merged.geminiApiKey,
     GROQ_API_KEY: merged.groqApiKey,

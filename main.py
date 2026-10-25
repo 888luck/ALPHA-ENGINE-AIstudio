@@ -4,6 +4,7 @@ import time
 import subprocess
 import datetime
 import argparse
+import json
 import zoneinfo
 from typing import List, Dict, Any, Optional
 
@@ -14,29 +15,34 @@ from alpha_strategy import AlphaStrategy, ProactiveSimulator
 from ha_manager import HighAvailabilityManager
 from edge_bridge import EdgeTcpBridgeServer
 
+def atomic_write_json(file_path: str, data: Any):
+    """Atomically persists JSON data to disk using .tmp and os.replace (Zero-loss compliant)."""
+    tmp_path = f"{file_path}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+    os.replace(tmp_path, file_path)
+
 def save_local_trade(trade_id: str, trade_data: dict, sandbox: bool = False):
     fname = "active_trades_sandbox.json" if sandbox else "active_trades.json"
     try:
         trades = {}
-        if os.path.exists(fname):
+        if os.path.exists(fname) and os.path.getsize(fname) > 0:
             with open(fname, "r", encoding="utf-8") as f:
                 trades = json.load(f)
         trades[trade_id] = trade_data
-        with open(fname, "w", encoding="utf-8") as f:
-            json.dump(trades, f, indent=2)
+        atomic_write_json(fname, trades)
     except Exception as e:
         print(f"[LOCAL STATE WARN] Failed saving trade: {e}")
 
 def remove_local_trade(trade_id: str):
     for fname in ["active_trades.json", "active_trades_sandbox.json"]:
-        if os.path.exists(fname):
+        if os.path.exists(fname) and os.path.getsize(fname) > 0:
             try:
                 with open(fname, "r", encoding="utf-8") as f:
                     trades = json.load(f)
                 if trade_id in trades:
                     del trades[trade_id]
-                    with open(fname, "w", encoding="utf-8") as f:
-                        json.dump(trades, f, indent=2)
+                    atomic_write_json(fname, trades)
             except Exception:
                 pass
 
@@ -50,16 +56,14 @@ def save_local_log(log_id: str, log_data: dict):
         logs.append(log_data)
         if len(logs) > 500:
             logs = logs[-500:]
-        with open(fname, "w", encoding="utf-8") as f:
-            json.dump(logs, f, indent=2)
+        atomic_write_json(fname, logs)
     except Exception as e:
         print(f"[LOCAL STATE WARN] Failed saving log: {e}")
 
 def save_local_risk_state(state_dict: dict):
     fname = "system_risk_state.json"
     try:
-        with open(fname, "w", encoding="utf-8") as f:
-            json.dump(state_dict, f, indent=2)
+        atomic_write_json(fname, state_dict)
     except Exception as e:
         print(f"[LOCAL STATE WARN] Failed saving risk state: {e}")
 
@@ -153,12 +157,56 @@ def main_loop():
     parser.add_argument("--basket-size", type=int, default=0, help="Override active basket focus limit (1-5)")
     args, unknown = parser.parse_known_args()
 
-    # 1. Load System Variables
+    # 1. Load System Variables & Reconcile Settings
     config = load_config()
+    remote_state = {}
+    for cfg_path in [
+        "system_settings.json",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "system_settings.json"),
+        "/opt/alpha-engine/system_settings.json",
+        "settings_vault.json",
+        "system_risk_state.json"
+    ]:
+        if os.path.exists(cfg_path):
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        for k, v in data.items():
+                            if k not in remote_state:
+                                remote_state[k] = v
+            except Exception:
+                pass
+
+    if remote_state:
+        if "tradingMode" in remote_state:
+            config["TRADING_MODE"] = str(remote_state["tradingMode"]).upper()
+            print(f"[INIT SYNC] Loaded tradingMode: {config['TRADING_MODE']}")
+        if "ibkrPort" in remote_state:
+            config["IBKR_PORT"] = int(remote_state["ibkrPort"])
+        if "ibkrClientId" in remote_state:
+            config["IBKR_CLIENT_ID"] = int(remote_state["ibkrClientId"])
+        if "ibkrAccountNumber" in remote_state:
+            config["IBKR_ACCOUNT_NUMBER"] = str(remote_state["ibkrAccountNumber"])
+            print(f"[INIT SYNC] Loaded Account override: {config['IBKR_ACCOUNT_NUMBER']}")
+
+    mode_from_cfg = str(config.get("TRADING_MODE", "LIVE")).upper()
+    port_from_cfg = int(config.get("IBKR_PORT", 4001 if mode_from_cfg == "LIVE" else 4002))
+    target_mode = "LIVE" if port_from_cfg == 4001 else "PAPER"
+    target_port = 4001 if target_mode == "LIVE" else 4002
+    config["TRADING_MODE"] = target_mode
+    config["IBKR_PORT"] = target_port
+
     basket_size = args.basket_size if args.basket_size > 0 else config.get("MAX_ACTIVE_INSTRUMENTS", 3)
     
-    # 2. Setup Connectivity Manager (IBKR IBIE Compliance Router)
-    cm = ConnectionManager()
+    # 2. Setup Connectivity Manager & Establish Gateway Connection (IBKR IBIE Compliance Router)
+    cm = ConnectionManager(trading_mode=target_mode)
+    try:
+        print(f"[GATEWAY CONNECT] Initializing Connection: Host={config['IBKR_HOST']} Port={target_port} ClientID={config['IBKR_CLIENT_ID']} Mode={cm.trading_mode}")
+        cm.connect_gateway(config["IBKR_HOST"], target_port, config["IBKR_CLIENT_ID"])
+    except Exception as e:
+        print(f"[CON_ERR] Could not establish connection to headless gateway: {e}")
+        cm.is_connected = False
     
     # 3. Initialize Multi-Agent Intelligence Layer
     news_ingestor = NewsIngestor(connection_manager=cm)
@@ -192,6 +240,9 @@ def main_loop():
     
     # 5. Bind DRM Protection Module
     drm = DRMMiddleware(cm, config["IBKR_ACCOUNT_NUMBER"])
+    if remote_state and "routerLocked" in remote_state:
+        drm.router_locked = bool(remote_state["routerLocked"])
+        print(f"[INIT SYNC] Loaded lock state from disk vault: LOCKED={drm.router_locked}")
     
     # Initialize HA Leader Election (Phase 3.2 - Local Atomic Lease)
     def on_failover():
@@ -253,19 +304,28 @@ def main_loop():
             drm.daily_capital_ceiling = float(settings_dict["dailyCapitalCeiling"])
         cloud_mode = settings_dict.get("tradingMode")
         if cloud_mode and cloud_mode.upper() in ["PAPER", "LIVE"]:
+            new_mode = cloud_mode.upper()
+            new_port = 4001 if new_mode == "LIVE" else 4002
             current_mode = "LIVE" if config.get("IBKR_PORT") == 4001 else "PAPER"
-            if cloud_mode.upper() != current_mode:
-                print(f"[TRADING MODE SWITCH] Switch requested via TCP Bridge: {current_mode} -> {cloud_mode.upper()}")
+            cm.trading_mode = new_mode
+            config["TRADING_MODE"] = new_mode
+            config["IBKR_PORT"] = new_port
+            if new_mode != current_mode:
+                print(f"[TRADING MODE SWITCH] Switch requested via TCP Bridge: {current_mode} -> {new_mode}")
                 script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "switch_gateway_mode.py")
                 if os.path.exists(script_path):
-                    subprocess.Popen(["python3", script_path, "--mode", cloud_mode.upper()])
+                    subprocess.Popen(["python3", script_path, "--mode", new_mode], start_new_session=True)
         return {"acknowledged": True}
 
     def handle_direct_telemetry():
         return {
             "connected": getattr(cm, "is_connected", False),
+            "trading_mode": getattr(cm, "trading_mode", "PAPER"),
+            "account": cm.accounts_list[0] if getattr(cm, "accounts_list", None) else config.get("IBKR_ACCOUNT_NUMBER"),
+            "accounts": getattr(cm, "accounts_list", []),
             "router_locked": drm.router_locked,
             "positions": getattr(cm, "active_positions", {}),
+            "account_summary": getattr(cm, "account_summary", {}),
             "timestamp": time.time(),
         }
 
@@ -280,49 +340,6 @@ def main_loop():
     print("[INIT] Initializing Proactive Sector Expectancy Calibration...")
     sim_data = simulator.run_expectancy_simulation()
     
-    # Load initial risk settings from local disk configuration (settings_vault.json / system_risk_state.json)
-    remote_state = {}
-    for cfg_path in ["settings_vault.json", "system_risk_state.json"]:
-        if os.path.exists(cfg_path):
-            try:
-                with open(cfg_path, "r", encoding="utf-8") as f:
-                    remote_state = json.load(f)
-                    break
-            except Exception:
-                pass
-
-    if remote_state:
-        if "routerLocked" in remote_state:
-            drm.router_locked = bool(remote_state["routerLocked"])
-            print(f"[INIT SYNC] Loaded lock state from disk vault: LOCKED={drm.router_locked}")
-        if "ibkrPort" in remote_state:
-            config["IBKR_PORT"] = int(remote_state["ibkrPort"])
-        if "ibkrClientId" in remote_state:
-            config["IBKR_CLIENT_ID"] = int(remote_state["ibkrClientId"])
-        if "ibkrAccountNumber" in remote_state:
-            config["IBKR_ACCOUNT_NUMBER"] = remote_state["ibkrAccountNumber"]
-            drm.account_number = config["IBKR_ACCOUNT_NUMBER"]
-            print(f"[INIT SYNC] Loaded Account override: {config['IBKR_ACCOUNT_NUMBER']}")
-        if "gatewayConnectionActive" in remote_state:
-            config_active = bool(remote_state["gatewayConnectionActive"])
-            print(f"[INIT SYNC] Gateway Connection Mode: {'ACTIVE IBKR PLATFORM INTERFACE' if config_active else 'STANDALONE OFFLINE SIMULATION'}")
-            
-    # Attempt gateway connection if enabled
-    try:
-        is_conn_enabled = remote_state.get("gatewayConnectionActive", False) if remote_state else False
-        if is_conn_enabled:
-            print(f"[GATEWAY CONNECT] Initializing Connection: Port={config['IBKR_PORT']} ClientID={config['IBKR_CLIENT_ID']}")
-            cm.connect_gateway(config["IBKR_HOST"], config["IBKR_PORT"], config["IBKR_CLIENT_ID"])
-            time.sleep(2) # Give connection time to establish
-            cm.reqAccountSummary(9001, "All", "AvailableFunds,ExcessLiquidity,InitMarginReq,MaintMarginReq")
-        else:
-            print("[GATEWAY BYPASS] Operating in offline simulation sandbox mode.")
-            cm.is_connected = False
-    except Exception as e:
-        print(f"[CON_ERR] Could not establish connection to headless gateway: {e}")
-        print("[CON_ERR] Proceeding in offline simulation mode for local diagnostics.")
-        cm.is_connected = False
-        
     print("\n[SCHEDULER] Master loop started. Waiting for tactical session windows...")
     from historical_var import HistoricalVAR
     var_engine = HistoricalVAR(confidence_interval=0.99, lookback_days=250)

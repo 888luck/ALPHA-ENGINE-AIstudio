@@ -616,25 +616,39 @@ class AlphaBacktestingEngine:
         else:
             barsize = "1 day"
 
-        duration_str = f"{days_diff} D" if days_diff <= 365 else f"{max(1, days_diff // 365)} Y"
+        # Ensure sufficient history for daily bars (minimum 180-250 bars required for 20-period SMA + multi-bar holding periods)
+        if barsize == "1 day" and days_diff < 180:
+            duration_str = "1 Y"
+        elif barsize in ["5 mins", "15 mins"]:
+            # IBKR max single-request lookback for 5m/15m is 1 M / 30 D
+            duration_str = f"{min(days_diff, 30)} D"
+        elif days_diff > 365:
+            duration_str = f"{max(1, days_diff // 365)} Y"
+        else:
+            duration_str = f"{days_diff} D"
         
         bars = []
         
         # 1. Attempt query via Edge TCP Bridge to IBKR Pro Gateway
         edge_host, edge_port = get_edge_endpoint()
+        auth_token = os.environ.get("EDGE_AUTH_TOKEN", "ALPHA_EDGE_SECRET_2026")
+        adaptive_timeout = max(25.0, min(65.0, float(days_diff) * 0.15))
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(5.0)
+            sock.settimeout(adaptive_timeout)
             sock.connect((edge_host, edge_port))
             cmd = {
                 "action": "DISPATCH_IBKR",
                 "method": "reqHistoricalData",
+                "token": auth_token,
                 "arguments": {
                     "contract": symbol,
+                    "symbol": symbol,
                     "durationStr": duration_str,
                     "barSizeSetting": barsize,
                     "whatToShow": "TRADES",
-                    "useRTH": 1
+                    "useRTH": 1,
+                    "timeout": adaptive_timeout - 2.0
                 }
             }
             sock.sendall((json.dumps(cmd) + "\n").encode("utf-8"))
@@ -648,11 +662,16 @@ class AlphaBacktestingEngine:
             
             if raw:
                 resp = json.loads(raw.decode("utf-8"))
-                if resp.get("status") == "SUCCESS" and "bars" in resp:
-                    bars = resp["bars"]
-                    if len(bars) > 0:
-                        print(f"[BACKTESTER] Successfully retrieved {len(bars)} verified historical bars for {symbol} from IBKR Pro Tape via {edge_host}:{edge_port}.", file=sys.stderr)
-                        return bars
+                bars = resp.get("bars") or (resp.get("result", {}).get("bars") if isinstance(resp.get("result"), dict) else None)
+                if bars and len(bars) > 0:
+                    print(f"[BACKTESTER] Successfully retrieved {len(bars)} verified historical bars for {symbol} from IBKR Pro Tape via {edge_host}:{edge_port}.", file=sys.stderr)
+                    try:
+                        cache_save_path = os.path.join(os.path.dirname(__file__), f"historical_bars_{symbol.upper()}_{timeframe.lower()}.json")
+                        with open(cache_save_path, "w", encoding="utf-8") as cf:
+                            json.dump(bars, cf, indent=2)
+                    except Exception:
+                        pass
+                    return bars
         except Exception as e:
             print(f"[BACKTESTER] TCP Bridge to IBKR Pro currently unreachable at {edge_host}:{edge_port} ({e}). Checking local verified cache...", file=sys.stderr)
 

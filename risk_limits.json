@@ -1,0 +1,8 @@
+{
+  "tradingMode": "PAPER",
+  "ibkrPort": 4002,
+  "ibkrAccountNumber": "DUE263010",
+  "dailyCapitalCeiling": 500,
+  "dailyMaxLossCutoff": 50,
+  "updated_at": "2026-10-24T02:53:51.480Z"
+}

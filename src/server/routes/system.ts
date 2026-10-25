@@ -339,7 +339,7 @@ systemRouter.post("/api/sync-from-cloud", (req, res) => {
   res.json({ success: true, settings: getMaskedSettings(systemSettings), activeTrades, historicalLogs });
 });
 
-systemRouter.post("/api/gateway/trigger-login", async (req, res) => {
+systemRouter.post("/api/gateway/trigger-login", authMiddleware, async (req, res) => {
   try {
     const result = await edgeBridge.triggerGatewayLogin();
     res.json({ success: true, message: "On-demand 2FA login signal dispatched to edge node.", result });

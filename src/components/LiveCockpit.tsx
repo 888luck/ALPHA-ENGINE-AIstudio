@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ExchangeTag } from "./ExchangeTag";
+import { getAdminHeaders } from "../utils/auth";
 import { 
   ShieldAlert, 
   ShieldCheck, 
@@ -136,16 +137,6 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
     return () => clearInterval(interval);
   }, [hasInitializedInputs]);
 
-  // Save risk configuration
-  const getAdminHeaders = () => {
-    const key = localStorage.getItem("alpha_operator_admin_key") || "ALPHA_ADMIN_REVERT_992";
-    return {
-      "Content-Type": "application/json",
-      "x-admin-key": key,
-      "Authorization": `Bearer ${key}`
-    };
-  };
-
   const handleSaveRiskSettings = async () => {
     setLoading(true);
     setError(null);
@@ -158,7 +149,7 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
 
       const res = await fetch("/api/risk/settings", {
         method: "POST",
-        headers: getAdminHeaders(),
+        headers: getAdminHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           dailyCapitalCeiling: safeCap,
           dailyMaxLossCutoff: safeLoss,
@@ -202,7 +193,7 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
     try {
       const res = await fetch("/api/risk/flatten-intraday", {
         method: "POST",
-        headers: getAdminHeaders(),
+        headers: getAdminHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ reason: "Manual Operator 15:45 MOC Execution Rule" })
       });
       const data = await res.json();

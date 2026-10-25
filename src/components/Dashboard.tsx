@@ -34,6 +34,7 @@ import {
 } from "recharts";
 import { ApiVaultModal } from "./ApiVaultModal";
 import { getStoredVaultValue, persistVaultItem, persistVaultBatch, syncVaultToServer } from "../utils/vaultStorage";
+import { getAdminHeaders } from "../utils/auth";
 
 
 
@@ -129,10 +130,7 @@ export default function Dashboard({ onNavigate, navTarget, activeTabOverride }: 
     try {
       const res = await fetch("/api/set-settings", {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "x-admin-key": "ALPHA_ADMIN_REVERT_992"
-        },
+        headers: getAdminHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ [key]: value })
       });
       if (!res.ok) {
@@ -259,10 +257,7 @@ export default function Dashboard({ onNavigate, navTarget, activeTabOverride }: 
     try {
       const res = await fetch("/api/set-settings", {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "x-admin-key": "ALPHA_ADMIN_REVERT_992"
-        },
+        headers: getAdminHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           ibkrAccountNumber: editAccount,
           ibkrPort: Number(editPort),
