@@ -201,13 +201,20 @@ class MarketHoursResolver:
         try:
             is_session = cal.is_session(date_str)
             if not is_session:
+                next_open_utc = None
+                try:
+                    next_session_ts = cal.date_to_session(date_str, direction="next")
+                    next_open_utc = cal.session_open(next_session_ts).to_pydatetime()
+                except Exception:
+                    pass
                 return {
                     "date": today_local,
                     "is_open": False,
                     "status": MarketSessionPhase.CLOSED_HOLIDAY,
                     "tz": tz_name,
                     "exchange": cal.name,
-                    "source": "EXCHANGE_CALENDARS_HOLIDAY"
+                    "source": "EXCHANGE_CALENDARS_HOLIDAY",
+                    "next_session_open_utc": next_open_utc
                 }
 
             # Extract exact official session open & close timestamps in UTC
@@ -227,6 +234,13 @@ class MarketHoursResolver:
             observation_end = observation_end_utc.astimezone(local_tz)
             flatten_start = flatten_start_utc.astimezone(local_tz)
 
+            next_open_utc = None
+            try:
+                next_session_ts = cal.next_session(date_str)
+                next_open_utc = cal.session_open(next_session_ts).to_pydatetime()
+            except Exception:
+                pass
+
             return {
                 "date": today_local,
                 "is_open": True,
@@ -242,7 +256,8 @@ class MarketHoursResolver:
                 "open_time_str": session_open.strftime("%H:%M"),
                 "close_time_str": session_close.strftime("%H:%M"),
                 "exchange": cal.name,
-                "source": "EXCHANGE_CALENDARS_OFFICIAL"
+                "source": "EXCHANGE_CALENDARS_OFFICIAL",
+                "next_session_open_utc": next_open_utc
             }
         except Exception as e:
             logger.debug(f"[EXCHANGE CALENDAR ERR] Failed resolving session for {exchange_code} on {date_str}: {e}")
@@ -264,13 +279,21 @@ class MarketHoursResolver:
 
         # Weekend check
         if today_local.weekday() >= 5:
+            days_to_mon = 7 - today_local.weekday()
+            next_mon = today_local + timedelta(days=days_to_mon)
+            next_open = datetime.combine(next_mon, time(open_h, open_m), tzinfo=tz)
             return {
                 "date": today_local,
                 "is_open": False,
                 "status": MarketSessionPhase.CLOSED_HOLIDAY,
                 "tz": cfg["tz"],
-                "source": "WEEKEND_FALLBACK"
+                "source": "WEEKEND_FALLBACK",
+                "next_session_open_utc": next_open.astimezone(timezone.utc)
             }
+
+        days_ahead = 3 if today_local.weekday() == 4 else 1
+        next_day = today_local + timedelta(days=days_ahead)
+        next_open = datetime.combine(next_day, time(open_h, open_m), tzinfo=tz)
 
         return {
             "date": today_local,
@@ -286,7 +309,8 @@ class MarketHoursResolver:
             "tz": cfg["tz"],
             "open_time_str": cfg["open"],
             "close_time_str": cfg["close"],
-            "source": "STATIC_SCHEDULE_FALLBACK"
+            "source": "STATIC_FALLBACK",
+            "next_session_open_utc": next_open.astimezone(timezone.utc)
         }
 
     def resolve_session(
@@ -357,6 +381,15 @@ class MarketHoursResolver:
         now_utc = current_time_utc or datetime.now(timezone.utc)
 
         if not session_info.get("is_open", False):
+            next_open = session_info.get("next_session_open_utc")
+            if next_open:
+                delta = next_open - now_utc
+                if delta.total_seconds() > 0:
+                    mins = int(delta.total_seconds() // 60)
+                    hrs = mins // 60
+                    m = mins % 60
+                    countdown = f"Opens in {hrs}h {m}m" if hrs > 0 else f"Opens in {m}m"
+                    return MarketSessionPhase.CLOSED_HOLIDAY, countdown
             return MarketSessionPhase.CLOSED_HOLIDAY, "Market Closed (Weekend / Holiday)"
 
         open_utc = session_info["session_open_utc"]
@@ -389,5 +422,16 @@ class MarketHoursResolver:
             delta = close_utc - now_utc
             mins = int(delta.total_seconds() // 60)
             return MarketSessionPhase.CLOSING_FLATTEN, f"Auto-Flatten Armed ({mins}m to close)"
+
+        # Post-Market: calculate countdown to next session open
+        next_open = session_info.get("next_session_open_utc")
+        if next_open:
+            delta = next_open - now_utc
+            if delta.total_seconds() > 0:
+                mins = int(delta.total_seconds() // 60)
+                hrs = mins // 60
+                m = mins % 60
+                countdown = f"Opens in {hrs}h {m}m" if hrs > 0 else f"Opens in {m}m"
+                return MarketSessionPhase.POST_MARKET, countdown
 
         return MarketSessionPhase.POST_MARKET, "Market Closed (Post-Session)"
