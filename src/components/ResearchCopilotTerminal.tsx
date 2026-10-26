@@ -348,45 +348,46 @@ export const ResearchCopilotTerminal: React.FC = () => {
   };
 
   return (
-    <div className="bg-[#080c14] border border-white/10 rounded-xl p-5 space-y-6">
+    <div className="terminal-card rounded-xl p-5 space-y-6">
       {/* HEADER & COPILOT TITLE */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/10 pb-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b terminal-border pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs bg-emerald-500/20 text-emerald-300 font-mono font-bold px-2.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1">
+            <span className="text-xs terminal-badge-bid font-mono font-bold px-2.5 py-0.5 rounded flex items-center gap-1">
               <Sparkles className="w-3 h-3" /> AGENTIC RESEARCH COPILOT
             </span>
-            <span className="text-xs text-slate-300 font-mono">IBKR Ireland Institutional Lab</span>
+            <span className="text-xs text-secondary font-mono">IBKR Ireland Institutional Lab</span>
           </div>
-          <h2 className="text-base font-extrabold text-white font-mono mt-1 flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-emerald-400" /> Conversational Strategy & Statistical Lab
+          <h2 className="text-base font-extrabold text-primary font-mono mt-1 flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-emerald-500 dark:text-emerald-400" /> Conversational Strategy & Statistical Lab
           </h2>
-          <p className="text-xs text-slate-300 font-sans mt-0.5">
+          <p className="text-xs text-secondary font-sans mt-0.5">
             Formulate hypotheses, enforce hard risk ceilings, de-noise with 12 primary feeds, and audit with López de Prado's Deflated Sharpe Ratio.
           </p>
         </div>
 
         {/* STAGE PROGRESS INDICATOR */}
-        <div className="flex items-center gap-2 bg-black/40 border border-white/10 px-3 py-1.5 rounded-lg text-xs font-mono">
-          <span className={activeStage >= 1 ? "text-emerald-400 font-bold" : "text-slate-400"}>1. Query & Disambiguate</span>
-          <span className="text-slate-500">→</span>
-          <span className={activeStage >= 2 ? "text-emerald-400 font-bold" : "text-slate-400"}>2. Quant Discovery</span>
-          <span className="text-slate-500">→</span>
-          <span className={activeStage >= 3 ? "text-emerald-400 font-bold" : "text-slate-400"}>3. Backtest & DSR</span>
+        <div className="flex items-center gap-2 terminal-elevated px-3 py-1.5 rounded-lg text-xs font-mono">
+          <span className={activeStage >= 1 ? "text-emerald-500 dark:text-emerald-400 font-bold" : "text-secondary"}>1. Query & Disambiguate</span>
+          <span className="text-muted">→</span>
+          <span className={activeStage >= 2 ? "text-emerald-500 dark:text-emerald-400 font-bold" : "text-secondary"}>2. Quant Discovery</span>
+          <span className="text-muted">→</span>
+          <span className={activeStage >= 3 ? "text-emerald-500 dark:text-emerald-400 font-bold" : "text-secondary"}>3. Backtest & DSR</span>
         </div>
       </div>
 
       {/* QUICK PRESET CHIPS */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-slate-300 font-mono">Quick Inquiries:</span>
+        <span className="text-xs text-secondary font-mono">Quick Inquiries:</span>
         {presets.map((p, idx) => (
           <button
             key={idx}
+            type="button"
             onClick={() => {
               setPrompt(p.text);
               handleQuerySubmit(p.text);
             }}
-            className="text-xs bg-black/40 hover:bg-white/5 border border-white/10 hover:border-emerald-500/40 text-slate-300 hover:text-white px-2.5 py-1 rounded transition cursor-pointer font-mono"
+            className="text-xs terminal-elevated hover:border-accent text-secondary hover:text-primary px-2.5 py-1 rounded transition cursor-pointer font-mono"
           >
             {p.label}
           </button>
@@ -401,12 +402,13 @@ export const ResearchCopilotTerminal: React.FC = () => {
             onChange={(e) => setPrompt(e.target.value)}
             rows={3}
             placeholder="Ask any question about a company, ticker, daily pattern, capital allocation, or safety gates..."
-            className="w-full bg-black/50 border border-white/10 rounded-xl p-3.5 text-xs sm:text-sm text-slate-100 placeholder:text-slate-400 font-mono focus:outline-none focus:border-emerald-500/50 transition resize-none"
+            className="w-full terminal-card p-3.5 text-xs sm:text-sm text-primary placeholder:text-muted font-mono focus:outline-none focus:border-cyan transition resize-none"
           />
           <button
+            type="button"
             onClick={() => handleQuerySubmit()}
             disabled={loading || !prompt.trim()}
-            className="absolute bottom-3 right-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-mono text-xs font-bold px-4 py-2 rounded-lg transition flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-950/40"
+            className="absolute bottom-3 right-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-mono text-xs font-bold px-4 py-2 rounded-lg transition flex items-center gap-2 cursor-pointer shadow-md"
           >
             {loading ? (
               <>
@@ -425,17 +427,17 @@ export const ResearchCopilotTerminal: React.FC = () => {
       {disambiguation && sanitizedRisk && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* DISAMBIGUATION PANEL */}
-          <div className="bg-black/35 border border-white/10 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between border-b border-white/10 pb-2">
-              <span className="text-xs font-mono font-bold text-slate-200 flex items-center gap-1.5">
-                <Search className="w-3.5 h-3.5 text-emerald-400" /> IBKR Contract Disambiguation
+          <div className="terminal-card rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between border-b terminal-border pb-2">
+              <span className="text-xs font-mono font-bold text-primary flex items-center gap-1.5">
+                <Search className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" /> IBKR Contract Disambiguation
               </span>
-              <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+              <span className="text-xs font-mono terminal-badge-bid px-2 py-0.5 rounded">
                 {disambiguation.status}
               </span>
             </div>
 
-            <p className="text-xs text-slate-300 font-sans">{disambiguation.message}</p>
+            <p className="text-xs text-secondary font-sans">{disambiguation.message}</p>
 
             <div className="space-y-2">
               {disambiguation.candidates.map((c, idx) => (
@@ -444,21 +446,21 @@ export const ResearchCopilotTerminal: React.FC = () => {
                   onClick={() => setSelectedContract(c)}
                   className={`p-3 rounded-lg border transition cursor-pointer flex items-center justify-between ${
                     selectedContract?.symbol === c.symbol && selectedContract?.exchange === c.exchange
-                      ? "bg-emerald-950/20 border-emerald-500/40"
-                      : "bg-black/20 border-white/5 hover:border-white/10"
+                      ? "terminal-elevated border-emerald-500/50"
+                      : "terminal-card hover:border-accent"
                   }`}
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-extrabold text-sm text-white">{c.symbol}</span>
-                      <span className="text-xs text-slate-400 font-sans">{c.name}</span>
+                      <span className="font-mono font-extrabold text-sm text-primary">{c.symbol}</span>
+                      <span className="text-xs text-secondary font-sans">{c.name}</span>
                       {c.is_primary && (
-                        <span className="text-[10px] bg-indigo-500/20 text-indigo-300 font-mono px-1.5 py-0.5 rounded border border-indigo-500/30">
+                        <span className="text-[10px] bg-indigo-500/20 text-indigo-400 font-mono px-1.5 py-0.5 rounded border border-indigo-500/30">
                           PRIMARY VENUE
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-slate-400 font-mono mt-0.5">
+                    <div className="text-xs text-secondary font-mono mt-0.5">
                       Exchange: {c.primary_exchange} • Currency: {c.currency} • conId: {c.conId || "DYNAMIC"}
                     </div>
                   </div>
@@ -474,60 +476,61 @@ export const ResearchCopilotTerminal: React.FC = () => {
           </div>
 
           {/* RISK SANITIZER & HARD ENVELOPE PANEL */}
-          <div className="bg-black/35 border border-white/10 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between border-b border-white/10 pb-2">
-              <span className="text-xs font-mono font-bold text-slate-200 flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" /> Institutional Risk Sanitizer & Clamping
+          <div className="terminal-card rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between border-b terminal-border pb-2">
+              <span className="text-xs font-mono font-bold text-primary flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" /> Institutional Risk Sanitizer & Clamping
               </span>
               {sanitizedRisk.is_clamped ? (
-                <span className="text-xs font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 flex items-center gap-1">
+                <span className="text-xs font-mono terminal-badge-warn px-2 py-0.5 rounded flex items-center gap-1">
                   <ShieldAlert className="w-3 h-3" /> CLAMPED TO FIRM CEILINGS
                 </span>
               ) : (
-                <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                <span className="text-xs font-mono terminal-badge-bid px-2 py-0.5 rounded">
                   WITHIN ENVELOPE
                 </span>
               )}
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-              <div className="bg-black/20 p-2 rounded border border-white/5">
-                <span className="text-slate-400 block text-[10px]">SANITIZED CAPITAL</span>
-                <span className="text-white font-bold">
+              <div className="terminal-elevated p-2 rounded">
+                <span className="text-secondary block text-[10px]">SANITIZED CAPITAL</span>
+                <span className="text-primary font-bold">
                   {sanitizedRisk.currency} {sanitizedRisk.sanitized_capital.toLocaleString()}
                 </span>
               </div>
-              <div className="bg-black/20 p-2 rounded border border-white/5">
-                <span className="text-slate-400 block text-[10px]">RISK BUDGET (r)</span>
-                <span className="text-white font-bold">{sanitizedRisk.risk_per_trade_pct}% per trade</span>
+              <div className="terminal-elevated p-2 rounded">
+                <span className="text-secondary block text-[10px]">RISK BUDGET (r)</span>
+                <span className="text-primary font-bold">{sanitizedRisk.risk_per_trade_pct}% per trade</span>
               </div>
-              <div className="bg-black/20 p-2 rounded border border-white/5">
-                <span className="text-slate-400 block text-[10px]">DAILY HARD STOP</span>
-                <span className="text-white font-bold">
+              <div className="terminal-elevated p-2 rounded">
+                <span className="text-secondary block text-[10px]">DAILY HARD STOP</span>
+                <span className="text-primary font-bold">
                   {sanitizedRisk.currency} {sanitizedRisk.daily_max_loss_cutoff.toFixed(2)}
                 </span>
               </div>
-              <div className="bg-black/20 p-2 rounded border border-white/5">
-                <span className="text-slate-400 block text-[10px]">FRICTION CEILING</span>
-                <span className="text-white font-bold">≤ {sanitizedRisk.friction_ceiling_pct}%</span>
+              <div className="terminal-elevated p-2 rounded">
+                <span className="text-secondary block text-[10px]">FRICTION CEILING</span>
+                <span className="text-primary font-bold">≤ {sanitizedRisk.friction_ceiling_pct}%</span>
               </div>
             </div>
 
             {/* AUDIT TRAIL */}
-            <div className="space-y-1 bg-black/40 p-2.5 rounded-lg border border-white/5 text-[11px] font-mono text-slate-300">
-              <span className="text-slate-400 font-bold block mb-1">Pre-Flight Audit Trail:</span>
+            <div className="space-y-1 terminal-elevated p-2.5 rounded-lg text-[11px] font-mono text-secondary">
+              <span className="text-primary font-bold block mb-1">Pre-Flight Audit Trail:</span>
               {sanitizedRisk.audit_trail.map((t, i) => (
                 <div key={i} className="flex items-start gap-1">
-                  <span className="text-emerald-400">•</span>
+                  <span className="text-emerald-500 dark:text-emerald-400">•</span>
                   <span>{t}</span>
                 </div>
               ))}
             </div>
 
             <button
+              type="button"
               onClick={handleRunAnalysis}
               disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold py-2 rounded-lg transition flex items-center justify-center gap-2 cursor-pointer shadow-lg"
+              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold py-2 rounded-lg transition flex items-center justify-center gap-2 cursor-pointer shadow-md"
             >
               <Play className="w-3.5 h-3.5" /> CONFIRM & RUN QUANT DISCOVERY
             </button>
@@ -537,58 +540,58 @@ export const ResearchCopilotTerminal: React.FC = () => {
 
       {/* STAGE 2 CARD: QUANT DISCOVERY & NEWS OVERLAY */}
       {analysisResult && (
-        <div className="bg-black/35 border border-white/10 rounded-xl p-5 space-y-4">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b border-white/10 pb-3">
+        <div className="terminal-card rounded-xl p-5 space-y-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b terminal-border pb-3">
             <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-sm font-bold text-white font-mono uppercase">
+              <Activity className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+              <h3 className="text-sm font-bold text-primary font-mono uppercase">
                 Deterministic Quant Discovery & 12-Feed Primary Causality Audit
               </h3>
             </div>
-            <span className="text-xs font-mono text-slate-400">
+            <span className="text-xs font-mono text-secondary">
               Wald-Wolfowitz Runs Test • Hurst Exponent • Exogenous De-Noising
             </span>
           </div>
 
           {/* METRIC BADGES */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-black/40 border border-white/5 p-3 rounded-lg">
-              <span className="text-[10px] text-slate-400 font-mono block">RUNS TEST (Z / P-VAL)</span>
-              <span className="text-sm font-mono font-bold text-white">
+            <div className="terminal-elevated p-3 rounded-lg">
+              <span className="text-[10px] text-secondary font-mono block">RUNS TEST (Z / P-VAL)</span>
+              <span className="text-sm font-mono font-bold text-primary">
                 Z: {analysisResult.quant_discovery.runs_test.z_stat} (p={analysisResult.quant_discovery.runs_test.p_value})
               </span>
-              <span className="text-[11px] text-emerald-400 font-mono block mt-0.5">
+              <span className="text-[11px] text-emerald-500 dark:text-emerald-400 font-mono block mt-0.5">
                 {analysisResult.quant_discovery.runs_test.pattern_type}
               </span>
             </div>
 
-            <div className="bg-black/40 border border-white/5 p-3 rounded-lg">
-              <span className="text-[10px] text-slate-400 font-mono block">HURST EXPONENT (H)</span>
-              <span className="text-sm font-mono font-bold text-white">
+            <div className="terminal-elevated p-3 rounded-lg">
+              <span className="text-[10px] text-secondary font-mono block">HURST EXPONENT (H)</span>
+              <span className="text-sm font-mono font-bold text-primary">
                 H = {analysisResult.quant_discovery.hurst_exponent.hurst_exponent}
               </span>
-              <span className="text-[11px] text-indigo-400 font-mono block mt-0.5">
+              <span className="text-[11px] text-indigo-500 dark:text-indigo-400 font-mono block mt-0.5">
                 {analysisResult.quant_discovery.hurst_exponent.regime}
               </span>
             </div>
 
-            <div className="bg-black/40 border border-white/5 p-3 rounded-lg">
-              <span className="text-[10px] text-slate-400 font-mono block">TRANSITION P(UP | DOWN)</span>
-              <span className="text-sm font-mono font-bold text-white">
+            <div className="terminal-elevated p-3 rounded-lg">
+              <span className="text-[10px] text-secondary font-mono block">TRANSITION P(UP | DOWN)</span>
+              <span className="text-sm font-mono font-bold text-primary">
                 {(analysisResult.quant_discovery.markov_transitions.p_up_given_down * 100).toFixed(1)}%
               </span>
-              <span className="text-[11px] text-slate-400 font-mono block mt-0.5">
+              <span className="text-[11px] text-secondary font-mono block mt-0.5">
                 {analysisResult.quant_discovery.markov_transitions.is_alternating_bias ? "Alternating Bias" : "Neutral"}
               </span>
             </div>
 
-            <div className="bg-black/40 border border-white/5 p-3 rounded-lg">
-              <span className="text-[10px] text-slate-400 font-mono block">FRICTION HURDLE RATIO</span>
-              <span className="text-sm font-mono font-bold text-white">
+            <div className="terminal-elevated p-3 rounded-lg">
+              <span className="text-[10px] text-secondary font-mono block">FRICTION HURDLE RATIO</span>
+              <span className="text-sm font-mono font-bold text-primary">
                 {analysisResult.quant_discovery.friction_hurdle.friction_ratio_pct}%
               </span>
               <span className={`text-[11px] font-mono block mt-0.5 ${
-                analysisResult.quant_discovery.friction_hurdle.passes_hurdle ? "text-emerald-400" : "text-rose-400"
+                analysisResult.quant_discovery.friction_hurdle.passes_hurdle ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"
               }`}>
                 {analysisResult.quant_discovery.friction_hurdle.institutional_verdict}
               </span>
@@ -596,32 +599,32 @@ export const ResearchCopilotTerminal: React.FC = () => {
           </div>
 
           {/* PRIMARY FEED ATTRIBUTION EXPLANATION */}
-          <div className="bg-black/50 border border-indigo-500/20 rounded-lg p-3.5 space-y-2">
+          <div className="terminal-elevated border border-indigo-500/30 rounded-lg p-3.5 space-y-2">
             <div className="flex items-center gap-2">
-              <Layers className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="text-xs font-mono font-bold text-slate-200">
+              <Layers className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+              <span className="text-xs font-mono font-bold text-primary">
                 Primary-Source Event Attribution: {analysisResult.news_event_correlation.regime}
               </span>
             </div>
-            <p className="text-xs text-slate-300 font-sans leading-relaxed">
+            <p className="text-xs text-secondary font-sans leading-relaxed">
               {analysisResult.news_event_correlation.explanation}
             </p>
           </div>
 
           {/* ANOMALY TIMELINE */}
           <div className="space-y-2">
-            <span className="text-xs font-mono font-bold text-slate-400 block">Outlier Moves & Feed Overlay:</span>
+            <span className="text-xs font-mono font-bold text-secondary block">Outlier Moves & Feed Overlay:</span>
             <div className="space-y-1.5">
               {analysisResult.news_event_correlation.anomaly_event_timeline.map((item, idx) => (
-                <div key={idx} className="bg-black/30 border border-white/5 p-2 rounded flex items-center justify-between text-xs font-mono">
+                <div key={idx} className="terminal-elevated p-2 rounded flex items-center justify-between text-xs font-mono">
                   <div className="flex items-center gap-2">
-                    <span className="text-slate-400">{item.date}</span>
-                    <span className={`font-bold ${item.return_pct > 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    <span className="text-secondary">{item.date}</span>
+                    <span className={`font-bold ${item.return_pct > 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}`}>
                       {item.return_pct > 0 ? `+${item.return_pct}%` : `${item.return_pct}%`}
                     </span>
-                    <span className="text-slate-300 font-sans">{item.headline}</span>
+                    <span className="text-primary font-sans">{item.headline}</span>
                   </div>
-                  <span className="text-[10px] bg-white/5 text-slate-400 px-1.5 py-0.5 rounded">
+                  <span className="text-[10px] terminal-card text-secondary px-1.5 py-0.5 rounded">
                     {item.source}
                   </span>
                 </div>
@@ -630,9 +633,10 @@ export const ResearchCopilotTerminal: React.FC = () => {
           </div>
 
           <button
+            type="button"
             onClick={handleExecuteBacktest}
             disabled={loading}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold py-2.5 rounded-lg transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-950/40"
+            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold py-2.5 rounded-lg transition flex items-center justify-center gap-2 cursor-pointer shadow-md"
           >
             <TrendingUp className="w-3.5 h-3.5" /> EXECUTE WALK-FORWARD BACKTEST & DEFLATED SHARPE AUDIT
           </button>
@@ -641,91 +645,91 @@ export const ResearchCopilotTerminal: React.FC = () => {
 
       {/* STAGE 3 CARD: WALK-FORWARD AUDIT & DEFLATED SHARPE RATIO */}
       {dsrAudit && (
-        <div className="bg-black/35 border border-white/10 rounded-xl p-5 space-y-4">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b border-white/10 pb-3">
+        <div className="terminal-card rounded-xl p-5 space-y-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b terminal-border pb-3">
             <div className="flex items-center gap-2">
-              <Award className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-sm font-bold text-white font-mono uppercase">
+              <Award className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+              <h3 className="text-sm font-bold text-primary font-mono uppercase">
                 Marcos López de Prado Deflated Sharpe Ratio (DSR) Audit Report
               </h3>
             </div>
-            <span className={`text-xs font-mono px-2.5 py-0.5 rounded border font-bold ${
+            <span className={`text-xs font-mono px-2.5 py-0.5 rounded font-bold ${
               dsrAudit.passes_dsr_hurdle
-                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                : "bg-rose-500/20 text-rose-300 border-rose-500/30"
+                ? "terminal-badge-bid"
+                : "terminal-badge-ask"
             }`}>
               {dsrAudit.institutional_verdict}
             </span>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
-            <div className="bg-black/40 border border-white/5 p-3 rounded-lg">
-              <span className="text-[10px] text-slate-400 block">ANNUALIZED SHARPE</span>
-              <span className="text-base font-bold text-white">{dsrAudit.annualized_sharpe.toFixed(2)}</span>
+            <div className="terminal-elevated p-3 rounded-lg">
+              <span className="text-[10px] text-secondary block">ANNUALIZED SHARPE</span>
+              <span className="text-base font-bold text-primary">{dsrAudit.annualized_sharpe.toFixed(2)}</span>
             </div>
-            <div className="bg-black/40 border border-white/5 p-3 rounded-lg">
-              <span className="text-[10px] text-slate-400 block">DEFLATED SHARPE (DSR)</span>
-              <span className={`text-base font-bold ${dsrAudit.passes_dsr_hurdle ? "text-emerald-400" : "text-rose-400"}`}>
+            <div className="terminal-elevated p-3 rounded-lg">
+              <span className="text-[10px] text-secondary block">DEFLATED SHARPE (DSR)</span>
+              <span className={`text-base font-bold ${dsrAudit.passes_dsr_hurdle ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}`}>
                 {dsrAudit.deflated_sharpe_ratio.toFixed(3)}
               </span>
-              <span className="text-[10px] text-slate-400 block">Hurdle: ≥ 0.950</span>
+              <span className="text-[10px] text-secondary block">Hurdle: ≥ 0.950</span>
             </div>
-            <div className="bg-black/40 border border-white/5 p-3 rounded-lg">
-              <span className="text-[10px] text-slate-400 block">SKEWNESS / KURTOSIS</span>
-              <span className="text-base font-bold text-white">
+            <div className="terminal-elevated p-3 rounded-lg">
+              <span className="text-[10px] text-secondary block">SKEWNESS / KURTOSIS</span>
+              <span className="text-base font-bold text-primary">
                 {dsrAudit.skewness.toFixed(2)} / {dsrAudit.kurtosis.toFixed(2)}
               </span>
             </div>
-            <div className="bg-black/40 border border-white/5 p-3 rounded-lg">
-              <span className="text-[10px] text-slate-400 block">EXPECTED NULL SHARPE</span>
-              <span className="text-base font-bold text-slate-300">{dsrAudit.expected_max_null_sr.toFixed(2)}</span>
+            <div className="terminal-elevated p-3 rounded-lg">
+              <span className="text-[10px] text-secondary block">EXPECTED NULL SHARPE</span>
+              <span className="text-base font-bold text-secondary">{dsrAudit.expected_max_null_sr.toFixed(2)}</span>
             </div>
           </div>
 
-          <p className="text-xs text-slate-300 font-sans leading-relaxed bg-black/40 p-3 rounded-lg border border-white/5">
+          <p className="text-xs text-secondary font-sans leading-relaxed terminal-elevated p-3 rounded-lg">
             {dsrAudit.explanation}
           </p>
 
           {/* DYNAMIC GATE ATTRIBUTION & PROTECTED CAPITAL CARD */}
           {backtestResult && backtestResult.gateAttribution && (
-            <div className="bg-black/50 border border-indigo-500/20 rounded-xl p-4 space-y-3">
-              <div className="flex justify-between items-center border-b border-white/5 pb-2">
+            <div className="terminal-elevated border border-indigo-500/30 rounded-xl p-4 space-y-3">
+              <div className="flex justify-between items-center border-b terminal-border pb-2">
                 <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-indigo-400" />
-                  <span className="text-xs font-mono font-bold text-white uppercase">
+                  <ShieldCheck className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+                  <span className="text-xs font-mono font-bold text-primary uppercase">
                     DRM Gate Attribution & Protected Capital ({backtestResult.symbol})
                   </span>
                 </div>
-                <span className="text-[11px] font-mono text-slate-400">
+                <span className="text-[11px] font-mono text-secondary">
                   Trades Executed: {backtestResult.totalTrades || 0} / Evaluated Setups: {backtestResult.gateAttribution.totalSetupsEvaluated || 0}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs font-mono">
-                <div className="bg-black/40 p-2.5 rounded border border-white/5">
-                  <span className="text-[10px] text-slate-400 block">GATE 1 CAPITAL CLAMPED</span>
-                  <span className="text-sm font-bold text-emerald-400">
+                <div className="terminal-card p-2.5 rounded">
+                  <span className="text-[10px] text-secondary block">GATE 1 CAPITAL CLAMPED</span>
+                  <span className="text-sm font-bold text-emerald-500 dark:text-emerald-400">
                     {backtestResult.gateAttribution.gate1CapitalClamped} Setups
                   </span>
                 </div>
-                <div className="bg-black/40 p-2.5 rounded border border-white/5">
-                  <span className="text-[10px] text-slate-400 block">GATE 2 FRICTION REJECTED</span>
-                  <span className="text-sm font-bold text-amber-400">
+                <div className="terminal-card p-2.5 rounded">
+                  <span className="text-[10px] text-secondary block">GATE 2 FRICTION REJECTED</span>
+                  <span className="text-sm font-bold text-amber-500 dark:text-amber-400">
                     {backtestResult.gateAttribution.gate2FrictionRejected} Trades
                   </span>
-                  <span className="text-[10px] text-slate-500 block mt-0.5">
+                  <span className="text-[10px] text-muted block mt-0.5">
                     Hurdle: {sanitizedRisk?.friction_ceiling_pct}%
                   </span>
                 </div>
-                <div className="bg-black/40 p-2.5 rounded border border-white/5">
-                  <span className="text-[10px] text-slate-400 block">GATE 5 MACRO BLACKOUT</span>
-                  <span className="text-sm font-bold text-purple-400">
+                <div className="terminal-card p-2.5 rounded">
+                  <span className="text-[10px] text-secondary block">GATE 5 MACRO BLACKOUT</span>
+                  <span className="text-sm font-bold text-purple-500 dark:text-purple-400">
                     {backtestResult.gateAttribution.gate5BlackoutRejected} Trades
                   </span>
                 </div>
-                <div className="bg-black/40 p-2.5 rounded border border-white/5">
-                  <span className="text-[10px] text-slate-400 block">FRICTION CAPITAL SAVED</span>
-                  <span className="text-sm font-bold text-emerald-400">
+                <div className="terminal-card p-2.5 rounded">
+                  <span className="text-[10px] text-secondary block">FRICTION CAPITAL SAVED</span>
+                  <span className="text-sm font-bold text-emerald-500 dark:text-emerald-400">
                     €{backtestResult.slippageFrictionSaved || 0}
                   </span>
                 </div>
@@ -735,17 +739,18 @@ export const ResearchCopilotTerminal: React.FC = () => {
 
           {/* PROMOTION BUTTON */}
           {promotionStatus === "PROMOTED" ? (
-            <div className="bg-emerald-950/30 border border-emerald-500/40 p-3.5 rounded-lg flex items-center justify-between text-xs font-mono">
-              <span className="text-emerald-300 font-bold flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <div className="terminal-elevated border border-emerald-500/50 p-3.5 rounded-lg flex items-center justify-between text-xs font-mono">
+              <span className="text-emerald-500 dark:text-emerald-300 font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
                 STRATEGY CANDIDATE EXPORTED TO SANDBOXED PAPER BLOTTER (Gate 0 Sign-off Pending)
               </span>
             </div>
           ) : (
             <button
+              type="button"
               onClick={handlePromoteToPaper}
               disabled={!dsrAudit.passes_dsr_hurdle}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-mono text-xs font-bold py-3 rounded-lg transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-950/40"
+              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-mono text-xs font-bold py-3 rounded-lg transition flex items-center justify-center gap-2 cursor-pointer shadow-md"
             >
               <ArrowRight className="w-4 h-4" /> PROMOTE VERIFIED CANDIDATE TO SANDBOXED PAPER BLOTTER
             </button>

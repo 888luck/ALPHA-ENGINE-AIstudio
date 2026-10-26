@@ -5,7 +5,6 @@ echo "[IBGATEWAY-DAEMON] Initializing headless display stack on :1..."
 pkill -f "Xvfb :1" || true
 pkill -f "x11vnc.*:1" || true
 pkill -f "websockify.*6080" || true
-pkill -f "gateway_autologin.py" || true
 
 Xvfb :1 -screen 0 1280x800x24 &
 sleep 2

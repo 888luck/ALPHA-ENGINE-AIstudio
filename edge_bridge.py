@@ -140,16 +140,29 @@ class EdgeTcpBridgeServer:
 
         elif action == "TRIGGER_GATEWAY_LOGIN":
             try:
+                import subprocess
+                # Purge legacy trigger file if present
                 trigger_path = "/tmp/gateway_login.trigger"
-                with open(trigger_path, "w") as f:
-                    f.write(str(time.time()))
-                try:
-                    os.chmod(trigger_path, 0o666)
-                except Exception:
-                    pass
-                return {"status": "TRIGGERED", "message": "On-demand 2FA login signal dispatched to gateway daemon.", "timestamp": timestamp}
+                if os.path.exists(trigger_path):
+                    try:
+                        os.remove(trigger_path)
+                    except Exception:
+                        pass
+
+                # Institutional restart of official IBC daemon to trigger fresh login & 2FA push
+                proc = subprocess.Popen(
+                    ["sudo", "systemctl", "restart", "ibgateway.service"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                print(f"[EDGE TCP BRIDGE] Dispatched 'sudo systemctl restart ibgateway.service' (PID {proc.pid}) for on-demand 2FA login.")
+                return {
+                    "status": "TRIGGERED",
+                    "message": "IB Gateway restarted via official IBC daemon. Please approve the 2FA push on your IBKR Mobile app.",
+                    "timestamp": timestamp
+                }
             except Exception as ex:
-                return {"status": "ERROR", "message": str(ex), "timestamp": timestamp}
+                return {"status": "ERROR", "message": f"Failed to restart ibgateway: {ex}", "timestamp": timestamp}
 
         elif action == "GET_TELEMETRY":
             telemetry = {}
@@ -184,22 +197,14 @@ class EdgeTcpBridgeServer:
                     "timestamp": timestamp,
                 }
             else:
-                status_file = "/tmp/gateway_status.json"
-                if os.path.exists(status_file):
-                    try:
-                        with open(status_file, "r") as f:
-                            telemetry["gateway_auth"] = json.load(f)
-                    except Exception:
-                        pass
-                if "gateway_auth" not in telemetry:
-                    telemetry["gateway_auth"] = {
-                        "mode": mode.upper(),
-                        "port": target_port,
-                        "state": "DISCONNECTED",
-                        "manager": "IBC",
-                        "message": f"IB Gateway offline on port {target_port}",
-                        "timestamp": timestamp,
-                    }
+                telemetry["gateway_auth"] = {
+                    "mode": mode.upper(),
+                    "port": target_port,
+                    "state": "DISCONNECTED",
+                    "manager": "IBC",
+                    "message": f"IB Gateway offline on port {target_port} (IBC Standby)",
+                    "timestamp": timestamp,
+                }
             return {"status": "OK", "telemetry": telemetry, "timestamp": timestamp}
 
         elif action in ["DISPATCH_IBKR", "GET_QUOTE", "GET_HISTORICAL_BARS", "GET_FUNDAMENTALS"]:

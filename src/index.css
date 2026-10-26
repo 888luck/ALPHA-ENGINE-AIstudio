@@ -1,82 +1,262 @@
 @import "tailwindcss";
 
+/* ==============================================================================
+   ALPHA ENGINE - INSTITUTIONAL DESIGN TOKENS & SYSTEMIC PALETTE ENGINE
+   ==============================================================================
+   Strict Bloomberg / TradingView standards:
+   - Zero arbitrary hardcoded hex classes in components.
+   - All surfaces, borders, and text resolve through dynamic CSS Custom Properties.
+   - Dual-Desk: Obsidian Dark Desk (Default) vs Financial Paper Light Desk.
+   ============================================================================== */
+
+:root,
+[data-theme="dark"],
+.theme-dark {
+  --bg-canvas: #080b10;
+  --bg-card: #0d1117;
+  --bg-elevated: #161b22;
+  --bg-inset: #05080c;
+  
+  --border-subtle: #21262d;
+  --border-accent: #30363d;
+  
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  
+  --color-bid: #00e676;
+  --color-bid-bg: rgba(0, 230, 118, 0.1);
+  --color-bid-border: rgba(0, 230, 118, 0.25);
+  
+  --color-ask: #f43f5e;
+  --color-ask-bg: rgba(244, 63, 94, 0.1);
+  --color-ask-border: rgba(244, 63, 94, 0.25);
+  
+  --color-warn: #f59e0b;
+  --color-warn-bg: rgba(245, 158, 11, 0.1);
+  --color-warn-border: rgba(245, 158, 11, 0.25);
+  
+  --color-cyan: #38bdf8;
+  --color-cyan-bg: rgba(56, 189, 248, 0.1);
+  --color-cyan-border: rgba(56, 189, 248, 0.25);
+
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.4);
+  --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"],
+.theme-light {
+  --bg-canvas: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-elevated: #f8fafc;
+  --bg-inset: #e2e8f0;
+  
+  --border-subtle: #cbd5e1;
+  --border-accent: #94a3b8;
+  
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  
+  --color-bid: #047857;
+  --color-bid-bg: rgba(4, 120, 87, 0.08);
+  --color-bid-border: rgba(4, 120, 87, 0.25);
+  
+  --color-ask: #dc2626;
+  --color-ask-bg: rgba(220, 38, 38, 0.08);
+  --color-ask-border: rgba(220, 38, 38, 0.25);
+  
+  --color-warn: #d97706;
+  --color-warn-bg: rgba(217, 119, 6, 0.08);
+  --color-warn-border: rgba(217, 119, 6, 0.25);
+  
+  --color-cyan: #0284c7;
+  --color-cyan-bg: rgba(2, 132, 199, 0.08);
+  --color-cyan-border: rgba(2, 132, 199, 0.25);
+
+  --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.08);
+  --shadow-elevated: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
 @theme {
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "Fira Code", "Courier New", monospace;
+  
+  --color-canvas: var(--bg-canvas);
+  --color-card: var(--bg-card);
+  --color-elevated: var(--bg-elevated);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-accent: var(--border-accent);
+  
+  --color-text-main: var(--text-primary);
+  --color-text-sub: var(--text-secondary);
+  --color-text-dim: var(--text-muted);
 }
 
-/* Base professional light theme (Off-white & Charcoal) */
+/* ==============================================================================
+   1. Systemic Root Density Scaling Engine (Direct Rem Cascading)
+   ============================================================================== */
+html {
+  font-size: 15px; /* Institutional baseline (standard) */
+}
+
+html[data-density="compact"] {
+  font-size: 13.5px; /* High-density floor: 15% reduction */
+  --terminal-row-h: 24px;
+}
+
+html[data-density="standard"] {
+  font-size: 15px; /* Balanced institutional scale */
+  --terminal-row-h: 28px;
+}
+
+html[data-density="comfort"] {
+  font-size: 17px; /* Relaxed readability scale */
+  --terminal-row-h: 34px;
+}
+
+/* ==============================================================================
+   2. Base Typography & Surface
+   ============================================================================== */
 body {
-  background-color: #f8f9fa !important;
-  color: #1a1d21;
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
   font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1, "cv01" 1, "cv02" 1;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.frosted-bg {
-  background-color: #f8f9fa;
-  background-image: 
-    radial-gradient(circle at 5% 5%, rgba(0, 102, 255, 0.03) 0%, transparent 45%),
-    radial-gradient(circle at 95% 95%, rgba(0, 255, 136, 0.03) 0%, transparent 45%);
+/* Institutional Tabular Alignment Utility */
+.tabular-nums,
+table,
+td,
+th {
+  font-variant-numeric: tabular-nums;
 }
 
-/* Professional Card Utility */
-.frosted-glass {
-  background: rgba(255, 255, 255, 0.8) !important;
-  backdrop-filter: blur(8px) saturate(150%) !important;
-  -webkit-backdrop-filter: blur(8px) saturate(150%) !important;
-  border: 1px solid rgba(0, 0, 0, 0.08) !important;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+/* ==============================================================================
+   3. Institutional Semantic Surface Components
+   ============================================================================== */
+.terminal-canvas {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
 }
 
-.frosted-glass-hover {
-  transition: all 0.2s ease-in-out;
+.terminal-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  box-shadow: var(--shadow-card);
+  color: var(--text-primary);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.frosted-glass-hover:hover {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border-color: rgba(0, 0, 0, 0.12) !important;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  transform: translateY(-1px);
+.terminal-surface {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
 }
 
-/* Active Highlight Statuses */
-.frosted-active-row {
-  background: rgba(0, 255, 136, 0.08) !important;
-  border-left: 4px solid #00c86e !important;
+.terminal-elevated {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  color: var(--text-primary);
+}
+
+.terminal-border {
+  border-color: var(--border-subtle);
+}
+
+.terminal-border-accent {
+  border-color: var(--border-accent);
+}
+
+.terminal-text-primary {
+  color: var(--text-primary);
+}
+
+.terminal-text-secondary {
+  color: var(--text-secondary);
+}
+
+.terminal-text-muted {
+  color: var(--text-muted);
+}
+
+.terminal-card-hover {
+  transition: all 0.15s ease-in-out;
+}
+
+.terminal-card-hover:hover {
+  background-color: var(--bg-elevated);
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-elevated);
+}
+
+/* Inputs, Selects & Interactive Elements */
+input,
+select,
+textarea {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--color-cyan);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-cyan-bg);
 }
 
 /* Status Indicators */
-.frosted-pulse-green {
-  background: #00c86e;
-  box-shadow: 0 0 8px rgba(0, 200, 110, 0.4);
+.terminal-badge-bid {
+  background-color: var(--color-bid-bg);
+  color: var(--color-bid);
+  border: 1px solid var(--color-bid-border);
 }
 
-.frosted-pulse-red {
-  background: #ef4444;
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+.terminal-badge-ask {
+  background-color: var(--color-ask-bg);
+  color: var(--color-ask);
+  border: 1px solid var(--color-ask-border);
 }
 
-.frosted-pulse-warning {
-  background: #f59e0b;
-  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+.terminal-badge-warn {
+  background-color: var(--color-warn-bg);
+  color: var(--color-warn);
+  border: 1px solid var(--color-warn-border);
 }
 
-/* Customized Scrollbar */
+.terminal-badge-cyan {
+  background-color: var(--color-cyan-bg);
+  color: var(--color-cyan);
+  border: 1px solid var(--color-cyan-border);
+}
+
+/* ==============================================================================
+   4. High-Density Institutional Scrollbars (Compact 6px)
+   ============================================================================== */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--bg-inset);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 10px;
+  background: var(--border-subtle);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--border-accent);
 }

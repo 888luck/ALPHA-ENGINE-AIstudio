@@ -31,7 +31,8 @@ import {
   Filter,
   Check,
   AlertTriangle,
-  AlertCircle
+  AlertCircle,
+  BarChart2
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -43,6 +44,9 @@ import {
   CartesianGrid
 } from "recharts";
 import { ApiVaultModal } from "../components/ApiVaultModal";
+import { InstitutionalModelSelector } from "../components/InstitutionalModelSelector";
+import { InstitutionalCandleChart } from "../components/InstitutionalCandleChart";
+import { InfoTip, InstitutionalTooltip } from "../components/InstitutionalTooltip";
 import {
   getAllStoredVaultSettings,
   persistVaultItem,
@@ -333,7 +337,7 @@ export function StrategyStudioPage() {
 
   // Active Strategy Details & Results
   const [strategyName, setStrategyName] = useState("Alpha Adaptive OFI Breakout");
-  const [activeTab, setActiveTab] = useState<"performance" | "frontier" | "blotter" | "vault">("performance");
+  const [activeTab, setActiveTab] = useState<"candles" | "performance" | "frontier" | "blotter" | "vault">("candles");
   const [loading, setLoading] = useState(false);
   const [sweeping, setSweeping] = useState(false);
   const [discovering, setDiscovering] = useState(false);
@@ -1116,223 +1120,40 @@ export function StrategyStudioPage() {
       {/* =========================================================================
           Top Navigation & Header Controls
           ========================================================================= */}
-      <div className="bg-[#0c101c] border border-white/10 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+      <div className="terminal-card rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs bg-emerald-500/20 text-[#00ff88] border border-emerald-500/40 px-2.5 py-1 rounded-md font-mono font-bold flex items-center gap-1.5 shadow-sm">
-              <Sparkles className="w-3.5 h-3.5 text-[#00ff88]" /> AGENTIC STRATEGY STUDIO
+            <span className="text-xs terminal-badge-bid px-2.5 py-1 rounded-md font-mono font-bold flex items-center gap-1.5 shadow-sm">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-500 dark:text-[#00ff88]" /> AGENTIC STRATEGY STUDIO
             </span>
-            <span className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2.5 py-1 rounded-md font-mono font-bold">
+            <span className="text-xs bg-blue-500/20 text-blue-500 dark:text-blue-300 border border-blue-500/30 px-2.5 py-1 rounded-md font-mono font-bold">
               VERIFIED BROKER BARS
             </span>
-            <span className="text-xs text-slate-400 font-mono hidden sm:inline-block">
+            <span className="text-xs text-secondary font-mono hidden sm:inline-block">
               Marcos López de Prado DSR (N=16) • Multi-Permutation Pareto Frontier
             </span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-black text-white font-mono mt-2 flex items-center gap-2">
-            <SlidersHorizontal className="w-6 h-6 text-emerald-400" /> Quantitative Strategy Studio & Experiment Vault
+          <h1 className="text-xl sm:text-2xl font-black text-primary font-mono mt-2 flex items-center gap-2">
+            <SlidersHorizontal className="w-6 h-6 text-emerald-500 dark:text-emerald-400" /> Quantitative Strategy Studio & Experiment Vault
           </h1>
-          <p className="text-xs sm:text-sm text-slate-300 font-sans mt-0.5">
+          <p className="text-xs sm:text-sm text-secondary font-sans mt-0.5">
             Direct autonomous agents to discover high-expectancy trading configurations, run parameter sweeps, and preserve audited strategy backtests.
           </p>
         </div>
 
         {/* Top Control Plane: Model Dropdown + 4-Pillar Vault + Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap w-full md:w-auto justify-end">
-          {/* Dynamic Model Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setShowModelDropdown(!showModelDropdown)}
-              className="bg-slate-900 hover:bg-slate-800 border border-[#00ff88]/30 rounded-xl px-3 py-2 flex items-center gap-2 text-xs font-mono transition cursor-pointer shadow-md"
-            >
-              <span>{activeModelObj.icon}</span>
-              <div className="text-left">
-                <div className="text-[9px] text-[#00ff88] font-bold uppercase">{activeModelObj.provider}</div>
-                <div className="text-white font-bold max-w-[150px] truncate">{activeModelObj.name}</div>
-              </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1" />
-            </button>
-
-            {showModelDropdown && (
-              <>
-                {/* Backdrop to close on outside click */}
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setShowModelDropdown(false)}
-                />
-
-                <div className="absolute right-0 mt-2 w-[420px] max-w-[90vw] bg-[#0e1422] border border-white/15 rounded-xl shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95 font-mono text-xs">
-                  {/* Catalog Header */}
-                  <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 mb-2 flex items-center justify-between">
-                    <span>Dynamic Model Catalog</span>
-                    <span className="text-[9px] text-[#00ff88] bg-[#00ff88]/10 px-1.5 py-0.5 rounded border border-[#00ff88]/20 font-bold">
-                      {availableModels.length} Active Verified
-                    </span>
-                  </div>
-
-                  {/* Instant Search Bar */}
-                  <div className="relative mb-2">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={modelSearchQuery}
-                      onChange={(e) => setModelSearchQuery(e.target.value)}
-                      placeholder="Search model name, provider, or size..."
-                      className="w-full bg-slate-900 border border-white/10 rounded-lg pl-8 pr-7 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00ff88]/50"
-                    />
-                    {modelSearchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setModelSearchQuery("")}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Provider Filter Tabs */}
-                  <div className="flex items-center gap-1 mb-2 pb-2 border-b border-white/10 overflow-x-auto text-[10px]">
-                    {["ALL", "FREE", "OPENROUTER", "GROQ", "NVIDIA", "GOOGLE", "LOCAL"].map((tab) => {
-                      const count = tab === "ALL" 
-                        ? availableModels.length 
-                        : tab === "FREE"
-                          ? availableModels.filter(m => m.isFree === true || m.id.includes(":free") || m.costStr.includes("$0.00") || m.id.startsWith("local")).length
-                          : availableModels.filter(m => m.id.toUpperCase().startsWith(tab) || m.provider.toUpperCase().includes(tab)).length;
-                      return (
-                        <button
-                          key={tab}
-                          type="button"
-                          onClick={() => setSelectedProviderFilter(tab)}
-                          className={`px-2 py-0.5 rounded transition cursor-pointer font-bold whitespace-nowrap flex items-center gap-1 ${
-                            selectedProviderFilter === tab
-                              ? tab === "FREE"
-                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                                : "bg-[#00ff88]/20 text-[#00ff88] border border-[#00ff88]/40"
-                              : "bg-white/5 hover:bg-white/10 text-slate-400"
-                          }`}
-                        >
-                          <span>{tab === "FREE" ? "🎁 FREE ONLY" : tab}</span>
-                          <span className="text-[9px] opacity-75">({count})</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Fast Access / Recommended Section (When No Search Query) */}
-                  {!modelSearchQuery.trim() && selectedProviderFilter === "ALL" && (
-                    <div className="mb-2 pb-2 border-b border-white/10 space-y-1">
-                      <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1 px-1">
-                        <span>⭐</span>
-                        <span>Recommended & Tested Active</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {(() => {
-                          const configured = availableModels.filter(m => isModelConfigured(m));
-                          const unconfigured = availableModels.filter(m => !isModelConfigured(m));
-                          return (configured.length >= 4 ? configured.slice(0, 4) : [...configured, ...unconfigured].slice(0, 4));
-                        })().map(m => {
-                          const isConfigured = isModelConfigured(m);
-                          return (
-                            <button
-                              key={`rec-${m.id}`}
-                              type="button"
-                              onClick={() => {
-                                setSelectedModel(m.id);
-                                localStorage.setItem("alpha_copilot_model", m.id);
-                                setShowModelDropdown(false);
-                              }}
-                              className={`p-1.5 rounded-lg border text-left flex items-center gap-1.5 transition cursor-pointer ${
-                                selectedModel === m.id
-                                  ? "bg-[#00ff88]/20 border-[#00ff88] text-white"
-                                  : isConfigured
-                                  ? "bg-white/5 hover:bg-white/10 border-white/10 text-slate-300"
-                                  : "bg-white/5 hover:bg-white/10 border-amber-500/20 text-slate-400 opacity-80"
-                              }`}
-                            >
-                              <span className="text-xs">{m.icon}</span>
-                              <div className="truncate min-w-0 flex-1">
-                                <div className="text-[10px] font-bold truncate text-white flex items-center justify-between">
-                                  <span className="truncate">{m.name.split("/").pop()}</span>
-                                  {isConfigured ? (
-                                    <span className="text-[8px] bg-emerald-500/20 text-[#00ff88] border border-emerald-500/40 px-1 py-0.2 rounded font-mono font-bold shrink-0 ml-1">READY</span>
-                                  ) : (
-                                    <span className="text-[8px] bg-amber-500/10 text-amber-300 border border-amber-500/30 px-1 py-0.2 rounded font-mono font-medium shrink-0 ml-1">KEY REQ</span>
-                                  )}
-                                </div>
-                                <div className="text-[9px] text-[#00ff88]">{m.badge}</div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Scrollable Model List */}
-                  <div className="max-h-72 overflow-y-auto space-y-1 pr-1">
-                    {filteredModels.length === 0 ? (
-                      <div className="text-center py-6 text-slate-400 text-xs">
-                        No models matching "{modelSearchQuery}"
-                      </div>
-                    ) : (
-                      filteredModels.map((m) => {
-                        const isConfigured = isModelConfigured(m);
-                        return (
-                          <button
-                            key={m.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedModel(m.id);
-                              localStorage.setItem("alpha_copilot_model", m.id);
-                              setShowModelDropdown(false);
-                              setModelSearchQuery("");
-                            }}
-                            className={`w-full text-left p-2 rounded-lg flex items-start gap-2.5 transition cursor-pointer ${
-                              selectedModel === m.id
-                                ? "bg-[#00ff88]/15 border border-[#00ff88]/40 text-white"
-                                : isConfigured
-                                ? "hover:bg-white/5 text-slate-300"
-                                : "hover:bg-white/5 text-slate-400 opacity-80"
-                            }`}
-                          >
-                            <span className="text-base shrink-0">{m.icon}</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-bold text-white truncate flex items-center justify-between">
-                                <span className="truncate" title={m.name}>{m.name}</span>
-                                <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                                  {isConfigured ? (
-                                    <span className="text-[9px] bg-emerald-500/20 text-[#00ff88] border border-emerald-500/40 px-1.5 py-0.2 rounded font-mono font-bold flex items-center gap-1">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-[#00ff88]" /> KEY ACTIVE
-                                    </span>
-                                  ) : (
-                                    <span className="text-[9px] bg-amber-500/10 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-mono font-medium">
-                                      NEEDS KEY
-                                    </span>
-                                  )}
-                                  {(m.isFree || m.id.includes(":free")) && (
-                                    <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.2 rounded font-mono font-bold">
-                                      FREE
-                                    </span>
-                                  )}
-                                  {selectedModel === m.id && <Check className="w-3.5 h-3.5 text-[#00ff88] shrink-0" />}
-                                </div>
-                              </div>
-                              <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                                <span className="text-indigo-400 font-bold">{m.provider}</span>
-                                <span>•</span>
-                                <span className="text-slate-300">{m.costStr}</span>
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+          {/* Dynamic Institutional Model Selector */}
+          <InstitutionalModelSelector
+            availableModels={availableModels}
+            selectedModel={selectedModel}
+            onSelectModel={(modelId) => {
+              setSelectedModel(modelId);
+              localStorage.setItem("alpha_copilot_model", modelId);
+            }}
+            isModelConfigured={isModelConfigured}
+            onOpenVault={() => setIsVaultOpen(true)}
+          />
 
           {/* 4-Pillar Vault Button */}
           <button
@@ -1403,17 +1224,17 @@ export function StrategyStudioPage() {
           ========================================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Conversational Agent Terminal */}
-        <div className="lg:col-span-5 bg-[#0c101c] border border-white/10 rounded-2xl flex flex-col h-[760px] shadow-xl overflow-hidden">
+        <div className="lg:col-span-5 terminal-card rounded-2xl flex flex-col h-[760px] shadow-xl overflow-hidden">
           {/* Chat Header */}
-          <div className="p-4 border-b border-white/10 bg-slate-900/60 flex items-center justify-between">
+          <div className="p-4 border-b terminal-border terminal-elevated flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
-                <Bot className="w-4 h-4 text-[#00ff88]" />
+                <Bot className="w-4 h-4 text-emerald-500 dark:text-[#00ff88]" />
               </div>
               <div>
-                <span className="text-xs font-mono font-bold text-white block">STRATEGY OPTIMIZER AGENT</span>
-                <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-xs font-mono font-bold text-primary block">STRATEGY OPTIMIZER AGENT</span>
+                <span className="text-[10px] font-mono text-emerald-500 dark:text-emerald-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   {isGenerating ? `Streaming Reasoning & Tools (${elapsedSeconds}s)...` : "Pareto Frontier Engine Active"}
                 </span>
               </div>
@@ -1502,13 +1323,13 @@ export function StrategyStudioPage() {
                   <div
                     className={`p-3.5 rounded-2xl max-w-[85%] leading-relaxed ${
                       isAgent
-                        ? "bg-slate-900/80 border border-white/10 text-slate-200"
+                        ? "terminal-elevated text-primary"
                         : "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                     }`}
                   >
                     <div className="whitespace-pre-wrap font-mono">{m.content || "..."}</div>
                     {m.isTruncated && (
-                      <div className="mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between gap-2">
+                      <div className="mt-2.5 pt-2 border-t border-border/60 flex items-center justify-between gap-2">
                         <span className="text-[10px] text-amber-400 font-mono flex items-center gap-1">
                           <AlertCircle className="w-3 h-3 text-amber-400 shrink-0" />
                           Reached 4,096-token ceiling.
@@ -1517,12 +1338,70 @@ export function StrategyStudioPage() {
                           type="button"
                           onClick={handleContinueChat}
                           disabled={isGenerating}
-                          className="px-2 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-[10px] text-[#00ff88] font-bold cursor-pointer flex items-center gap-1 transition"
+                          className="px-2 py-0.5 rounded bg-accent/20 hover:bg-accent/30 border border-accent/40 text-[10px] text-accent font-bold cursor-pointer flex items-center gap-1 transition"
                         >
                           <Play className="w-2.5 h-2.5" /> Continue
                         </button>
                       </div>
                     )}
+
+                    {/* Two-Way Action Chips on Agent Recommendations */}
+                    {isAgent && (
+                      <div className="mt-3 pt-2.5 border-t border-border/60 flex flex-wrap items-center gap-1.5 text-[10px] font-mono">
+                        {result?.parameters && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const p = result.parameters;
+                              if (p.stop_atr !== undefined) setStopAtr(p.stop_atr);
+                              if (p.stopAtrMultiplier !== undefined) setStopAtr(p.stopAtrMultiplier);
+                              if (p.max_hold !== undefined) setMaxHoldBars(p.max_hold);
+                              if (p.maxHoldBars !== undefined) setMaxHoldBars(p.maxHoldBars);
+                              if (p.partial_profit !== undefined) setPartialProfit(p.partial_profit);
+                              if (p.partialProfit !== undefined) setPartialProfit(p.partialProfit);
+                              if (p.breakeven_lock !== undefined) setBreakevenLock(p.breakeven_lock);
+                              if (p.breakevenLock !== undefined) setBreakevenLock(p.breakevenLock);
+                              if (p.ofi_filter !== undefined) setOfiFilter(p.ofi_filter);
+                              if (p.ofiFilter !== undefined) setOfiFilter(p.ofiFilter);
+                              setSaveSuccessMsg("Applied strategy parameters directly to interactive control deck!");
+                              setTimeout(() => setSaveSuccessMsg(null), 3500);
+                            }}
+                            className="px-2 py-0.5 rounded bg-accent/15 hover:bg-accent/25 border border-accent/40 text-accent font-bold transition cursor-pointer flex items-center gap-1 shadow-xs"
+                          >
+                            <span>📥 APPLY TO FORM</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab("candles")}
+                          className="px-2 py-0.5 rounded bg-surface hover:bg-surface/80 border border-border text-foreground font-semibold transition cursor-pointer flex items-center gap-1"
+                        >
+                          <BarChart2 className="w-3 h-3 text-accent" />
+                          <span>L1 CANDLES</span>
+                        </button>
+                        {sweepCandidates.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("frontier")}
+                            className="px-2 py-0.5 rounded bg-surface hover:bg-surface/80 border border-border text-amber-400 font-semibold transition cursor-pointer flex items-center gap-1"
+                          >
+                            <Zap className="w-3 h-3" />
+                            <span>LOAD PARETO</span>
+                          </button>
+                        )}
+                        {result && (
+                          <button
+                            type="button"
+                            onClick={handleSaveToVault}
+                            className="px-2 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-300 font-bold transition cursor-pointer flex items-center gap-1"
+                          >
+                            <Bookmark className="w-3 h-3" />
+                            <span>SAVE TO VAULT</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
                     <span className="text-[10px] opacity-40 block mt-1.5 text-right font-sans">{m.timestamp}</span>
                   </div>
                 </div>
@@ -1530,10 +1409,10 @@ export function StrategyStudioPage() {
             })}
             {(sweeping || discovering) && (
               <div className="flex gap-3 items-start animate-in fade-in">
-                <div className="w-6 h-6 rounded-md bg-emerald-500/20 text-[#00ff88] flex items-center justify-center shrink-0 mt-0.5">
+                <div className="w-6 h-6 rounded-md bg-emerald-500/20 text-emerald-500 dark:text-[#00ff88] flex items-center justify-center shrink-0 mt-0.5">
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                 </div>
-                <div className="p-3 rounded-2xl bg-slate-900/80 border border-emerald-500/30 text-emerald-300 font-mono text-xs">
+                <div className="p-3 rounded-2xl terminal-elevated text-emerald-500 dark:text-emerald-300 font-mono text-xs">
                   {sweeping ? "Executing 16-parameter sweep across verified broker bars..." : "Computing Wald-Wolfowitz & Hurst exponent..."}
                 </div>
               </div>
@@ -1542,15 +1421,16 @@ export function StrategyStudioPage() {
           </div>
 
           {/* Quick Action Chips */}
-          <div className="px-4 py-2 bg-black/40 border-t border-white/5 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          <div className="px-4 py-2 terminal-elevated border-t terminal-border flex items-center gap-1.5 overflow-x-auto no-scrollbar">
             {quickChips.map((chip, idx) => (
               <button
                 key={idx}
+                type="button"
                 onClick={() => {
                   setChatInput(chip);
                 }}
                 disabled={isGenerating}
-                className="whitespace-nowrap px-2.5 py-1 rounded-md bg-white/5 hover:bg-emerald-500/20 hover:border-emerald-500/40 border border-white/10 text-[11px] font-mono text-slate-300 hover:text-[#00ff88] transition cursor-pointer shrink-0"
+                className="whitespace-nowrap px-2.5 py-1 rounded-md terminal-card hover:border-accent text-[11px] font-mono text-secondary hover:text-primary transition cursor-pointer shrink-0"
               >
                 {chip}
               </button>
@@ -1558,19 +1438,19 @@ export function StrategyStudioPage() {
           </div>
 
           {/* Chat Input Bar */}
-          <form onSubmit={handleSendChat} className="p-3 bg-slate-950 border-t border-white/10 flex gap-2">
+          <form onSubmit={handleSendChat} className="p-3 terminal-card border-t terminal-border flex gap-2">
             <input
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               placeholder="Direct agent (e.g. Run 16-parameter sweep on ASML)..."
               disabled={isGenerating}
-              className="flex-1 bg-black/70 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              className="flex-1 terminal-elevated rounded-xl px-3.5 py-2.5 text-xs text-primary font-mono placeholder:text-muted focus:outline-none focus:border-cyan"
             />
             <button
               type="submit"
               disabled={isGenerating || !chatInput.trim()}
-              className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl transition cursor-pointer flex items-center justify-center shadow-lg shadow-emerald-600/20"
+              className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl transition cursor-pointer flex items-center justify-center shadow-md"
             >
               <Send className="w-4 h-4" />
             </button>
@@ -1580,12 +1460,12 @@ export function StrategyStudioPage() {
         {/* Right Column: Tactical Parameters & Results Visualizer */}
         <div className="lg:col-span-7 space-y-5">
           {/* Parameter Tuning Controls */}
-          <div className="bg-[#0c101c] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <span className="text-xs font-mono uppercase font-bold text-slate-200 flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-emerald-400" /> Strategy Parameter & Friction Controls
+          <div className="terminal-card rounded-2xl p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b terminal-border pb-3">
+              <span className="text-xs font-mono uppercase font-bold text-primary flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-emerald-500 dark:text-emerald-400" /> Strategy Parameter & Friction Controls
               </span>
-              <span className="text-xs text-slate-400 font-mono">Calibrated against IBKR Europe Rates</span>
+              <span className="text-xs text-secondary font-mono">Calibrated against IBKR Europe Rates</span>
             </div>
 
             {/* Selector Grid */}
@@ -1627,7 +1507,7 @@ export function StrategyStudioPage() {
                       }
                     }}
                     placeholder="Ticker (e.g. ASML)..."
-                    className="flex-1 bg-slate-900 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono uppercase font-bold focus:outline-none focus:border-emerald-500"
+                    className="flex-1 terminal-elevated rounded-lg px-2.5 py-1.5 text-xs text-primary font-mono uppercase font-bold focus:outline-none focus:border-cyan"
                   />
                   <select
                     value={symbol}
@@ -1636,7 +1516,7 @@ export function StrategyStudioPage() {
                       setCustomTickerInput(e.target.value);
                       resolveContractForSymbol(e.target.value);
                     }}
-                    className="w-24 bg-slate-900 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500 font-bold"
+                    className="w-24 terminal-elevated rounded-lg px-2 py-1.5 text-xs text-primary font-mono focus:outline-none focus:border-cyan font-bold"
                   >
                     {dynamicUniverse.map((u) => (
                       <option key={u.symbol} value={u.symbol}>
@@ -1652,11 +1532,11 @@ export function StrategyStudioPage() {
 
               {/* Timeframe */}
               <div>
-                <label className="text-[11px] text-slate-300 uppercase font-mono font-bold block mb-1">Timeframe</label>
+                <label className="text-[11px] text-secondary uppercase font-mono font-bold block mb-1">Timeframe</label>
                 <select
                   value={timeframe}
                   onChange={(e) => setTimeframe(e.target.value)}
-                  className="w-full bg-slate-900 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500 font-bold"
+                  className="w-full terminal-elevated rounded-lg px-2.5 py-1.5 text-xs text-primary font-mono focus:outline-none focus:border-cyan font-bold"
                 >
                   <option value="5m">5 Min (Microstructure)</option>
                   <option value="15m">15 Min (Intraday Drift)</option>
@@ -1667,8 +1547,8 @@ export function StrategyStudioPage() {
               {/* Starting Capital */}
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-[11px] text-slate-300 uppercase font-mono font-bold">Capital ($)</label>
-                  <span className="text-xs text-emerald-400 font-mono font-bold">${capitalOverride.toLocaleString()}</span>
+                  <label className="text-[11px] text-secondary uppercase font-mono font-bold">Capital ($)</label>
+                  <span className="text-xs text-emerald-500 dark:text-[#00ff88] font-mono font-bold">${capitalOverride.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center gap-1 mb-1">
                   {[5000, 25000, 100000].map((preset) => (
@@ -1678,8 +1558,8 @@ export function StrategyStudioPage() {
                       onClick={() => setCapitalOverride(preset)}
                       className={`flex-1 py-0.5 rounded text-[10px] font-mono cursor-pointer transition ${
                         capitalOverride === preset
-                          ? "bg-emerald-500/30 text-[#00ff88] border border-emerald-500/50 font-bold"
-                          : "bg-white/5 text-slate-400 hover:text-white border border-white/5"
+                          ? "terminal-badge-bid font-bold"
+                          : "terminal-elevated text-secondary hover:text-primary"
                       }`}
                     >
                       ${preset >= 1000 ? `${preset / 1000}k` : preset}
@@ -1693,14 +1573,16 @@ export function StrategyStudioPage() {
                   step="1000"
                   value={capitalOverride}
                   onChange={(e) => setCapitalOverride(Math.max(500, parseFloat(e.target.value) || 500))}
-                  className="w-full bg-slate-900 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                  className="w-full terminal-elevated rounded-lg px-2.5 py-1 text-xs text-primary font-mono focus:outline-none focus:border-cyan"
                 />
               </div>
 
               {/* Stop ATR */}
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-[11px] text-slate-300 uppercase font-mono font-bold">Stop ATR</label>
+                  <label className="text-[11px] text-slate-300 uppercase font-mono font-bold flex items-center gap-1">
+                    Stop ATR <InfoTip id="atr" />
+                  </label>
                   <span className="text-xs text-emerald-400 font-mono font-bold">{stopAtr.toFixed(1)}x</span>
                 </div>
                 <input
@@ -1733,15 +1615,15 @@ export function StrategyStudioPage() {
             </div>
 
             {/* Friction Gating Checkboxes */}
-            <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-white/5 text-xs font-mono">
+            <div className="flex flex-wrap items-center gap-4 pt-2 border-t terminal-border text-xs font-mono">
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={partialProfit}
                   onChange={(e) => setPartialProfit(e.target.checked)}
-                  className="rounded bg-black border-white/20 text-emerald-500 focus:ring-0"
+                  className="rounded terminal-elevated text-emerald-500 focus:ring-0"
                 />
-                <span className="text-slate-300 font-semibold">Tranche Scaling (50% @ 2.5 ATR)</span>
+                <span className="text-secondary font-semibold">Tranche Scaling (50% @ 2.5 ATR)</span>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -1749,9 +1631,9 @@ export function StrategyStudioPage() {
                   type="checkbox"
                   checked={breakevenLock}
                   onChange={(e) => setBreakevenLock(e.target.checked)}
-                  className="rounded bg-black border-white/20 text-emerald-500 focus:ring-0"
+                  className="rounded terminal-elevated text-emerald-500 focus:ring-0"
                 />
-                <span className="text-slate-300 font-semibold">Breakeven Ratchet (+1.0 ATR)</span>
+                <span className="text-secondary font-semibold">Breakeven Ratchet (+1.0 ATR)</span>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -1759,9 +1641,9 @@ export function StrategyStudioPage() {
                   type="checkbox"
                   checked={adaptiveStop}
                   onChange={(e) => setAdaptiveStop(e.target.checked)}
-                  className="rounded bg-black border-white/20 text-emerald-500 focus:ring-0"
+                  className="rounded terminal-elevated text-emerald-500 focus:ring-0"
                 />
-                <span className="text-slate-300 font-semibold">Adaptive Stop Cushion</span>
+                <span className="text-secondary font-semibold">Adaptive Stop Cushion</span>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -1769,21 +1651,31 @@ export function StrategyStudioPage() {
                   type="checkbox"
                   checked={ofiFilter}
                   onChange={(e) => setOfiFilter(e.target.checked)}
-                  className="rounded bg-black border-white/20 text-emerald-500 focus:ring-0"
+                  className="rounded terminal-elevated text-emerald-500 focus:ring-0"
                 />
-                <span className="text-slate-300 font-semibold">OFI Imbalance Gate (1.4x)</span>
+                <span className="text-secondary font-semibold flex items-center gap-1">
+                  OFI Imbalance Gate (1.4x) <InfoTip id="ofi" />
+                </span>
               </label>
             </div>
           </div>
 
-          {/* Results Tab Navigation (Performance / Pareto Frontier / Blotter / Vault) */}
-          <div className="bg-[#0c101c] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3 flex-wrap gap-2">
-              <div className="flex items-center gap-2 bg-black/60 p-1 rounded-xl border border-white/10 text-xs font-mono flex-wrap">
+          {/* Results Tab Navigation (Candles / Performance / Pareto Frontier / Blotter / Vault) */}
+          <div className="terminal-card p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-border/80 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-1.5 bg-surface/50 p-1 rounded-xl border border-border text-xs font-mono flex-wrap">
+                <button
+                  onClick={() => setActiveTab("candles")}
+                  className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 font-bold cursor-pointer ${
+                    activeTab === "candles" ? "bg-accent text-background shadow" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <BarChart2 className="w-3.5 h-3.5" /> Intraday Candles & OFI
+                </button>
                 <button
                   onClick={() => setActiveTab("performance")}
                   className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 font-bold cursor-pointer ${
-                    activeTab === "performance" ? "bg-emerald-600 text-white shadow" : "text-slate-400 hover:text-white"
+                    activeTab === "performance" ? "bg-accent text-background shadow" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   <TrendingUp className="w-3.5 h-3.5" /> Performance & Curve
@@ -1791,7 +1683,7 @@ export function StrategyStudioPage() {
                 <button
                   onClick={() => setActiveTab("frontier")}
                   className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 font-bold cursor-pointer ${
-                    activeTab === "frontier" ? "bg-emerald-600 text-white shadow" : "text-slate-400 hover:text-white"
+                    activeTab === "frontier" ? "bg-accent text-background shadow" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   <Zap className="w-3.5 h-3.5 text-amber-400" /> Pareto Frontier ({sweepCandidates.length || 0})
@@ -1799,7 +1691,7 @@ export function StrategyStudioPage() {
                 <button
                   onClick={() => setActiveTab("blotter")}
                   className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 font-bold cursor-pointer ${
-                    activeTab === "blotter" ? "bg-emerald-600 text-white shadow" : "text-slate-400 hover:text-white"
+                    activeTab === "blotter" ? "bg-accent text-background shadow" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   <Activity className="w-3.5 h-3.5" /> Trade Blotter ({result?.tradesList?.length || 0})
@@ -1807,7 +1699,7 @@ export function StrategyStudioPage() {
                 <button
                   onClick={() => setActiveTab("vault")}
                   className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 font-bold cursor-pointer ${
-                    activeTab === "vault" ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-white"
+                    activeTab === "vault" ? "bg-indigo-600 text-white shadow" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   <FolderOpen className="w-3.5 h-3.5" /> Saved Vault ({vault.length})
@@ -1815,11 +1707,25 @@ export function StrategyStudioPage() {
               </div>
 
               {result && (
-                <span className="text-xs font-mono font-bold text-slate-300 truncate max-w-[200px]">
+                <span className="text-xs font-mono font-bold text-foreground truncate max-w-[200px]">
                   {strategyName}
                 </span>
               )}
             </div>
+
+            {/* =========================================================================
+                TAB 0: Intraday Candlestick & Order Flow Imbalance (OFI) Canvas
+                ========================================================================= */}
+            {activeTab === "candles" && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <InstitutionalCandleChart
+                  symbol={symbol}
+                  timeframe={timeframe}
+                  onTimeframeChange={(tf) => setTimeframe(tf)}
+                  height={460}
+                />
+              </div>
+            )}
 
             {/* =========================================================================
                 TAB 1: Performance Curve & League Table
@@ -1828,66 +1734,68 @@ export function StrategyStudioPage() {
               <div className="space-y-4 animate-in fade-in duration-200">
                 {/* Metric Badges */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5 text-center font-mono text-xs">
-                  <div className="bg-black/50 p-3 rounded-xl border border-white/5">
-                    <span className="text-[10px] text-slate-400 block uppercase font-semibold">Net PnL</span>
+                  <div className="terminal-elevated p-3 rounded-xl">
+                    <span className="text-[10px] text-secondary block uppercase font-semibold">Net PnL</span>
                     <span className={`font-bold text-base mt-1 block ${
-                      (Number(result.totalPnL || 0)) >= 0 ? "text-[#00ff88]" : "text-rose-400"
+                      (Number(result.totalPnL || 0)) >= 0 ? "text-emerald-500 dark:text-[#00ff88]" : "text-rose-500 dark:text-rose-400"
                     }`}>
                       {(Number(result.totalPnL || 0)) >= 0 ? "+" : ""}${Number(result.totalPnL || 0).toFixed(2)}
                     </span>
-                    <span className="text-[10px] text-slate-500">({result.totalPnLPercent || "0.0"}%)</span>
+                    <span className="text-[10px] text-muted">({result.totalPnLPercent || "0.0"}%)</span>
                   </div>
 
-                  <div className="bg-black/50 p-3 rounded-xl border border-white/5">
-                    <span className="text-[10px] text-slate-400 block uppercase font-semibold">Annual Sharpe</span>
-                    <span className="font-bold text-base text-[#00ff88] mt-1 block">
+                  <div className="terminal-elevated p-3 rounded-xl">
+                    <span className="text-[10px] text-secondary block uppercase font-semibold">Annual Sharpe</span>
+                    <span className="font-bold text-base text-emerald-500 dark:text-[#00ff88] mt-1 block">
                       {result.annualizedSharpe !== undefined ? result.annualizedSharpe : "0.00"}
                     </span>
-                    <span className="text-[10px] text-slate-500">Roll-adjusted</span>
+                    <span className="text-[10px] text-muted">Roll-adjusted</span>
                   </div>
 
-                  <div className="bg-black/50 p-3 rounded-xl border border-white/5">
-                    <span className="text-[10px] text-slate-400 block uppercase font-semibold">Deflated Sharpe</span>
+                  <div className="terminal-elevated p-3 rounded-xl">
+                    <span className="text-[10px] text-secondary block uppercase font-semibold flex items-center justify-center gap-1">
+                      Deflated Sharpe <InfoTip id="dsr" />
+                    </span>
                     <span className={`font-bold text-base mt-1 block ${
-                      result.passesDsrHurdle ? "text-[#00ff88]" : "text-amber-400"
+                      result.passesDsrHurdle ? "text-emerald-500 dark:text-[#00ff88]" : "text-amber-500 dark:text-amber-400"
                     }`}>
                       {result.deflatedSharpeRatio !== undefined ? `${(Number(result.deflatedSharpeRatio) * 100).toFixed(1)}%` : "N/A"}
                     </span>
-                    <span className="text-[10px] text-slate-500">{result.passesDsrHurdle ? "✓ DSR ≥ 95%" : "⚠️ Sub-hurdle"}</span>
+                    <span className="text-[10px] text-muted">{result.passesDsrHurdle ? "✓ DSR ≥ 95%" : "⚠️ Sub-hurdle"}</span>
                   </div>
 
-                  <div className="bg-black/50 p-3 rounded-xl border border-white/5">
-                    <span className="text-[10px] text-slate-400 block uppercase font-semibold">Win Rate</span>
-                    <span className="font-bold text-base text-white mt-1 block">
+                  <div className="terminal-elevated p-3 rounded-xl">
+                    <span className="text-[10px] text-secondary block uppercase font-semibold">Win Rate</span>
+                    <span className="font-bold text-base text-primary mt-1 block">
                       {result.winRate !== undefined ? result.winRate : "0.0"}%
                     </span>
-                    <span className="text-[10px] text-slate-500">{result.winningTrades || 0}W / {result.losingTrades || 0}L</span>
+                    <span className="text-[10px] text-muted">{result.winningTrades || 0}W / {result.losingTrades || 0}L</span>
                   </div>
 
-                  <div className="bg-black/50 p-3 rounded-xl border border-white/5">
-                    <span className="text-[10px] text-slate-400 block uppercase font-semibold">Profit Factor</span>
-                    <span className="font-bold text-base text-cyan-400 mt-1 block">
+                  <div className="terminal-elevated p-3 rounded-xl">
+                    <span className="text-[10px] text-secondary block uppercase font-semibold">Profit Factor</span>
+                    <span className="font-bold text-base text-cyan-500 dark:text-cyan-400 mt-1 block">
                       {result.profitFactor !== undefined ? result.profitFactor : "1.00"}
                     </span>
-                    <span className="text-[10px] text-slate-500">Gross W/L Ratio</span>
+                    <span className="text-[10px] text-muted">Gross W/L Ratio</span>
                   </div>
 
-                  <div className="bg-black/50 p-3 rounded-xl border border-white/5">
-                    <span className="text-[10px] text-slate-400 block uppercase font-semibold">Max Drawdown</span>
-                    <span className="font-bold text-base text-rose-400 mt-1 block">
+                  <div className="terminal-elevated p-3 rounded-xl">
+                    <span className="text-[10px] text-secondary block uppercase font-semibold">Max Drawdown</span>
+                    <span className="font-bold text-base text-rose-500 dark:text-rose-400 mt-1 block">
                       -{result.maxDrawdownPercent !== undefined ? result.maxDrawdownPercent : "0.0"}%
                     </span>
-                    <span className="text-[10px] text-slate-500">Peak-to-trough</span>
+                    <span className="text-[10px] text-muted">Peak-to-trough</span>
                   </div>
                 </div>
 
                 {/* Equity Curve */}
-                <div className="bg-black/50 border border-white/10 rounded-xl p-4 space-y-2">
+                <div className="terminal-elevated rounded-xl p-4 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono font-bold text-slate-200 uppercase flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-emerald-400" /> Compounded Equity Trajectory ({result.symbol || symbol})
+                    <span className="text-xs font-mono font-bold text-primary uppercase flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-emerald-500 dark:text-emerald-400" /> Compounded Equity Trajectory ({result.symbol || symbol})
                     </span>
-                    <span className="text-xs font-mono text-slate-400">
+                    <span className="text-xs font-mono text-secondary">
                       ${Number(result.startingCapital || capitalOverride).toLocaleString()} ➔ ${Number(result.finalCapital || capitalOverride).toLocaleString()}
                     </span>
                   </div>
@@ -1956,62 +1864,62 @@ export function StrategyStudioPage() {
               <div className="space-y-4 animate-in fade-in duration-200">
                 {/* Discovery Microstructure Card (if available) */}
                 {discoveryData && (
-                  <div className="bg-black/50 border border-cyan-500/30 rounded-xl p-4 space-y-2 font-mono text-xs">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                      <span className="font-bold text-cyan-300 flex items-center gap-2">
+                  <div className="terminal-elevated border border-cyan-500/30 rounded-xl p-4 space-y-2 font-mono text-xs">
+                    <div className="flex items-center justify-between border-b terminal-border pb-2">
+                      <span className="font-bold text-cyan-400 flex items-center gap-2">
                         <Activity className="w-4 h-4 text-cyan-400" /> Empirical Microstructure Analysis ({discoveryData.symbol})
                       </span>
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        discoveryData.regime === "PERSISTENT_TRENDING" ? "bg-emerald-500/20 text-[#00ff88]" :
-                        discoveryData.regime === "MEAN_REVERTING" ? "bg-amber-500/20 text-amber-300" :
-                        "bg-slate-700 text-slate-300"
+                        discoveryData.regime === "PERSISTENT_TRENDING" ? "terminal-badge-bid" :
+                        discoveryData.regime === "MEAN_REVERTING" ? "terminal-badge-warn" :
+                        "terminal-card text-secondary"
                       }`}>
                         {discoveryData.regime}
                       </span>
                     </div>
                     <div className="grid grid-cols-3 gap-3 pt-1 text-center">
-                      <div className="bg-slate-900/80 p-2 rounded-lg">
-                        <span className="text-[10px] text-slate-400 block">HURST EXPONENT (H)</span>
-                        <span className="font-bold text-emerald-400 text-sm">
+                      <div className="terminal-card p-2 rounded-lg">
+                        <span className="text-[10px] text-secondary block">HURST EXPONENT (H)</span>
+                        <span className="font-bold text-emerald-500 dark:text-[#00ff88] text-sm">
                           {Number(discoveryData.quant_discovery?.hurst_exponent?.hurst_exponent || 0.5).toFixed(3)}
                         </span>
                       </div>
-                      <div className="bg-slate-900/80 p-2 rounded-lg">
-                        <span className="text-[10px] text-slate-400 block">RUNS TEST (Z-SCORE)</span>
-                        <span className="font-bold text-cyan-400 text-sm">
+                      <div className="terminal-card p-2 rounded-lg">
+                        <span className="text-[10px] text-secondary block">RUNS TEST (Z-SCORE)</span>
+                        <span className="font-bold text-cyan-500 dark:text-cyan-400 text-sm">
                           {Number(discoveryData.quant_discovery?.runs_test?.z_score || 0).toFixed(2)}
                         </span>
                       </div>
-                      <div className="bg-slate-900/80 p-2 rounded-lg">
-                        <span className="text-[10px] text-slate-400 block">MARKOV P(UP|UP)</span>
-                        <span className="font-bold text-white text-sm">
+                      <div className="terminal-card p-2 rounded-lg">
+                        <span className="text-[10px] text-secondary block">MARKOV P(UP|UP)</span>
+                        <span className="font-bold text-primary text-sm">
                           {(Number(discoveryData.quant_discovery?.markov_transitions?.transition_matrix?.up_to_up || 0.5) * 100).toFixed(1)}%
                         </span>
                       </div>
                     </div>
-                    <p className="text-[11px] text-slate-300 font-sans italic pt-1">{discoveryData.guidance}</p>
+                    <p className="text-[11px] text-secondary font-sans italic pt-1">{discoveryData.guidance}</p>
                   </div>
                 )}
 
                 {/* Pareto Candidates Table */}
-                <div className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-3 font-mono text-xs">
+                <div className="terminal-card rounded-xl p-4 space-y-3 font-mono text-xs">
                   <div className="flex items-center justify-between flex-wrap gap-2">
-                    <span className="font-bold uppercase text-slate-200 flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-amber-400" /> Multi-Permutation Candidates Matrix ({sweepCandidates.length} Trials Tested)
+                    <span className="font-bold uppercase text-primary flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-amber-500 dark:text-amber-400" /> Multi-Permutation Candidates Matrix ({sweepCandidates.length} Trials Tested)
                     </span>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-[11px] text-secondary">
                       Selection Bias Penalty: N={sweepCandidates.length || 16} • Click any row to load
                     </span>
                   </div>
 
                   {sweepCandidates.length === 0 ? (
-                    <div className="py-12 text-center text-xs text-slate-500">
+                    <div className="py-12 text-center text-xs text-muted">
                       No sweep completed yet. Click <strong>16-TRIAL SWEEP</strong> above or direct the agent: <em>"Run 16-parameter sweep on {symbol}"</em>.
                     </div>
                   ) : (
                     <div className="overflow-x-auto max-h-96">
                       <table className="w-full text-left">
-                        <thead className="sticky top-0 bg-slate-900 border-b border-white/10 text-slate-400">
+                        <thead className="sticky top-0 terminal-elevated border-b terminal-border text-secondary">
                           <tr>
                             <th className="py-2 px-2.5">Trial / Label</th>
                             <th className="py-2 px-2 text-right">Stop ATR</th>
@@ -2097,7 +2005,7 @@ export function StrategyStudioPage() {
                 ) : (
                   <div className="overflow-x-auto max-h-96">
                     <table className="w-full text-left font-mono text-xs">
-                      <thead className="sticky top-0 bg-slate-900 border-b border-white/10 text-slate-400">
+                      <thead className="sticky top-0 terminal-elevated border-b terminal-border text-secondary">
                         <tr>
                           <th className="py-2 px-3">Trade ID</th>
                           <th className="py-2 px-3">Timestamp</th>
@@ -2110,30 +2018,30 @@ export function StrategyStudioPage() {
                           <th className="py-2 px-3 text-right">Net PnL</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-white/5">
+                      <tbody className="divide-y terminal-border">
                         {result.tradesList.map((tr: any) => {
                           const isWin = Number(tr.realizedPnL || 0) >= 0;
                           return (
-                            <tr key={tr.id} className="hover:bg-white/5 transition">
-                              <td className="py-2 px-3 font-semibold text-slate-300">{tr.id}</td>
-                              <td className="py-2 px-3 text-slate-400">{tr.date}</td>
+                            <tr key={tr.id} className="hover:bg-slate-500/5 transition">
+                              <td className="py-2 px-3 font-semibold text-primary">{tr.id}</td>
+                              <td className="py-2 px-3 text-secondary">{tr.date}</td>
                               <td className="py-2 px-3">
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                  tr.direction === "BUY" ? "bg-emerald-500/20 text-[#00ff88]" : "bg-rose-500/20 text-rose-400"
+                                  tr.direction === "BUY" ? "terminal-badge-bid" : "terminal-badge-ask"
                                 }`}>
                                   {tr.direction}
                                 </span>
                               </td>
-                              <td className="py-2 px-3 text-right text-slate-300">{tr.quantity}</td>
-                              <td className="py-2 px-3 text-right text-slate-300">${Number(tr.entryPrice).toFixed(2)}</td>
-                              <td className="py-2 px-3 text-right text-slate-300">${Number(tr.exitPrice).toFixed(2)}</td>
-                              <td className="py-2 px-3 text-slate-400">
-                                <span className="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded text-[10px]">
+                              <td className="py-2 px-3 text-right text-secondary">{tr.quantity}</td>
+                              <td className="py-2 px-3 text-right text-secondary">${Number(tr.entryPrice).toFixed(2)}</td>
+                              <td className="py-2 px-3 text-right text-secondary">${Number(tr.exitPrice).toFixed(2)}</td>
+                              <td className="py-2 px-3 text-secondary">
+                                <span className="terminal-elevated text-secondary px-1.5 py-0.5 rounded text-[10px]">
                                   {tr.reason}
                                 </span>
                               </td>
-                              <td className="py-2 px-3 text-right text-slate-400">${Number(tr.commission || 0).toFixed(2)}</td>
-                              <td className={`py-2 px-3 text-right font-bold ${isWin ? "text-[#00ff88]" : "text-rose-400"}`}>
+                              <td className="py-2 px-3 text-right text-secondary">${Number(tr.commission || 0).toFixed(2)}</td>
+                              <td className={`py-2 px-3 text-right font-bold ${isWin ? "text-emerald-500 dark:text-[#00ff88]" : "text-rose-500 dark:text-rose-400"}`}>
                                 {isWin ? "+" : ""}${Number(tr.realizedPnL || 0).toFixed(2)}
                               </td>
                             </tr>
@@ -2151,15 +2059,15 @@ export function StrategyStudioPage() {
                 ========================================================================= */}
             {activeTab === "vault" && (
               <div className="space-y-3 animate-in fade-in duration-200">
-                <div className="flex items-center justify-between pb-2 border-b border-white/5">
-                  <span className="text-xs font-mono font-bold text-white uppercase flex items-center gap-2">
-                    <FolderOpen className="w-4 h-4 text-indigo-400" /> Preserved Strategy Experiment Vault ({vault.length} Audited Records)
+                <div className="flex items-center justify-between pb-2 border-b border-subtle">
+                  <span className="text-xs font-mono font-bold text-primary uppercase flex items-center gap-2">
+                    <FolderOpen className="w-4 h-4 text-accent" /> Preserved Strategy Experiment Vault ({vault.length} Audited Records)
                   </span>
-                  <span className="text-xs font-mono text-slate-400">Deterministic Local Atomic Engine (Rule 9)</span>
+                  <span className="text-xs font-mono text-muted">Deterministic Local Atomic Engine (Rule 9)</span>
                 </div>
 
                 {vault.length === 0 ? (
-                  <div className="py-12 text-center text-xs text-slate-500 font-mono">
+                  <div className="py-12 text-center text-xs text-muted font-mono">
                     No strategies saved yet. Run a simulation or parameter sweep, then click "SAVE".
                   </div>
                 ) : (
@@ -2168,19 +2076,19 @@ export function StrategyStudioPage() {
                       <div
                         key={exp.id}
                         onClick={() => handleLoadExperiment(exp)}
-                        className="p-3.5 rounded-xl border border-white/10 bg-black/40 hover:border-indigo-500/40 hover:bg-slate-900/60 transition cursor-pointer space-y-2 group"
+                        className="p-3.5 rounded-xl terminal-card hover:border-accent transition cursor-pointer space-y-2 group"
                       >
                         <div className="flex items-start justify-between">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-xs text-white group-hover:text-indigo-300 transition">
+                              <span className="font-mono font-bold text-xs text-primary group-hover:text-accent transition">
                                 {exp.name}
                               </span>
-                              <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.2 rounded font-mono font-bold">
+                              <span className="text-[10px] terminal-elevated text-secondary px-1.5 py-0.2 rounded font-mono font-bold">
                                 {exp.symbol} • {exp.timeframe}
                               </span>
                             </div>
-                            <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                            <span className="text-[10px] text-muted font-mono block mt-0.5">
                               {new Date(exp.timestamp).toLocaleDateString()} {new Date(exp.timestamp).toLocaleTimeString()}
                             </span>
                           </div>
@@ -2188,34 +2096,34 @@ export function StrategyStudioPage() {
                           <button
                             onClick={(e) => handleDeleteExperiment(exp.id, e)}
                             title="Delete from vault"
-                            className="text-slate-500 hover:text-rose-400 p-1 rounded transition opacity-0 group-hover:opacity-100"
+                            className="text-muted hover:text-rose-400 p-1 rounded transition opacity-0 group-hover:opacity-100"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
 
-                        <div className="grid grid-cols-4 gap-2 text-center text-[11px] font-mono bg-black/30 p-2 rounded-lg border border-white/5">
+                        <div className="grid grid-cols-4 gap-2 text-center text-[11px] font-mono terminal-elevated p-2 rounded-lg">
                           <div>
-                            <span className="text-slate-500 block text-[9px]">NET PNL</span>
-                            <span className={`font-bold ${exp.metrics.totalPnL >= 0 ? "text-[#00ff88]" : "text-rose-400"}`}>
+                            <span className="text-muted block text-[9px]">NET PNL</span>
+                            <span className={`font-bold ${exp.metrics.totalPnL >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                               {exp.metrics.totalPnL >= 0 ? "+" : ""}${exp.metrics.totalPnL.toFixed(0)}
                             </span>
                           </div>
                           <div>
-                            <span className="text-slate-500 block text-[9px]">SHARPE</span>
-                            <span className="font-bold text-white">{exp.metrics.annualizedSharpe.toFixed(2)}</span>
+                            <span className="text-muted block text-[9px]">SHARPE</span>
+                            <span className="font-bold text-primary">{exp.metrics.annualizedSharpe.toFixed(2)}</span>
                           </div>
                           <div>
-                            <span className="text-slate-500 block text-[9px]">WIN RATE</span>
-                            <span className="font-bold text-white">{exp.metrics.winRate}%</span>
+                            <span className="text-muted block text-[9px]">WIN RATE</span>
+                            <span className="font-bold text-primary">{exp.metrics.winRate}%</span>
                           </div>
                           <div>
-                            <span className="text-slate-500 block text-[9px]">TRADES</span>
-                            <span className="font-bold text-slate-300">{exp.metrics.totalTrades}</span>
+                            <span className="text-muted block text-[9px]">TRADES</span>
+                            <span className="font-bold text-secondary">{exp.metrics.totalTrades}</span>
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between text-[10px] text-indigo-400 font-mono font-semibold pt-1">
+                        <div className="flex items-center justify-between text-[10px] text-accent font-mono font-semibold pt-1">
                           <span>Stop ATR: {exp.parameters.stopAtrMultiplier}x • Hold: {exp.parameters.maxHoldBars}b</span>
                           <span className="flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
                             Restore to Studio <ArrowUpRight className="w-3 h-3" />

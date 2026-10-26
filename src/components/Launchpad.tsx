@@ -96,7 +96,7 @@ export default function Launchpad({ onNavigate, systemState }: LaunchpadProps) {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00ff88]/5 border border-[#00ff88]/10 text-[#00ff88] text-[10px] font-mono tracking-widest uppercase font-bold"
+          className="inline-flex items-center gap-2 px-3 py-1 rounded-full terminal-badge-bid text-[10px] font-mono tracking-widest uppercase font-bold"
         >
           <Activity className="w-3 h-3" />
           System Launchpad v1.4
@@ -105,15 +105,15 @@ export default function Launchpad({ onNavigate, systemState }: LaunchpadProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl"
+          className="text-4xl font-extrabold tracking-tight text-primary sm:text-5xl"
         >
-          The Alpha <span className="text-[#00ff88]">Engine</span>
+          The Alpha <span className="text-emerald-500 dark:text-[#00ff88]">Engine</span>
         </motion.h1>
         <motion.p 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="text-slate-400 text-sm leading-relaxed"
+          className="text-secondary text-sm leading-relaxed"
         >
           Deploy modular hybrid trading architecture with co-located edge execution. 
           Monitor institutional risk and AI-calibrated baskets from a single control plane.
@@ -130,14 +130,14 @@ export default function Launchpad({ onNavigate, systemState }: LaunchpadProps) {
             transition={{ delay: 0.1 * (idx + 3) }}
             className={`group relative overflow-hidden rounded-2xl border transition-all duration-300 hover:scale-[1.02] cursor-pointer ${
               section.primary 
-                ? "bg-slate-900/40 border-[#00ff88]/20 hover:border-[#00ff88]/40 shadow-lg shadow-[#00ff88]/5" 
-                : "bg-slate-900/20 border-white/5 hover:border-white/10"
+                ? "terminal-card border-emerald-500/40 hover:border-emerald-500 shadow-lg" 
+                : "terminal-card hover:border-accent"
             }`}
             onClick={() => onNavigate("dashboard", section.navTarget)}
           >
             {/* Action Required Badge */}
             {section.actionRequired && (
-              <div className="absolute top-4 right-4 flex items-center gap-1.5 px-2 py-1 rounded bg-amber-400/10 border border-amber-400/20 text-amber-400 text-[9px] font-mono font-bold animate-pulse">
+              <div className="absolute top-4 right-4 flex items-center gap-1.5 px-2 py-1 rounded terminal-badge-warn text-[9px] font-mono font-bold animate-pulse">
                 <AlertCircle className="w-3 h-3" />
                 ACTION REQUIRED
               </div>
@@ -145,34 +145,34 @@ export default function Launchpad({ onNavigate, systemState }: LaunchpadProps) {
 
             <div className="p-6 space-y-4">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 group-hover:bg-white/10 transition-colors">
+                <div className="p-2.5 rounded-xl terminal-elevated group-hover:border-accent transition-colors">
                   {section.icon}
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white group-hover:text-[#00ff88] transition-colors">{section.title}</h3>
+                  <h3 className="text-sm font-bold text-primary group-hover:text-emerald-500 dark:group-hover:text-[#00ff88] transition-colors">{section.title}</h3>
                   <div className={`text-[10px] font-mono font-bold ${section.statusColor}`}>
                     {section.status}
                   </div>
                 </div>
               </div>
 
-              <p className="text-[11px] text-slate-400 leading-relaxed h-8">
+              <p className="text-[11px] text-secondary leading-relaxed h-8">
                 {section.description}
               </p>
 
-              <div className="pt-4 border-t border-white/5 space-y-2">
+              <div className="pt-4 border-t terminal-border space-y-2">
                 {section.details.map((detail, dIdx) => (
                   <div key={dIdx} className="flex items-center justify-between text-[10px] font-mono">
-                    <span className="text-slate-500 flex items-center gap-1.5">
+                    <span className="text-muted flex items-center gap-1.5">
                       {detail.icon}
                       {detail.label}
                     </span>
-                    <span className="text-slate-300 font-bold">{detail.value}</span>
+                    <span className="text-primary font-bold">{detail.value}</span>
                   </div>
                 ))}
               </div>
 
-              <div className="pt-2 flex items-center justify-end text-[10px] font-bold text-[#00ff88] opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="pt-2 flex items-center justify-end text-[10px] font-bold text-emerald-500 dark:text-[#00ff88] opacity-0 group-hover:opacity-100 transition-opacity">
                 Configure Section
                 <ChevronRight className="w-3 h-3 ml-1" />
               </div>
@@ -182,7 +182,7 @@ export default function Launchpad({ onNavigate, systemState }: LaunchpadProps) {
       </div>
 
       {/* Global Status Footer */}
-      <div className="flex items-center justify-center gap-8 text-[10px] font-mono text-slate-500 bg-slate-900/10 py-3 rounded-full border border-white/5 max-w-fit mx-auto px-8">
+      <div className="flex items-center justify-center gap-8 text-[10px] font-mono text-secondary terminal-card py-3 rounded-full max-w-fit mx-auto px-8">
         <div className="flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse" />
           EDGE NODE: FRANKFURT (ACTIVE)

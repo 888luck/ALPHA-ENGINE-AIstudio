@@ -70,6 +70,7 @@ interface CopilotStats {
 }
 
 import { ApiVaultModal } from "../components/ApiVaultModal";
+import { InstitutionalModelSelector } from "../components/InstitutionalModelSelector";
 import {
   getAllStoredVaultSettings,
   persistVaultItem,
@@ -185,10 +186,8 @@ Click any quick query below or type your request:`,
     }
     return "local/finbert-int8";
   });
+  const activeModelObj = availableModels.find((m) => m.id === selectedModel) || availableModels[0] || TIER0_OFFLINE_MODEL;
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showModelDropdown, setShowModelDropdown] = useState(false);
-  const [modelSearchQuery, setModelSearchQuery] = useState("");
-  const [selectedProviderFilter, setSelectedProviderFilter] = useState<string>("ALL");
   const [activeTools, setActiveTools] = useState<string[]>([]);
   const [stats, setStats] = useState<CopilotStats>({
     daily_spent_usd: 0.00041,
@@ -587,28 +586,28 @@ Click any quick query below or type your request:`,
       );
 
       elements.push(
-        <div key={`tbl-${key}`} className="my-3 overflow-x-auto rounded-lg border border-white/10 shadow-lg">
+        <div key={`tbl-${key}`} className="my-3 overflow-x-auto rounded-lg border terminal-border shadow-md">
           <table className="w-full text-xs font-mono text-left border-collapse">
-            <thead className="bg-slate-900/90 text-slate-200 uppercase tracking-wider border-b border-white/10">
+            <thead className="terminal-elevated text-secondary uppercase tracking-wider border-b terminal-border">
               <tr>
                 {headers.map((h, i) => (
-                  <th key={i} className="py-2.5 px-3 font-bold border-r border-white/5 last:border-none">
+                  <th key={i} className="py-2.5 px-3 font-bold border-r terminal-border last:border-none">
                     {h.replace(/\*\*/g, "")}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5 bg-slate-950/60">
+            <tbody className="divide-y terminal-border terminal-card">
               {rows.map((r, ri) => (
-                <tr key={ri} className="hover:bg-white/5 transition-colors">
+                <tr key={ri} className="hover:bg-slate-500/5 transition-colors">
                   {r.map((cell, ci) => {
                     const isProfit = cell.includes("+$");
                     const isLoss = cell.includes("-$");
                     return (
                       <td
                         key={ci}
-                        className={`py-2 px-3 border-r border-white/5 last:border-none ${
-                          isProfit ? "text-emerald-400 font-bold" : isLoss ? "text-rose-400 font-bold" : "text-slate-300"
+                        className={`py-2 px-3 border-r terminal-border last:border-none ${
+                          isProfit ? "text-emerald-500 dark:text-[#00ff88] font-bold" : isLoss ? "text-rose-500 dark:text-rose-400 font-bold" : "text-secondary"
                         }`}
                       >
                         {cell.replace(/\*\*/g, "").replace(/`/g, "")}
@@ -668,64 +667,32 @@ Click any quick query below or type your request:`,
     return <div className="space-y-1">{elements}</div>;
   };
 
-  const filteredModels = useMemo(() => {
-    return availableModels.filter((m) => {
-      if (selectedProviderFilter !== "ALL") {
-        if (selectedProviderFilter === "FREE") {
-          const isFree = m.isFree === true || m.id.includes(":free") || m.costStr.includes("$0.00") || m.id.startsWith("local");
-          if (!isFree) return false;
-        } else if (selectedProviderFilter === "LOCAL" && !m.id.startsWith("local")) {
-          return false;
-        } else if (selectedProviderFilter === "OPENROUTER" && !m.id.startsWith("openrouter")) {
-          return false;
-        } else if (selectedProviderFilter === "NVIDIA" && !m.id.startsWith("nvidia")) {
-          return false;
-        } else if (selectedProviderFilter === "GOOGLE" && !m.id.startsWith("google")) {
-          return false;
-        } else if (selectedProviderFilter === "GROQ" && !m.id.startsWith("groq")) {
-          return false;
-        } else if (selectedProviderFilter === "OPENAI" && !m.id.startsWith("openai")) {
-          return false;
-        }
-      }
-      if (modelSearchQuery.trim()) {
-        const q = modelSearchQuery.toLowerCase();
-        return (
-          m.name.toLowerCase().includes(q) ||
-          m.id.toLowerCase().includes(q) ||
-          m.provider.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
-  }, [availableModels, selectedProviderFilter, modelSearchQuery]);
-
-  const activeModelObj = availableModels.find((m) => m.id === selectedModel) || availableModels[0];
   const quotaPct = Math.min(100, Math.round((stats.daily_requests / stats.daily_quota) * 100));
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-[#00ff88]/30 selection:text-white">
+    <div className="min-h-screen terminal-canvas text-primary flex flex-col font-sans">
       {/* Institutional Top Header */}
-      <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-white/10 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+      <header className="sticky top-0 z-40 terminal-card border-b terminal-border px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           {onNavigateHome && (
             <button
+              type="button"
               onClick={onNavigateHome}
-              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition cursor-pointer"
+              className="p-1.5 rounded-lg terminal-elevated hover:border-accent text-secondary hover:text-primary transition cursor-pointer"
               title="Return to Dashboard"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
           )}
-          <div className="p-2 rounded-lg bg-[#00ff88]/10 border border-[#00ff88]/20 text-[#00ff88]">
+          <div className="p-2 rounded-lg terminal-badge-bid">
             <Sparkles className="w-5 h-5 animate-pulse" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-sm sm:text-base font-extrabold tracking-tight text-white uppercase flex items-center gap-1.5">
-                ALPHA ENGINE <span className="text-[#00ff88]">COPILOT</span>
+              <h1 className="text-sm sm:text-base font-extrabold tracking-tight text-primary uppercase flex items-center gap-1.5">
+                ALPHA ENGINE <span className="text-emerald-500 dark:text-[#00ff88]">COPILOT</span>
               </h1>
-              <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded terminal-badge-bid font-mono text-[10px] font-bold">
                 STANDALONE AD-HOC
               </span>
             </div>
@@ -736,17 +703,17 @@ Click any quick query below or type your request:`,
                 className={`px-2.5 py-0.5 rounded text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95 ${
                   tradingMode === "LIVE"
                     ? "bg-rose-600 hover:bg-rose-500 text-white border-rose-400 animate-pulse"
-                    : "bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40"
+                    : "terminal-badge-warn"
                 }`}
                 title="Click to toggle execution lane between PAPER (4002) and LIVE (4001)"
               >
                 <span>{tradingMode === "LIVE" ? "🔴 LIVE PRODUCTION (PORT: 4001)" : "🟡 PAPER SIMULATION (PORT: 4002)"}</span>
                 <span className="text-[10px] uppercase underline opacity-80">SWITCH</span>
               </button>
-              <span className="text-slate-400">
-                Host: <strong className="text-white">{vaultSettings?.ibkrHost || "127.0.0.1"}</strong>
+              <span className="text-secondary">
+                Host: <strong className="text-primary">{vaultSettings?.ibkrHost || "127.0.0.1"}</strong>
               </span>
-              <span className="text-emerald-400 font-bold">• EDGE ACTIVE</span>
+              <span className="text-emerald-500 dark:text-emerald-400 font-bold">• EDGE ACTIVE</span>
             </div>
           </div>
         </div>
@@ -754,13 +721,13 @@ Click any quick query below or type your request:`,
         {/* Cost Governance Header Telemetry Bar */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Daily Quota Meter */}
-          <div className="bg-slate-900/90 border border-white/10 rounded-lg px-3 py-1.5 flex items-center gap-2.5 text-xs font-mono">
-            <Activity className="w-3.5 h-3.5 text-indigo-400" />
+          <div className="terminal-elevated rounded-lg px-3 py-1.5 flex items-center gap-2.5 text-xs font-mono">
+            <Activity className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
             <div>
-              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Today's Quota</div>
-              <div className="text-white font-bold flex items-center gap-1.5">
+              <div className="text-[10px] text-secondary uppercase tracking-wider font-semibold">Today's Quota</div>
+              <div className="text-primary font-bold flex items-center gap-1.5">
                 <span>{stats.daily_requests} / {stats.daily_quota.toLocaleString()}</span>
-                <span className={`text-[10px] px-1 rounded ${quotaPct > 80 ? "bg-amber-500/20 text-amber-300" : "bg-emerald-500/20 text-emerald-300"}`}>
+                <span className={`text-[10px] px-1 rounded ${quotaPct > 80 ? "terminal-badge-warn" : "terminal-badge-bid"}`}>
                   {quotaPct}%
                 </span>
               </div>
@@ -768,11 +735,11 @@ Click any quick query below or type your request:`,
           </div>
 
           {/* Daily Cumulative Spent */}
-          <div className="bg-slate-900/90 border border-white/10 rounded-lg px-3 py-1.5 flex items-center gap-2.5 text-xs font-mono">
-            <DollarSign className="w-3.5 h-3.5 text-[#00ff88]" />
+          <div className="terminal-elevated rounded-lg px-3 py-1.5 flex items-center gap-2.5 text-xs font-mono">
+            <DollarSign className="w-3.5 h-3.5 text-emerald-500 dark:text-[#00ff88]" />
             <div>
-              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Daily Estimated Cost</div>
-              <div className="text-[#00ff88] font-bold">
+              <div className="text-[10px] text-secondary uppercase tracking-wider font-semibold">Daily Estimated Cost</div>
+              <div className="text-emerald-500 dark:text-[#00ff88] font-bold">
                 ${stats.daily_spent_usd.toFixed(4)}
               </div>
             </div>
@@ -781,10 +748,10 @@ Click any quick query below or type your request:`,
           {/* Circuit Breaker Ceiling Badge */}
           <div className={`border rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs font-mono ${
             stats.circuit_breaker_active
-              ? "bg-rose-950/80 border-rose-500/50 text-rose-300 animate-pulse"
-              : "bg-slate-900/90 border-white/10 text-slate-300"
+              ? "terminal-badge-ask animate-pulse"
+              : "terminal-elevated text-secondary"
           }`}>
-            <Shield className={`w-3.5 h-3.5 ${stats.circuit_breaker_active ? "text-rose-400" : "text-blue-400"}`} />
+            <Shield className={`w-3.5 h-3.5 ${stats.circuit_breaker_active ? "text-rose-500" : "text-blue-500"}`} />
             <div>
               <div className="text-[10px] uppercase tracking-wider opacity-75">Ceiling: ${stats.daily_budget_ceiling_usd.toFixed(2)}</div>
               <div className="font-bold text-[11px]">
@@ -795,188 +762,25 @@ Click any quick query below or type your request:`,
 
           {/* Direct 4-Pillar Key Vault Access Button */}
           <button
+            type="button"
             onClick={() => setIsVaultOpen(true)}
-            className="bg-indigo-950/70 hover:bg-indigo-900 border border-indigo-500/40 text-indigo-300 hover:text-white rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs font-mono transition cursor-pointer shadow-md"
+            className="terminal-card hover:border-accent text-secondary hover:text-primary rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs font-mono transition cursor-pointer shadow-sm"
             title="Open 4-Pillar Connection & Feed Vault to configure Cloud LLMs, IBKR, and Market Feeds"
           >
             <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
             <span className="font-bold">4-Pillar Vault</span>
           </button>
 
-          {/* Active Model Selector Dropdown with Dynamic Discovery */}
-          <div className="relative">
-            <button
-              onClick={() => setShowModelDropdown(!showModelDropdown)}
-              className="bg-slate-900 hover:bg-slate-800 border border-[#00ff88]/30 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs font-mono transition cursor-pointer shadow-md"
-            >
-              <span>{activeModelObj.icon}</span>
-              <div className="text-left">
-                <div className="text-[9px] text-[#00ff88] font-bold uppercase">{activeModelObj.provider}</div>
-                <div className="text-white font-bold max-w-[170px] truncate">{activeModelObj.name}</div>
-              </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1" />
-            </button>
-
-            {showModelDropdown && (
-              <div className="absolute right-0 mt-2 w-[420px] max-w-[90vw] bg-[#0e1422] border border-white/15 rounded-xl shadow-2xl p-3 z-50 animate-fade-in font-mono text-xs">
-                {/* Catalog Header */}
-                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 mb-2 flex items-center justify-between">
-                  <span>Dynamic Model Catalog</span>
-                  <span className="text-[9px] text-[#00ff88] bg-[#00ff88]/10 px-1.5 py-0.5 rounded border border-[#00ff88]/20 font-bold">
-                    {availableModels.length} Active Verified
-                  </span>
-                </div>
-
-                {/* Instant Search Bar */}
-                <div className="relative mb-2">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={modelSearchQuery}
-                    onChange={(e) => setModelSearchQuery(e.target.value)}
-                    placeholder="Search model name, provider, or size..."
-                    className="w-full bg-slate-900 border border-white/10 rounded-lg pl-8 pr-7 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00ff88]/50"
-                  />
-                  {modelSearchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setModelSearchQuery("")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Provider Filter Tabs */}
-                <div className="flex items-center gap-1 mb-2 pb-2 border-b border-white/10 overflow-x-auto text-[10px]">
-                  {["ALL", "FREE", "OPENROUTER", "GROQ", "NVIDIA", "GOOGLE", "LOCAL"].map((tab) => {
-                    const count = tab === "ALL" 
-                      ? availableModels.length 
-                      : tab === "FREE"
-                        ? availableModels.filter(m => m.isFree === true || m.id.includes(":free") || m.costStr.includes("$0.00") || m.id.startsWith("local")).length
-                        : availableModels.filter(m => m.id.toUpperCase().startsWith(tab) || m.provider.toUpperCase().includes(tab)).length;
-                    return (
-                      <button
-                        key={tab}
-                        type="button"
-                        onClick={() => setSelectedProviderFilter(tab)}
-                        className={`px-2 py-0.5 rounded transition cursor-pointer font-bold whitespace-nowrap flex items-center gap-1 ${
-                          selectedProviderFilter === tab
-                            ? tab === "FREE"
-                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                              : "bg-[#00ff88]/20 text-[#00ff88] border border-[#00ff88]/40"
-                            : "bg-white/5 hover:bg-white/10 text-slate-400"
-                        }`}
-                      >
-                        <span>{tab === "FREE" ? "🎁 FREE ONLY" : tab}</span>
-                        <span className="text-[9px] opacity-75">({count})</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Fast Access / Recommended Section (When No Search Query) */}
-                {!modelSearchQuery.trim() && selectedProviderFilter === "ALL" && (
-                  <div className="mb-2 pb-2 border-b border-white/10 space-y-1">
-                    <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1 px-1">
-                      <span>⭐</span>
-                      <span>Recommended & Tested Active</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {availableModels.filter(m => 
-                        m.id === "local/finbert-int8" || 
-                        m.id.includes("llama-3.2-11b-vision") || 
-                        m.id.includes("qwen3.8-27b") || 
-                        m.id.includes("gpt-oss-120b")
-                      ).map(m => (
-                        <button
-                          key={`rec-${m.id}`}
-                          type="button"
-                          onClick={() => {
-                            setSelectedModel(m.id);
-                            setShowModelDropdown(false);
-                          }}
-                          className={`p-1.5 rounded-lg border text-left flex items-center gap-1.5 transition cursor-pointer ${
-                            selectedModel === m.id
-                              ? "bg-[#00ff88]/20 border-[#00ff88] text-white"
-                              : "bg-white/5 hover:bg-white/10 border-white/10 text-slate-300"
-                          }`}
-                        >
-                          <span className="text-xs">{m.icon}</span>
-                          <div className="truncate min-w-0">
-                            <div className="text-[10px] font-bold truncate text-white">{m.name.split("/").pop()}</div>
-                            <div className="text-[9px] text-[#00ff88]">{m.badge}</div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Scrollable Model List */}
-                <div className="max-h-72 overflow-y-auto space-y-1 pr-1">
-                  {filteredModels.length === 0 ? (
-                    <div className="text-center py-6 text-slate-400 text-xs">
-                      No models matching "{modelSearchQuery}"
-                    </div>
-                  ) : (
-                    filteredModels.map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedModel(m.id);
-                          setShowModelDropdown(false);
-                          setModelSearchQuery("");
-                        }}
-                        className={`w-full text-left p-2 rounded-lg flex items-start gap-2.5 transition cursor-pointer ${
-                          selectedModel === m.id
-                            ? "bg-[#00ff88]/15 border border-[#00ff88]/40 text-white"
-                            : "hover:bg-white/5 text-slate-300"
-                        }`}
-                      >
-                        <span className="text-base shrink-0">{m.icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-bold text-white truncate flex items-center justify-between">
-                            <span className="truncate" title={m.name}>{m.name}</span>
-                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                              {(m.isFree || m.id.includes(":free")) && (
-                                <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.2 rounded font-mono font-bold">
-                                  FREE
-                                </span>
-                              )}
-                              {selectedModel === m.id && <Check className="w-3.5 h-3.5 text-[#00ff88] shrink-0" />}
-                            </div>
-                          </div>
-                          <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                            <span className="text-indigo-400 font-bold">{m.provider}</span>
-                            <span>•</span>
-                            <span className="text-slate-300">{m.costStr}</span>
-                          </div>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-
-                {/* Vault Config Button Footer */}
-                <div className="mt-2 pt-2 border-t border-white/10">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowModelDropdown(false);
-                      setIsVaultOpen(true);
-                    }}
-                    className="w-full p-2 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-[11px] font-mono font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Manage Keys in 4-Pillar Vault</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Institutional Dynamic Model Selector with Monoline Icons & Vault Probing */}
+          <InstitutionalModelSelector
+            availableModels={availableModels}
+            selectedModel={selectedModel}
+            onSelectModel={(id) => {
+              setSelectedModel(id);
+              localStorage.setItem("alpha_copilot_model", id);
+            }}
+            onOpenVault={() => setIsVaultOpen(true)}
+          />
         </div>
       </header>
 
@@ -1007,29 +811,31 @@ Click any quick query below or type your request:`,
 
               {/* Message Bubble */}
               <div
-                className={`rounded-2xl p-4 sm:p-5 max-w-[90%] sm:max-w-[85%] border shadow-lg relative group ${
+                className={`rounded-2xl p-4 sm:p-5 max-w-[90%] sm:max-w-[85%] border shadow-md relative group ${
                   msg.role === "user"
-                    ? "bg-indigo-950/40 border-indigo-500/30 text-white rounded-tr-none"
-                    : "bg-slate-900/80 border-white/10 text-slate-100 rounded-tl-none"
+                    ? "bg-indigo-950/30 border-indigo-500/40 text-primary rounded-tr-none"
+                    : "terminal-card rounded-tl-none"
                 }`}
               >
                 {/* Copy Button */}
                 <button
+                  type="button"
                   onClick={() => copyToClipboard(msg.content, msg.id)}
-                  className="absolute top-3 right-3 p-1 rounded bg-black/40 hover:bg-black/60 text-slate-400 hover:text-white transition opacity-0 group-hover:opacity-100 cursor-pointer"
+                  className="absolute top-3 right-3 p-1 rounded terminal-elevated text-secondary hover:text-primary transition opacity-0 group-hover:opacity-100 cursor-pointer"
                   title="Copy message"
                 >
-                  {copiedId === msg.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  {copiedId === msg.id ? <Check className="w-3 h-3 text-emerald-500 dark:text-[#00ff88]" /> : <Copy className="w-3 h-3" />}
                 </button>
 
                 {/* Content */}
                 {renderMarkdown(msg.content)}
 
                 {msg.content.includes("4-Pillar") && (
-                  <div className="mt-3 pt-2 border-t border-white/5">
+                  <div className="mt-3 pt-2 border-t terminal-border">
                     <button
+                      type="button"
                       onClick={() => setIsVaultOpen(true)}
-                      className="px-3 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-300 hover:text-white font-mono text-xs font-bold flex items-center gap-2 transition cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-400 hover:text-primary font-mono text-xs font-bold flex items-center gap-2 transition cursor-pointer"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                       <span>Open 4-Pillar Connection & Feed Vault</span>
@@ -1039,17 +845,17 @@ Click any quick query below or type your request:`,
 
                 {/* Per-Message Telemetry Badge */}
                 {msg.telemetry && (
-                  <div className="mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center gap-2 text-[10px] font-mono text-slate-400">
-                    <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 font-bold">
+                  <div className="mt-4 pt-3 border-t terminal-border flex flex-wrap items-center gap-2 text-[10px] font-mono text-secondary">
+                    <span className="px-1.5 py-0.5 rounded terminal-card text-secondary font-bold">
                       {msg.telemetry.provider} • {msg.telemetry.model_name}
                     </span>
-                    <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
+                    <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
                       {msg.telemetry.total_tokens} tokens ({msg.telemetry.prompt_tokens}p / {msg.telemetry.completion_tokens}c)
                     </span>
-                    <span className="px-1.5 py-0.5 rounded bg-[#00ff88]/10 border border-[#00ff88]/20 text-[#00ff88] font-bold">
+                    <span className="px-1.5 py-0.5 rounded terminal-badge-bid font-bold">
                       ${msg.telemetry.cost_usd.toFixed(5)}
                     </span>
-                    <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                    <span className="px-1.5 py-0.5 rounded terminal-elevated text-secondary">
                       {msg.telemetry.latency_ms}ms latency
                     </span>
                   </div>
@@ -1060,12 +866,12 @@ Click any quick query below or type your request:`,
 
           {/* Active Tool Execution Indicator */}
           {activeTools.length > 0 && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-900/90 border border-[#00ff88]/30 max-w-md animate-pulse">
-              <RefreshCw className="w-4 h-4 text-[#00ff88] animate-spin" />
-              <div className="text-xs font-mono text-slate-300">
-                <span className="text-[#00ff88] font-bold">Executing Tools: </span>
+            <div className="flex items-center gap-2 p-3 rounded-xl terminal-card border border-emerald-500/40 max-w-md animate-pulse">
+              <RefreshCw className="w-4 h-4 text-emerald-500 dark:text-[#00ff88] animate-spin" />
+              <div className="text-xs font-mono text-secondary">
+                <span className="text-emerald-500 dark:text-[#00ff88] font-bold">Executing Tools: </span>
                 {activeTools.map((t) => (
-                  <span key={t} className="px-1.5 py-0.5 mx-1 rounded bg-black/50 border border-white/10 text-white font-bold">
+                  <span key={t} className="px-1.5 py-0.5 mx-1 rounded terminal-elevated text-primary font-bold">
                     {t}()
                   </span>
                 ))}
@@ -1078,7 +884,7 @@ Click any quick query below or type your request:`,
 
         {/* Quick Query Recommendation Pills */}
         <div className="pt-2 pb-3">
-          <div className="text-[10px] font-mono text-slate-400 mb-2 uppercase tracking-wider font-semibold">
+          <div className="text-[10px] font-mono text-secondary mb-2 uppercase tracking-wider font-semibold">
             Institutional Tool Presets
           </div>
           <div className="flex flex-wrap gap-2">
@@ -1091,11 +897,12 @@ Click any quick query below or type your request:`,
             ].map((preset, idx) => (
               <button
                 key={idx}
+                type="button"
                 onClick={() => handleSend(preset)}
                 disabled={isGenerating}
-                className="px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-white/10 hover:border-[#00ff88]/40 text-xs font-mono text-slate-300 hover:text-white transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                className="px-3 py-1.5 rounded-lg terminal-card hover:border-accent text-xs font-mono text-secondary hover:text-primary transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
               >
-                <Terminal className="w-3 h-3 text-[#00ff88]" />
+                <Terminal className="w-3 h-3 text-emerald-500 dark:text-[#00ff88]" />
                 <span>{preset}</span>
               </button>
             ))}
@@ -1103,15 +910,16 @@ Click any quick query below or type your request:`,
         </div>
 
         {/* Chat Input Console */}
-        <div className="sticky bottom-4 bg-[#0e1422]/95 backdrop-blur-md border border-white/15 rounded-2xl p-2.5 shadow-2xl flex flex-col gap-2">
-          <div className="flex items-center justify-between px-2 text-[10px] font-mono text-slate-400">
+        <div className="sticky bottom-4 terminal-card border terminal-border rounded-2xl p-2.5 shadow-xl flex flex-col gap-2">
+          <div className="flex items-center justify-between px-2 text-[10px] font-mono text-secondary">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>ACTIVE: <strong className="text-white">{activeModelObj.name}</strong></span>
+              <span>ACTIVE: <strong className="text-primary">{activeModelObj.name}</strong></span>
             </div>
             <button
+              type="button"
               onClick={handleClearHistory}
-              className="hover:text-rose-400 transition cursor-pointer flex items-center gap-1"
+              className="hover:text-rose-500 transition cursor-pointer flex items-center gap-1"
               title="Clear conversational memory"
             >
               <Trash2 className="w-3 h-3" />
@@ -1131,22 +939,24 @@ Click any quick query below or type your request:`,
               }}
               placeholder="Ask an ad-hoc portfolio question, SEC filing check, or clinical trial query..."
               rows={1}
-              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs sm:text-sm font-sans text-white placeholder:text-slate-500 focus:outline-none focus:border-[#00ff88]/50 resize-none"
+              className="flex-1 terminal-elevated rounded-xl px-4 py-3 text-xs sm:text-sm font-sans text-primary placeholder:text-muted focus:outline-none focus:border-cyan resize-none"
             />
 
             {isGenerating ? (
               <button
+                type="button"
                 onClick={handleStop}
-                className="p-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white transition cursor-pointer shadow-lg flex items-center justify-center"
+                className="p-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white transition cursor-pointer shadow-md flex items-center justify-center"
                 title="Stop generation"
               >
                 <Square className="w-4 h-4 fill-current" />
               </button>
             ) : (
               <button
+                type="button"
                 onClick={() => handleSend()}
                 disabled={!input.trim()}
-                className="p-3 rounded-xl bg-[#00ff88] hover:bg-[#00ff88]/80 text-black transition cursor-pointer shadow-lg shadow-[#00ff88]/20 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+                className="p-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white dark:bg-emerald-400 dark:hover:bg-emerald-300 dark:text-slate-950 transition cursor-pointer shadow-md flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed font-bold"
                 title="Send query"
               >
                 <Send className="w-4 h-4" />

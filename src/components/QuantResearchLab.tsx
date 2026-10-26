@@ -499,26 +499,27 @@ export const QuantResearchLab: React.FC = () => {
       {/* 0. AGENTIC RESEARCH COPILOT & STRATEGY TERMINAL */}
       <ResearchCopilotTerminal />
       {/* HEADER BANNER */}
-      <div className="bg-[#0c101c] border border-white/10 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="terminal-card rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs bg-indigo-500/20 text-indigo-300 font-mono font-bold px-2.5 py-1 rounded border border-indigo-500/30">
+            <span className="text-xs bg-indigo-500/20 text-indigo-400 font-mono font-bold px-2.5 py-1 rounded border border-indigo-500/30">
               RESEARCH & QUALIFICATION LAB
             </span>
-            <span className="text-xs text-slate-300 font-mono font-semibold">Isolated Sandbox Engine</span>
+            <span className="text-xs text-secondary font-mono font-semibold">Isolated Sandbox Engine</span>
           </div>
-          <h2 className="text-base font-extrabold text-white font-mono mt-1 flex items-center gap-2">
-            <Layers className="w-4 h-4 text-indigo-400" /> Event Catalysts & Microstructure Qualification
+          <h2 className="text-base font-extrabold text-primary font-mono mt-1 flex items-center gap-2">
+            <Layers className="w-4 h-4 text-indigo-500 dark:text-indigo-400" /> Event Catalysts & Microstructure Qualification
           </h2>
-          <p className="text-xs sm:text-sm text-slate-300 font-sans mt-0.5">
+          <p className="text-xs sm:text-sm text-secondary font-sans mt-0.5">
             Audit primary-source SEC filings, clinical trial milestones, and short borrow depth before promoting assets to live execution.
           </p>
         </div>
 
         <button
+          type="button"
           onClick={fetchCatalysts}
           disabled={loadingCatalysts}
-          className="bg-black/40 border border-white/10 hover:border-white/20 text-slate-300 hover:text-white px-3 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition cursor-pointer"
+          className="terminal-elevated text-secondary hover:text-primary px-3 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition cursor-pointer"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loadingCatalysts ? "animate-spin" : ""}`} />
           SYNC PRIMARY FEEDS
@@ -526,15 +527,15 @@ export const QuantResearchLab: React.FC = () => {
       </div>
 
       {/* 1. VERIFIED CATALYST RADAR (SEC, ClinicalTrials, FDA, Macro) */}
-      <div className="bg-[#0c101c] border border-white/10 rounded-xl p-5 space-y-4">
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+      <div className="terminal-card rounded-xl p-5 space-y-4">
+        <div className="flex items-center justify-between border-b terminal-border pb-3">
           <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-[#00ff88]" />
-            <h3 className="text-xs sm:text-sm font-bold text-slate-200 uppercase tracking-wider font-mono">
+            <FileText className="w-4 h-4 text-emerald-500 dark:text-[#00ff88]" />
+            <h3 className="text-xs sm:text-sm font-bold text-primary uppercase tracking-wider font-mono">
               Verified Event & Regulatory Catalyst Radar
             </h3>
           </div>
-          <span className="text-xs text-slate-400 font-mono font-semibold">Zero Hallucination • Direct Source Verified</span>
+          <span className="text-xs text-secondary font-mono font-semibold">Zero Hallucination • Direct Source Verified</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -544,13 +545,13 @@ export const QuantResearchLab: React.FC = () => {
               className={`p-4 rounded-lg border transition space-y-3 ${
                 ev.riskGated 
                   ? "bg-rose-950/20 border-rose-500/30" 
-                  : "bg-black/35 border-white/5 hover:border-white/10"
+                  : "terminal-elevated hover:border-accent"
               }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-white bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30">
+                    <span className="text-xs font-mono font-bold text-primary bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30">
                       {ev.symbol}
                     </span>
                     <span className="text-xs text-slate-400 font-mono uppercase font-semibold">{ev.category}</span>
@@ -596,27 +597,28 @@ export const QuantResearchLab: React.FC = () => {
       </div>
 
       {/* 2. PEAD MOMENTUM RADAR (POST-EARNINGS ANNOUNCEMENT DRIFT) */}
-      <div className="bg-[#0c101c] border border-white/10 rounded-xl p-5 space-y-4">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b border-white/10 pb-3">
+      <div className="terminal-card rounded-xl p-5 space-y-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b terminal-border pb-3">
           <div>
             <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-amber-400" />
-              <h3 className="text-xs sm:text-sm font-bold text-slate-200 uppercase tracking-wider font-mono">
+              <Zap className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+              <h3 className="text-xs sm:text-sm font-bold text-primary uppercase tracking-wider font-mono">
                 Post-Earnings Announcement Drift (PEAD) Radar
               </h3>
-              <span className="text-xs bg-amber-500/20 text-amber-300 font-mono font-bold px-2 py-0.5 rounded border border-amber-500/30">
+              <span className="text-xs terminal-badge-warn font-mono font-bold px-2 py-0.5 rounded">
                 50-YR EMPIRICALLY PROVEN ANOMALY
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-slate-300 font-sans mt-1">
+            <p className="text-xs sm:text-sm text-secondary font-sans mt-1">
               Exploits multi-day institutional under-reaction following corporate earnings releases. Requires &gt; 2.0x ADV volume confirmation, 15-minute post-open spread stabilization, and Level 2 OFI accumulation (&gt; +1.5σ). Strictly no overnight binary gap holding.
             </p>
           </div>
 
           <button
+            type="button"
             onClick={fetchPeadCandidates}
             disabled={loadingPead}
-            className="bg-black/40 border border-white/10 hover:border-white/20 text-slate-300 hover:text-white px-3 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition cursor-pointer shrink-0"
+            className="terminal-elevated text-secondary hover:text-primary px-3 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 transition cursor-pointer shrink-0"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loadingPead ? "animate-spin" : ""}`} />
             REFRESH DRIFT RADAR
@@ -633,32 +635,32 @@ export const QuantResearchLab: React.FC = () => {
                 key={cand.symbol}
                 className={`p-4 rounded-lg border transition space-y-3 ${
                   cand.qualified
-                    ? "bg-black/40 border-amber-500/25 hover:border-amber-500/40"
+                    ? "terminal-elevated border-amber-500/30 hover:border-amber-500/60"
                     : "bg-rose-950/15 border-rose-500/20"
                 }`}
               >
                 {/* Header row */}
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-mono font-extrabold text-white bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30">
+                    <span className="text-sm font-mono font-extrabold text-primary bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30">
                       {cand.symbol}
                     </span>
                     <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
                       cand.direction === "BUY"
-                        ? "bg-emerald-500/20 text-[#00ff88] border border-emerald-500/30"
-                        : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                        ? "terminal-badge-bid"
+                        : "terminal-badge-ask"
                     }`}>
                       {cand.direction} DRIFT
                     </span>
-                    <span className="text-xs text-slate-300 font-mono">
+                    <span className="text-xs text-secondary font-mono">
                       Mkt Cap: ${cand.marketCapBillions.toLocaleString()}B
                     </span>
                   </div>
 
                   <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
                     cand.qualified
-                      ? "bg-emerald-500/20 text-[#00ff88] border border-emerald-500/30"
-                      : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                      ? "terminal-badge-bid"
+                      : "terminal-badge-ask"
                   }`}>
                     {cand.qualified ? "QUALIFIED" : "DISQUALIFIED"}
                   </span>
@@ -668,37 +670,37 @@ export const QuantResearchLab: React.FC = () => {
                 <div className="grid grid-cols-4 gap-2 text-center text-xs font-mono">
                   <div 
                     title="Earnings Surprise: Actual reported EPS vs consensus analyst estimate percentage difference."
-                    className="bg-black/50 p-2 rounded border border-white/5 cursor-help hover:border-white/20 transition"
+                    className="terminal-card p-2 rounded cursor-help hover:border-accent transition"
                   >
-                    <span className="text-xs text-slate-400 block uppercase font-semibold">EPS Surprise ⓘ</span>
-                    <span className={`font-bold block mt-1 text-xs sm:text-sm ${cand.epsSurprisePct >= 0 ? "text-[#00ff88]" : "text-rose-400"}`}>
+                    <span className="text-xs text-secondary block uppercase font-semibold">EPS Surprise ⓘ</span>
+                    <span className={`font-bold block mt-1 text-xs sm:text-sm ${cand.epsSurprisePct >= 0 ? "text-emerald-500 dark:text-[#00ff88]" : "text-rose-500 dark:text-rose-400"}`}>
                       {cand.epsSurprisePct >= 0 ? "+" : ""}{cand.epsSurprisePct}%
                     </span>
                   </div>
                   <div 
                     title="Revenue Surprise: Actual reported top-line revenue vs consensus forecast percentage difference."
-                    className="bg-black/50 p-2 rounded border border-white/5 cursor-help hover:border-white/20 transition"
+                    className="terminal-card p-2 rounded cursor-help hover:border-accent transition"
                   >
-                    <span className="text-xs text-slate-400 block uppercase font-semibold">Rev Surprise ⓘ</span>
-                    <span className={`font-bold block mt-1 text-xs sm:text-sm ${cand.revSurprisePct >= 0 ? "text-[#00ff88]" : "text-rose-400"}`}>
+                    <span className="text-xs text-secondary block uppercase font-semibold">Rev Surprise ⓘ</span>
+                    <span className={`font-bold block mt-1 text-xs sm:text-sm ${cand.revSurprisePct >= 0 ? "text-emerald-500 dark:text-[#00ff88]" : "text-rose-500 dark:text-rose-400"}`}>
                       {cand.revSurprisePct >= 0 ? "+" : ""}{cand.revSurprisePct}%
                     </span>
                   </div>
                   <div 
                     title="Institutional Participation: First 15-minute volume relative to 20-day Average Daily Volume (ADV). Threshold: ≥2.0x ADV."
-                    className="bg-black/50 p-2 rounded border border-white/5 cursor-help hover:border-white/20 transition"
+                    className="terminal-card p-2 rounded cursor-help hover:border-accent transition"
                   >
-                    <span className="text-xs text-slate-400 block uppercase font-semibold">Volume Surge ⓘ</span>
-                    <span className={`font-bold block mt-1 text-xs sm:text-sm ${cand.openingVolumeMultiple >= 2.0 ? "text-amber-400" : "text-slate-300"}`}>
+                    <span className="text-xs text-secondary block uppercase font-semibold">Volume Surge ⓘ</span>
+                    <span className={`font-bold block mt-1 text-xs sm:text-sm ${cand.openingVolumeMultiple >= 2.0 ? "text-amber-500 dark:text-amber-400" : "text-secondary"}`}>
                       {cand.openingVolumeMultiple}x ADV
                     </span>
                   </div>
                   <div 
                     title="Microstructure Order Flow Imbalance: Standardized z-score of institutional buying pressure at top of order book. Threshold: ≥+1.5σ."
-                    className="bg-black/50 p-2 rounded border border-white/5 cursor-help hover:border-white/20 transition"
+                    className="terminal-card p-2 rounded cursor-help hover:border-accent transition"
                   >
-                    <span className="text-xs text-slate-400 block uppercase font-semibold">L2 OFI Sigma ⓘ</span>
-                    <span className={`font-bold block mt-1 text-xs sm:text-sm ${cand.ofiSigma >= 1.5 ? "text-cyan-400" : "text-slate-300"}`}>
+                    <span className="text-xs text-secondary block uppercase font-semibold">L2 OFI Sigma ⓘ</span>
+                    <span className={`font-bold block mt-1 text-xs sm:text-sm ${cand.ofiSigma >= 1.5 ? "text-cyan-500 dark:text-cyan-400" : "text-secondary"}`}>
                       +{cand.ofiSigma}σ
                     </span>
                   </div>
@@ -710,14 +712,14 @@ export const QuantResearchLab: React.FC = () => {
                   className="space-y-1.5 cursor-help"
                 >
                   <div className="flex justify-between text-xs font-mono">
-                    <span className="text-slate-300 font-semibold">Institutional Conviction ⓘ:</span>
-                    <span className="font-bold text-white">{cand.convictionScore} / 100</span>
+                    <span className="text-secondary font-semibold">Institutional Conviction ⓘ:</span>
+                    <span className="font-bold text-primary">{cand.convictionScore} / 100</span>
                   </div>
-                  <div className="w-full bg-black/60 rounded-full h-2 border border-white/5 overflow-hidden">
+                  <div className="w-full terminal-elevated rounded-full h-2 border terminal-border overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${
                         cand.convictionScore >= 80
-                          ? "bg-gradient-to-r from-amber-500 to-[#00ff88]"
+                          ? "bg-gradient-to-r from-amber-500 to-emerald-500"
                           : cand.convictionScore >= 60
                           ? "bg-amber-500"
                           : "bg-rose-500"
@@ -730,8 +732,8 @@ export const QuantResearchLab: React.FC = () => {
                 {/* Rationale / Disqualification reason */}
                 <div className={`p-2.5 rounded text-xs font-mono ${
                   cand.qualified
-                    ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-300"
-                    : "bg-rose-500/10 border border-rose-500/20 text-rose-300"
+                    ? "terminal-badge-bid"
+                    : "terminal-badge-ask"
                 }`}>
                   {cand.rationale}
                 </div>
@@ -762,7 +764,7 @@ export const QuantResearchLab: React.FC = () => {
                   ) : (
                     <div 
                       title="Asset has failed one or more quantitative risk gates (e.g. market cap < $5B, volume < 2.0x ADV, or binary blackout window)."
-                      className="w-full py-2 rounded bg-black/40 border border-white/5 text-slate-400 text-xs font-mono font-semibold text-center cursor-help"
+                      className="w-full py-2 rounded terminal-elevated text-secondary text-xs font-mono font-semibold text-center cursor-help"
                     >
                       RESTRICTED FROM ACTIVE TRADING (RISK GATE ACTIVE)
                     </div>
@@ -778,12 +780,12 @@ export const QuantResearchLab: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Panel A: Microstructure Qualification Screener */}
-        <div className="bg-[#0c101c] border border-white/10 rounded-xl p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
-            <h3 className="text-xs sm:text-sm font-bold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-2">
-              <Search className="w-4 h-4 text-indigo-400" /> Asset Qualification Filter (Pre-Trade Audit)
+        <div className="terminal-card rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between border-b terminal-border pb-3">
+            <h3 className="text-xs sm:text-sm font-bold text-primary uppercase tracking-wider font-mono flex items-center gap-2">
+              <Search className="w-4 h-4 text-indigo-500 dark:text-indigo-400" /> Asset Qualification Filter (Pre-Trade Audit)
             </h3>
-            <span className="text-xs text-slate-400 font-mono font-semibold">Microstructure & Liquidity</span>
+            <span className="text-xs text-secondary font-mono font-semibold">Microstructure & Liquidity</span>
           </div>
 
           <div className="flex gap-2">
@@ -792,12 +794,13 @@ export const QuantResearchLab: React.FC = () => {
               value={screenTicker}
               onChange={(e) => setScreenTicker(e.target.value.toUpperCase())}
               placeholder="e.g. NVDA, XLE, VRTX..."
-              className="flex-1 bg-black/50 border border-white/10 rounded px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:border-indigo-500"
+              className="flex-1 terminal-elevated rounded px-3 py-2 text-xs text-primary font-mono uppercase focus:outline-none focus:border-cyan"
             />
             <button
+              type="button"
               onClick={handleRunQualification}
               disabled={screening || !screenTicker}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold px-4 py-2 rounded-lg transition cursor-pointer flex items-center gap-2"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold px-4 py-2 rounded-lg transition cursor-pointer flex items-center gap-2 shadow-md"
             >
               {screening ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
               RUN AUDIT
@@ -805,41 +808,41 @@ export const QuantResearchLab: React.FC = () => {
           </div>
 
           {screenResult && (
-            <div className="bg-black/35 border border-white/5 rounded-lg p-4 space-y-3 font-mono text-xs animate-in fade-in duration-300">
-              <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                <span className="font-bold text-white text-sm">{screenResult.symbol} AUDIT REPORT</span>
+            <div className="terminal-elevated rounded-lg p-4 space-y-3 font-mono text-xs animate-in fade-in duration-300">
+              <div className="flex justify-between items-center border-b terminal-border pb-2">
+                <span className="font-bold text-primary text-sm">{screenResult.symbol} AUDIT REPORT</span>
                 <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                   screenResult.overallVerdict.includes("APPROVED")
-                    ? "bg-emerald-500/20 text-[#00ff88] border border-emerald-500/30"
-                    : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                    ? "terminal-badge-bid"
+                    : "terminal-badge-ask"
                 }`}>
                   {screenResult.overallVerdict}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="bg-black/40 p-2.5 rounded border border-white/5">
-                  <span className="text-xs text-slate-400 block uppercase font-semibold">Level 2 OFI Readiness</span>
-                  <span className="font-bold text-slate-200 mt-1 block">{screenResult.ofiReadiness}</span>
+                <div className="terminal-card p-2.5 rounded">
+                  <span className="text-xs text-secondary block uppercase font-semibold">Level 2 OFI Readiness</span>
+                  <span className="font-bold text-primary mt-1 block">{screenResult.ofiReadiness}</span>
                 </div>
-                <div className="bg-black/40 p-2.5 rounded border border-white/5">
-                  <span className="text-xs text-slate-400 block uppercase font-semibold">Spread / ATR Friction</span>
-                  <span className="font-bold text-slate-200 mt-1 block">{screenResult.spreadToAtrRatio}</span>
+                <div className="terminal-card p-2.5 rounded">
+                  <span className="text-xs text-secondary block uppercase font-semibold">Spread / ATR Friction</span>
+                  <span className="font-bold text-primary mt-1 block">{screenResult.spreadToAtrRatio}</span>
                 </div>
-                <div className="bg-black/40 p-2.5 rounded border border-white/5">
-                  <span className="text-xs text-slate-400 block uppercase font-semibold">Short Locate & Borrow Fee</span>
-                  <span className="font-bold text-slate-200 mt-1 block">{screenResult.shortAvailability}</span>
+                <div className="terminal-card p-2.5 rounded">
+                  <span className="text-xs text-secondary block uppercase font-semibold">Short Locate & Borrow Fee</span>
+                  <span className="font-bold text-primary mt-1 block">{screenResult.shortAvailability}</span>
                 </div>
-                <div className="bg-black/40 p-2.5 rounded border border-white/5">
-                  <span className="text-xs text-slate-400 block uppercase font-semibold">Fractional lot eligible</span>
-                  <span className="font-bold text-[#00ff88] mt-1 block">ELIGIBLE (Synthetic Stop)</span>
+                <div className="terminal-card p-2.5 rounded">
+                  <span className="text-xs text-secondary block uppercase font-semibold">Fractional lot eligible</span>
+                  <span className="font-bold text-emerald-500 dark:text-[#00ff88] mt-1 block">ELIGIBLE (Synthetic Stop)</span>
                 </div>
               </div>
 
-              <div className={`p-2.5 rounded border text-xs ${
+              <div className={`p-2.5 rounded text-xs ${
                 screenResult.binaryRiskStatus.safe 
-                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
-                  : "bg-rose-500/10 border-rose-500/20 text-rose-300"
+                  ? "terminal-badge-bid"
+                  : "terminal-badge-ask"
               }`}>
                 <strong>Binary Risk Check:</strong> {screenResult.binaryRiskStatus.reason}
               </div>
@@ -848,19 +851,19 @@ export const QuantResearchLab: React.FC = () => {
         </div>
 
         {/* Panel B: Strategy Studio Link & Overview Banner */}
-        <div className="bg-[#0c101c] border border-white/10 rounded-xl p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+        <div className="terminal-card rounded-xl p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b terminal-border pb-3">
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs bg-emerald-500/20 text-[#00ff88] border border-emerald-500/40 px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3 text-[#00ff88]" /> DEDICATED FULL-PAGE SECTION
+                <span className="text-xs terminal-badge-bid px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3 text-emerald-500 dark:text-[#00ff88]" /> DEDICATED FULL-PAGE SECTION
                 </span>
-                <span className="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded font-mono font-bold">
+                <span className="text-xs bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded font-mono font-bold">
                   CONVERSATIONAL AGENT + TACTILE SLIDERS
                 </span>
               </div>
-              <h3 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2 mt-1.5">
-                <SlidersHorizontal className="w-4 h-4 text-emerald-400" /> Strategy Studio & Experiment Vault
+              <h3 className="text-sm sm:text-base font-bold text-primary uppercase tracking-wider font-mono flex items-center gap-2 mt-1.5">
+                <SlidersHorizontal className="w-4 h-4 text-emerald-500 dark:text-emerald-400" /> Strategy Studio & Experiment Vault
               </h3>
             </div>
             <a
@@ -869,28 +872,28 @@ export const QuantResearchLab: React.FC = () => {
                 e.preventDefault();
                 window.location.href = "/studio";
               }}
-              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono font-black text-xs rounded-lg transition shadow-md shadow-emerald-500/20 flex items-center gap-2"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-black text-xs rounded-lg transition shadow-md flex items-center gap-2"
             >
               <span>OPEN FULL STRATEGY STUDIO</span>
               <ArrowUpRight className="w-4 h-4" />
             </a>
           </div>
 
-          <div className="p-4 rounded-xl bg-black/40 border border-white/5 space-y-3 font-mono text-xs text-slate-300 leading-relaxed">
+          <div className="p-4 rounded-xl terminal-elevated space-y-3 font-mono text-xs text-secondary leading-relaxed">
             <p>
               The Strategy Studio now runs as its own dedicated section with a complete conversational optimization interface, full-width Recharts equity trajectories, multi-candidate parameter sweeps, and the local experiment vault.
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
-              <span className="bg-slate-800 text-slate-300 px-2.5 py-1 rounded border border-white/5">
+              <span className="terminal-card text-secondary px-2.5 py-1 rounded">
                 💬 Conversational Strategy Agent
               </span>
-              <span className="bg-slate-800 text-slate-300 px-2.5 py-1 rounded border border-white/5">
+              <span className="terminal-card text-secondary px-2.5 py-1 rounded">
                 🎛️ Dual Tactile Parameter Controls
               </span>
-              <span className="bg-slate-800 text-slate-300 px-2.5 py-1 rounded border border-white/5">
+              <span className="terminal-card text-secondary px-2.5 py-1 rounded">
                 📈 Full-Screen Equity Visualizer
               </span>
-              <span className="bg-slate-800 text-slate-300 px-2.5 py-1 rounded border border-white/5">
+              <span className="terminal-card text-secondary px-2.5 py-1 rounded">
                 📁 Saved Experiment Vault (Local Storage)
               </span>
             </div>
