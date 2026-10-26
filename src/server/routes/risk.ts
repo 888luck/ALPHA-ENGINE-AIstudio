@@ -34,6 +34,37 @@ riskRouter.get("/api/risk/status", async (req, res) => {
 
   const tcpLatencyMs = await edgeBridge.measureLatency();
 
+  // Active trading phase check (strictly during observation, execution, or closing flatten)
+  const activePhases = ["OPENING_OBSERVATION", "ACTIVE_EXECUTION", "CLOSING_FLATTEN"];
+  const usActive = schedule?.us?.phase ? activePhases.includes(schedule.us.phase) : (schedule?.us?.is_open_now !== undefined ? schedule.us.is_open_now : usMarketOpen);
+  const euActive = schedule?.eu?.phase ? activePhases.includes(schedule.eu.phase) : (schedule?.eu?.is_open_now !== undefined ? schedule.eu.is_open_now : euMarketOpen);
+
+  let liveAccount = systemSettings.ibkrAccountNumber;
+  let netLiq = systemSettings.netLiquidation;
+  let maintMargin = systemSettings.maintenanceMargin;
+
+  try {
+    const telemResp = await edgeBridge.sendCommand({ action: "GET_TELEMETRY" }, 1000);
+    if (telemResp && telemResp.status === "OK" && telemResp.telemetry) {
+      const telem = telemResp.telemetry;
+      if (telem.account) {
+        liveAccount = telem.account;
+        systemSettings.ibkrAccountNumber = telem.account;
+      }
+      if (telem.account_summary?.NetLiquidation) {
+        netLiq = Number(telem.account_summary.NetLiquidation);
+      }
+      if (telem.account_summary?.MaintMarginReq) {
+        maintMargin = Number(telem.account_summary.MaintMarginReq);
+      }
+      if (telem.trading_mode) {
+        systemSettings.tradingMode = telem.trading_mode;
+      }
+    }
+  } catch {
+    // Keep cached settings if bridge query times out
+  }
+
   res.json({
     success: true,
     dailyCapitalCeiling: systemSettings.dailyCapitalCeiling,
@@ -51,18 +82,18 @@ riskRouter.get("/api/risk/status", async (req, res) => {
     scheduleSource: schedule?.us?.source || "FALLBACK_STATIC",
     nyTimeEST: schedule?.ny_time_est || nyTimeEST,
     cetTimeCET: schedule?.cet_time_cet || cetTimeCET,
-    usMarketOpen: schedule?.us?.is_open !== undefined ? schedule.us.is_open : usMarketOpen,
-    euMarketOpen: schedule?.eu?.is_open !== undefined ? schedule.eu.is_open : euMarketOpen,
+    usMarketOpen: usActive,
+    euMarketOpen: euActive,
     usCountdown: schedule?.us?.countdown || null,
     euCountdown: schedule?.eu?.countdown || null,
     marketScope: systemSettings.marketScope || "ALL",
     killSwitchEngaged: systemSettings.killSwitchEngaged,
     tradingMode: systemSettings.tradingMode,
     tcpLatencyMs,
-    netLiquidation: systemSettings.netLiquidation,
-    maintenanceMargin: systemSettings.maintenanceMargin,
+    netLiquidation: netLiq,
+    maintenanceMargin: maintMargin,
     activePositionsCount: activeTrades.length,
-    accountNumber: systemSettings.ibkrAccountNumber
+    accountNumber: liveAccount || systemSettings.ibkrAccountNumber
   });
 });
 

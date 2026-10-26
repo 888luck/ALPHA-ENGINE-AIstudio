@@ -370,7 +370,7 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
 
         {/* Telemetry Metrics & Global Market Clocks */}
         <div className="flex flex-wrap items-center gap-4 sm:gap-6 font-mono text-right">
-          <div className="terminal-card px-3 py-1.5 rounded-lg text-right">
+          <div className="terminal-card px-3 py-1.5 rounded-lg text-right" title={riskStatus?.euCountdown ? `Euronext Phase: ${riskStatus.euCountdown}` : undefined}>
             <div className="flex items-center justify-end gap-2">
               <span className={`w-2 h-2 rounded-full ${riskStatus?.euMarketOpen ? "bg-emerald-500 dark:bg-emerald-400 animate-pulse" : "bg-slate-500"}`} />
               <span className="text-xs text-primary font-bold">🇪🇺 EURONEXT/XETRA</span>
@@ -378,10 +378,15 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
                 {riskStatus?.euMarketOpen ? "OPEN" : "CLOSED"}
               </span>
             </div>
-            <span className="text-xs text-secondary font-semibold block mt-0.5">CET {riskStatus?.cetTimeCET || "--:--"}</span>
+            <div className="flex items-center justify-end gap-1.5 mt-0.5">
+              <span className="text-xs text-secondary font-semibold">CET {riskStatus?.cetTimeCET || "--:--"}</span>
+              {riskStatus?.euCountdown && (
+                <span className="text-[10px] text-slate-400 font-mono">({riskStatus.euCountdown})</span>
+              )}
+            </div>
           </div>
 
-          <div className="terminal-card px-3 py-1.5 rounded-lg text-right">
+          <div className="terminal-card px-3 py-1.5 rounded-lg text-right" title={riskStatus?.usCountdown ? `NYSE Phase: ${riskStatus.usCountdown}` : undefined}>
             <div className="flex items-center justify-end gap-2">
               <span className={`w-2 h-2 rounded-full ${riskStatus?.usMarketOpen ? "bg-blue-400 animate-pulse" : "bg-slate-500"}`} />
               <span className="text-xs text-primary font-bold">🇺🇸 NYSE/NASDAQ</span>
@@ -389,7 +394,12 @@ export const LiveCockpit: React.FC<LiveCockpitProps> = ({ systemState, onRefresh
                 {riskStatus?.usMarketOpen ? "OPEN" : "CLOSED"}
               </span>
             </div>
-            <span className="text-xs text-secondary font-semibold block mt-0.5">EST {riskStatus?.nyTimeEST || "--:--"}</span>
+            <div className="flex items-center justify-end gap-1.5 mt-0.5">
+              <span className="text-xs text-secondary font-semibold">EST {riskStatus?.nyTimeEST || "--:--"}</span>
+              {riskStatus?.usCountdown && (
+                <span className="text-[10px] text-slate-400 font-mono">({riskStatus.usCountdown})</span>
+              )}
+            </div>
           </div>
 
           <div>

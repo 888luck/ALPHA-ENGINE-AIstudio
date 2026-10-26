@@ -150,6 +150,10 @@ def handle_schedule(args) -> Dict[str, Any]:
     us_flatten = us_session.get("flatten_start")
     eu_flatten = eu_session.get("flatten_start")
 
+    active_phases = ["OPENING_OBSERVATION", "ACTIVE_EXECUTION", "CLOSING_FLATTEN"]
+    us_is_open_now = us_phase in active_phases
+    eu_is_open_now = eu_phase in active_phases
+
     return {
         "status": "success",
         "timestamp_utc": now_utc.isoformat(),
@@ -157,7 +161,9 @@ def handle_schedule(args) -> Dict[str, Any]:
         "cet_time_cet": cet_now.strftime("%H:%M"),
         "us": {
             "exchange": us_session.get("exchange", "XNYS"),
-            "is_open": us_session.get("is_open", False),
+            "is_open": us_is_open_now,
+            "is_open_now": us_is_open_now,
+            "is_session_day": us_session.get("is_open", False),
             "phase": us_phase,
             "countdown": us_countdown,
             "open_time": us_session.get("open_time_str", "09:30"),
@@ -168,7 +174,9 @@ def handle_schedule(args) -> Dict[str, Any]:
         },
         "eu": {
             "exchange": eu_session.get("exchange", "XPAR"),
-            "is_open": eu_session.get("is_open", False),
+            "is_open": eu_is_open_now,
+            "is_open_now": eu_is_open_now,
+            "is_session_day": eu_session.get("is_open", False),
             "phase": eu_phase,
             "countdown": eu_countdown,
             "open_time": eu_session.get("open_time_str", "09:00"),
