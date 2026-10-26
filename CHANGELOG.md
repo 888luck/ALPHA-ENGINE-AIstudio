@@ -4,6 +4,52 @@ All notable changes, architectural evolutions, and institutional fixes to the Al
 
 ---
 
+## [v2.5.0] - 2026-10-26: Dynamic Trailing Profit Engine, Chandelier Ratchet & 83-Tool Reflection Evolution
+
+### 🌟 Major Evolutions & Enhancements
+
+#### 1. Dynamic Trailing Profit Engine (`backtester.py`)
+- **Extreme Watermark Tracking**:
+  - Implemented continuous high/low watermark tracking (`highest_high`, `lowest_low`) throughout active trade lifecycles.
+- **Dynamic Ratchet Methodologies**:
+  - `CHANDELIER`: Volatility-adjusted trail ratcheted to highest high minus $k_{trail} \times \text{ATR}$ (or lowest low plus $k_{trail} \times \text{ATR}$ for short trades).
+  - `ATR`: Dynamic volatility trail adjusting off running bar closes.
+  - `FIXED_R`: Fixed R-multiple trail locking cumulative accrued profits.
+  - `PARABOLIC`: Accelerating parabolic ratchet tightening stop distance as trade duration matures.
+- **Activation Hurdle & Churn Damper**:
+  - `trailing_activation_r`: Profit threshold hurdle (in R-multiples or ATR) required before the trailing stop activates, eliminating premature exits on minor entry noise.
+  - `trailing_step_atr`: Minimum ATR increment damper before stops ratchet upward, preventing micro-adjustments and order churn.
+- **Coordinated Multi-Tranche Scaling**:
+  - Coordinated with Target 1 partial profit: Tranche 1 scales out 50% at Target 1 and ratchets initial stop to breakeven; remaining runner tranches transition to the dynamic trailing ratchet to ride extended trends.
+- **Backward Compatibility & Baseline Invariance**:
+  - Positional CLI and function arguments default to `None`, preserving 100% backward compatibility with prior static stop-loss and sweep pipelines.
+
+#### 2. Strategy Studio Tactile Trailing Controls (`StrategyStudioPage.tsx`)
+- **Dual-Control Quant Sliders & Inputs**:
+  - Added dedicated tactile "⚡ Dynamic Trailing Stop" panel with instant toggle switch.
+  - Interactive dual sliders and precise numeric steppers for `Trailing Stop Distance (1.0–3.0 ATR)`, `Activation Hurdle (0.5–3.0 R)`, and `Ratchet Step (0.1–1.0 ATR)`.
+  - Method selector dropdown for `CHANDELIER`, `ATR`, `FIXED_R`, and `PARABOLIC`.
+- **Trade Blotter Visual Badges**:
+  - Amber badge styling for `TRAILING STOP LOSS HIT` distinctly separates dynamic trailing exits from classical initial stop-outs (`STOP LOSS HIT`).
+- **Experiment Vault Persistence**:
+  - Trailing parameters are serialized into `StrategyStudioExperiment` and stored locally in the Experiment Vault.
+
+#### 3. Autonomous Copilot Tool Dispatcher & REST API (`copilot.py`, `backtest.ts`)
+- **JSON Tool Schema Extension**:
+  - Extended `run_strategy_backtest` schema with full type definitions and descriptions for `trailing_stop_atr`, `trailing_activation_r`, `trailing_step_atr`, and `trailing_type`.
+  - Added execution routing in `execute_tool_call` and `CopilotTools`.
+- **Express Route & AI Quant Audit**:
+  - Updated `POST /api/backtest` Express route to forward trailing parameters to `backtester.py`.
+  - Integrated trailing stop parameters into the AI Quant Audit analysis prompt (`POST /api/backtest-audit`).
+
+#### 4. Unified Tool Reflector Engine (`tools_reflector.py` & `tools_registry.json`)
+- **Quant Tool Schema Auto-Reflection**:
+  - Added `reflect_quant_strategy_tools()` directly into `tools_reflector.py` to prevent quantitative tools from dropping when `--force` reflection is triggered.
+- **Expanded Reflected Catalog**:
+  - Catalog expanded to **83 callable tools across 11 institutional categories**, including official Interactive Brokers client API surface (`ibapi.client.EClient`), institutional feeds, and quant backtesting/sweeps.
+
+---
+
 ## [v2.4.0] - 2026-10-25: Quantitative Strategy Studio, Multi-Model Resilience & Dynamic Lookback Engine
 
 ### 🌟 Major Evolutions & Enhancements

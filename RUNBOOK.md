@@ -150,6 +150,20 @@ The risk engine (`dynamic_risk_manager.py`) evaluates 6 deterministic gates befo
 | **Gate 5** | **Liquidity & OFI Floor** | Spread $\le 0.08\%$ and Volume Spike $\ge 1.4\times$ 10-period SMA | Signal rejected; order withheld |
 | **Gate 6** | **MOC Session Blackout** | No new orders within 15 min of European (17:15 CET) or US (15:45 EST) close | Order blocked |
 
+### ⚡ Dynamic Trailing Profit & Runner Ratchet Protocol
+When running backtests or deploying candidate baskets from `STRATEGY STUDIO` (`Alt+5`), the dynamic trailing profit engine protects open profits without exposing runners to retracements back into negative territory:
+
+1. **Parameter Calibration**:
+   - `trailing_stop_atr` ($k_{trail}$): Trailing distance below highest high (default: `1.5` ATR).
+   - `trailing_activation_r`: Profit threshold before activation (default: `1.2` R / ATR), preventing premature stop-outs during noise-sized entry moves.
+   - `trailing_step_atr`: Ratchet damper (default: `0.5` ATR), requiring price to make a meaningful advance before lifting the stop order.
+   - `trailing_type`: Ratchet methodology (`CHANDELIER`, `ATR`, `FIXED_R`, `PARABOLIC`).
+
+2. **Multi-Tranche Execution Flow**:
+   - **Target 1**: 50% partial profit scale-out triggers; remaining tranche moves initial stop to Breakeven ($P_{entry}$).
+   - **Trend Extension**: Once profit exceeds `trailing_activation_r`, the runner tranche stop is dynamically ratcheted upward to $\text{Highest High} - (k_{trail} \times \text{ATR})$.
+   - **Audit Blotter**: The simulation blotter tags trailing exits with amber badge `TRAILING STOP LOSS HIT` for transaction analysis.
+
 ---
 
 ## 🚨 6. Emergency Protocols & Disaster Recovery

@@ -55,9 +55,9 @@ The web control plane provides 7 specialized operational tabs with dedicated glo
 | **`BLOTTER`** | `Alt+2` | [`ActiveHoldingsTable.tsx`](./src/components/ActiveHoldingsTable.tsx)<br>[`TcaAuditTable.tsx`](./src/components/TcaAuditTable.tsx) | **Active Holdings Ledger**: Real marks, trailing stops, unrealized P&L, and MiFID II RTS-22 algorithm shortcodes (`ALGO_DEC_992` / `ALGO_EXE_554`).<br>**TCA Audit Ledger**: Transaction Cost Analysis recording basis point slippage vs. arrival midpoint and transaction friction ratios. |
 | **`RISK`** | `Alt+3` | [`LiveCockpit.tsx`](./src/components/LiveCockpit.tsx) | **SEC Rule 15c3-5 Pre-Trade Risk Gates**: Capital at Risk (1% constraint), Max Position Size, Daily Loss Ceilings, Transaction Friction Filter, Liquidity / OFI Floor, and MOC Blackout Flattening. Two-stage emergency kill switch. |
 | **`QUANT LAB`** | `Alt+4` | [`QuantResearchLab.tsx`](./src/components/QuantResearchLab.tsx) | **3 Focused Quantitative Lenses**: Catalyst Radar (SEC 8-K/10-Q primary filings, ClinicalTrials.gov, OpenFDA alerts), PEAD Momentum Radar (Post-Earnings Announcement Drift), and Microstructure Screener (OFI & spread efficiency). Seamless 1-click bridge to Strategy Studio. |
-| **`STRATEGY STUDIO`** | `Alt+5` | [`StrategyStudioPage.tsx`](./src/pages/StrategyStudioPage.tsx) | **Quant Simulation & Parameter Sweeps**: Dual-control quant gates (tactile sliders + exact numeric inputs for 5–30% friction ceiling and 50–99.9% DSR confidence hurdle). Pre-flight execution gate modal (`[⚡ Snap Ceiling to X%]`), Bailey & López de Prado Deflated Sharpe Ratio (DSR) 16-trial sweeps, authentic historical bars, and candidate pool deployment (`dynamic_baskets.json`) over TCP port 4005. |
+| **`STRATEGY STUDIO`** | `Alt+5` | [`StrategyStudioPage.tsx`](./src/pages/StrategyStudioPage.tsx) | **Quant Simulation & Parameter Sweeps**: Dynamic Trailing Profit Engine (Chandelier, ATR, Fixed R, Parabolic) with tactile dual-sliders, numeric inputs, and simulation blotter badges (`TRAILING STOP LOSS HIT`). Dual-control quant gates (5–30% friction ceiling and 50–99.9% DSR confidence hurdle), Bailey & López de Prado Deflated Sharpe Ratio (DSR) 16-trial sweeps, authentic historical broker bars, and candidate pool deployment (`dynamic_baskets.json`) over TCP port 4005. |
 | **`VAULT`** | `Alt+6` | [`VaultConsole.tsx`](./src/components/VaultConsole.tsx) | **Full-Screen 4-Pillar Vault Console**: Executive Vault Ribbon (`[RESTORE BROWSER KEYS]`, `[PROBE ACTIVE SERVICES]`, `[COPY SECRETS.ENV]`), interactive live credential probing (`probe_connection`), runtime `/models` discovery (zero hardcoded model names), and 12-Factor POSIX export (`/etc/alpha-engine/secrets.env`, `chmod 600`). |
-| **`COPILOT`** | `Alt+7` | [`CopilotPage.tsx`](./src/pages/CopilotPage.tsx) | **Autonomous Trading Copilot**: Multi-turn streaming reasoning, contextual action deep links (`[OPEN STRATEGY STUDIO]`, `[OPEN LIVE BLOTTER]`, `[INSPECT RISK GATES]`), quantitative prompt presets, dynamic Groq 8,000 TPM headroom clamping, OpenRouter reasoning tokens extraction, and direct function calling into 78 tools in `tools_registry.json`. |
+| **`COPILOT`** | `Alt+7` | [`CopilotPage.tsx`](./src/pages/CopilotPage.tsx) | **Autonomous Trading Copilot**: Multi-turn streaming reasoning, contextual action deep links (`[OPEN STRATEGY STUDIO]`, `[OPEN LIVE BLOTTER]`, `[INSPECT RISK GATES]`), quantitative prompt presets, dynamic Groq 8,000 TPM headroom clamping, OpenRouter reasoning tokens extraction, and direct function calling into 83 reflected tools in `tools_registry.json`. |
 
 ---
 
@@ -119,7 +119,7 @@ sudo systemctl restart alpha-engine.service alpha-ui.service
 ```bash
 python3 tools_reflector.py --force
 ```
-- Dynamically reflects `ibapi.client.EClient` and institutional feeds into `tools_registry.json` (78 callable tools across 10 categories, 24h TTL).
+- Dynamically reflects `ibapi.client.EClient`, quant strategy tools, and institutional feeds into `tools_registry.json` (**83 callable tools across 11 categories**, 24h TTL).
 
 ---
 
@@ -140,6 +140,9 @@ py -3.12 -m pytest tests/test_direct_tcp_bridge.py -v
 
 # 4. Trailing stop-loss & risk simulation tests
 py -3.12 test_stage4_trailing.py
+
+# 5. Dynamic Trailing Profit backtester verification (ASML.AS)
+py -3.12 backtester.py ASML.AS 1.8 2.0 1.4 20 10 15.0 5 0 20000 0.0008 1.5 5 1h 60 None 1.5 1.2 0.5 CHANDELIER
 ```
 
 ---
