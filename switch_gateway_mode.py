@@ -46,22 +46,71 @@ def update_jts_ini(mode: str):
 
 
 def update_engine_config(port: int, mode: str):
-    """Update local engine config and .env to route to the new port."""
+    """Update local engine config, 12-factor secrets, and .env to route to the new port."""
     print(f"[SWITCHER] Updating engine port configuration to {port} ({mode})...")
-    # Update config.json if present
-    if os.path.exists(CONFIG_JSON_PATH):
+    # 1. Update /etc/alpha-engine/secrets.env if present
+    secrets_env_path = "/etc/alpha-engine/secrets.env"
+    if os.path.exists(secrets_env_path):
         try:
-            with open(CONFIG_JSON_PATH, "r") as f:
-                data = json.load(f)
-            data["IBKR_PORT"] = port
-            data["TRADING_MODE"] = mode.upper()
-            with open(CONFIG_JSON_PATH, "w") as f:
-                json.dump(data, f, indent=2)
-            print(f"[SWITCHER] Updated {CONFIG_JSON_PATH}")
+            with open(secrets_env_path, "r") as f:
+                content = f.read()
+            new_lines = []
+            for line in content.splitlines():
+                if line.startswith("IBKR_PORT="):
+                    new_lines.append(f'IBKR_PORT="{port}"')
+                elif line.startswith("TRADING_MODE="):
+                    new_lines.append(f'TRADING_MODE="{mode.upper()}"')
+                elif line.startswith("ibkrPort="):
+                    new_lines.append(f'ibkrPort="{port}"')
+                elif line.startswith("tradingMode="):
+                    new_lines.append(f'tradingMode="{mode.upper()}"')
+                else:
+                    new_lines.append(line)
+            tmp_path = f"{secrets_env_path}.tmp"
+            with open(tmp_path, "w") as f:
+                f.write("\n".join(new_lines) + "\n")
+            os.replace(tmp_path, secrets_env_path)
+            try:
+                os.chmod(secrets_env_path, 0o660)
+            except Exception:
+                pass
+            print(f"[SWITCHER] Successfully synchronized {secrets_env_path}")
         except Exception as e:
-            print(f"[SWITCHER] Warning updating {CONFIG_JSON_PATH}: {e}")
+            print(f"[SWITCHER] Warning updating {secrets_env_path}: {e}")
 
-    # Update .env
+    # 2. Update system_settings.json
+    settings_json_path = "/opt/alpha-engine/system_settings.json"
+    if os.path.exists(settings_json_path):
+        try:
+            with open(settings_json_path, "r") as f:
+                sdata = json.load(f)
+            sdata["ibkrPort"] = port
+            sdata["tradingMode"] = mode.upper()
+            tmp_s = f"{settings_json_path}.tmp"
+            with open(tmp_s, "w") as f:
+                json.dump(sdata, f, indent=2)
+            os.replace(tmp_s, settings_json_path)
+            print(f"[SWITCHER] Updated {settings_json_path}")
+        except Exception as e:
+            print(f"[SWITCHER] Warning updating {settings_json_path}: {e}")
+
+    # 3. Update risk_limits.json
+    risk_limits_path = "/opt/alpha-engine/risk_limits.json"
+    if os.path.exists(risk_limits_path):
+        try:
+            with open(risk_limits_path, "r") as f:
+                rdata = json.load(f)
+            rdata["ibkrPort"] = port
+            rdata["tradingMode"] = mode.upper()
+            tmp_r = f"{risk_limits_path}.tmp"
+            with open(tmp_r, "w") as f:
+                json.dump(rdata, f, indent=2)
+            os.replace(tmp_r, risk_limits_path)
+            print(f"[SWITCHER] Updated {risk_limits_path}")
+        except Exception as e:
+            print(f"[SWITCHER] Warning updating {risk_limits_path}: {e}")
+
+    # 4. Update .env
     if os.path.exists(ENV_PATH):
         try:
             lines = []

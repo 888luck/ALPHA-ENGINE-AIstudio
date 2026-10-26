@@ -28,22 +28,39 @@ ln -sfn /opt/ibgateway /root/Jts/ibgateway/1050
 ln -sfn /opt/ibgateway /root/Jts/1050
 echo "/opt/ibgateway/jre" > /opt/ibgateway/.install4j/pref_jre.cfg
 
-# Sync IBC config credentials and mode dynamically from /opt/alpha-engine/.env if present
+# Sync IBC config credentials and mode dynamically from /etc/alpha-engine/secrets.env or /opt/alpha-engine/.env
 TARGET_MODE="paper"
-if [ -f /opt/alpha-engine/.env ]; then
-  echo "[IBGATEWAY-DAEMON] Syncing IBC credentials & lane from /opt/alpha-engine/.env..."
-  python3 -c "
-import os
+echo "[IBGATEWAY-DAEMON] Syncing IBC credentials & lane from 12-factor vault..."
+python3 -c "
+import os, json
 env_vars = {}
-try:
-    with open('/opt/alpha-engine/.env', 'r') as f:
-        for line in f:
-            line = line.strip()
-            if '=' in line and not line.startswith('#'):
-                k, v = line.split('=', 1)
-                env_vars[k.strip()] = v.strip().strip('\"').strip(\"'\")
-except Exception as e:
-    print(f'[IBGATEWAY-DAEMON] Warning reading .env: {e}')
+
+# Priority 1: /etc/alpha-engine/secrets.env
+# Priority 2: /opt/alpha-engine/.env
+for env_path in ['/etc/alpha-engine/secrets.env', '/opt/alpha-engine/.env']:
+    if os.path.exists(env_path):
+        try:
+            with open(env_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if '=' in line and not line.startswith('#'):
+                        k, v = line.split('=', 1)
+                        k_clean = k.strip()
+                        if k_clean not in env_vars:
+                            env_vars[k_clean] = v.strip().strip('\"').strip(\"'\")
+        except Exception as e:
+            print(f'[IBGATEWAY-DAEMON] Notice reading {env_path}: {e}')
+
+# Fallback: check system_settings.json for tradingMode
+settings_path = '/opt/alpha-engine/system_settings.json'
+if 'TRADING_MODE' not in env_vars and os.path.exists(settings_path):
+    try:
+        with open(settings_path, 'r') as f:
+            d = json.load(f)
+            if 'tradingMode' in d:
+                env_vars['TRADING_MODE'] = d['tradingMode']
+    except Exception:
+        pass
 
 trading_mode = env_vars.get('TRADING_MODE', 'PAPER').upper()
 is_live = (trading_mode == 'LIVE')
@@ -84,9 +101,10 @@ if os.path.exists(ibc_ini):
     except Exception as e:
         print(f'[IBGATEWAY-DAEMON] Warning updating IBC config: {e}')
 "
-  if grep -qi '^TRADING_MODE=["'"'"']*LIVE' /opt/alpha-engine/.env; then
-    TARGET_MODE="live"
-  fi
+if [ -f /etc/alpha-engine/secrets.env ] && grep -qi '^TRADING_MODE=["'"'"']*LIVE' /etc/alpha-engine/secrets.env; then
+  TARGET_MODE="live"
+elif [ -f /opt/alpha-engine/.env ] && grep -qi '^TRADING_MODE=["'"'"']*LIVE' /opt/alpha-engine/.env; then
+  TARGET_MODE="live"
 fi
 
 echo "[IBGATEWAY-DAEMON] Launching official IB Gateway via IBC standard (mode: ${TARGET_MODE})..."

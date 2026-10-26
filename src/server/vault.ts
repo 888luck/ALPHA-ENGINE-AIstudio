@@ -281,10 +281,9 @@ export function saveVaultCredentials(updates: Partial<VaultCredentials>): VaultC
   }
 
   // 3. Atomically write to .tmp and rename
-  const tmpPath = `${targetPath}.tmp.${Date.now()}`;
   const lines = [
     "# AlphaEngine 12-Factor Decoupled Secrets Vault",
-    "# Auto-generated via AlphaEngine Control Plane. Strictly Protected (chmod 600).",
+    "# Auto-generated via AlphaEngine Control Plane. Strictly Protected (chmod 660).",
     `# Updated At: ${new Date().toISOString()}`,
     "",
   ];
@@ -293,16 +292,31 @@ export function saveVaultCredentials(updates: Partial<VaultCredentials>): VaultC
     lines.push(`${k}="${v.replace(/"/g, '\\"')}"`);
   }
   lines.push("");
+  const content = lines.join("\n");
 
-  try {
-    fs.writeFileSync(tmpPath, lines.join("\n"), { encoding: "utf-8", mode: 0o600 });
-    fs.renameSync(tmpPath, targetPath);
-    console.log(`[VAULT] Successfully persisted 12-factor secrets atomically to ${targetPath}`);
-  } catch (err: any) {
-    console.error(`[VAULT ERROR] Could not persist secrets to ${targetPath}:`, err.message);
-    if (fs.existsSync(tmpPath)) {
-      try { fs.unlinkSync(tmpPath); } catch {}
+  const writeAtomic = (filePath: string) => {
+    const tmp = `${filePath}.tmp.${Date.now()}`;
+    try {
+      fs.writeFileSync(tmp, content, { encoding: "utf-8", mode: 0o660 });
+      fs.renameSync(tmp, filePath);
+      try { fs.chmodSync(filePath, 0o660); } catch {}
+      console.log(`[VAULT] Successfully persisted 12-factor secrets atomically to ${filePath}`);
+      return true;
+    } catch (err: any) {
+      console.error(`[VAULT ERROR] Could not persist secrets to ${filePath}:`, err.message);
+      if (fs.existsSync(tmp)) {
+        try { fs.unlinkSync(tmp); } catch {}
+      }
+      return false;
     }
+  };
+
+  const prodSuccess = writeAtomic(targetPath);
+  if (!prodSuccess && targetPath !== LOCAL_SECRETS_PATH) {
+    writeAtomic(LOCAL_SECRETS_PATH);
+  } else if (prodSuccess && targetPath === PRODUCTION_SECRETS_PATH && fs.existsSync(LOCAL_SECRETS_PATH)) {
+    // Keep local mirror synchronized
+    writeAtomic(LOCAL_SECRETS_PATH);
   }
 
   return merged;

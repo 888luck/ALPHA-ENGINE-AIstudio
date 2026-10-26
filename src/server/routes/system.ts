@@ -180,6 +180,22 @@ systemRouter.post("/api/system/toggle-lane", authMiddleware, async (req, res) =>
       console.warn("[TCP BRIDGE] Notice: Edge sync deferred or offline:", err.message);
     });
 
+    // Orchestrate IBC Gateway mode switch on edge node
+    const switcherPath = path.join(process.cwd(), "switch_gateway_mode.py");
+    if (fs.existsSync(switcherPath) && process.platform === "linux") {
+      try {
+        const { spawn } = await import("child_process");
+        const proc = spawn("sudo", ["python3", switcherPath, "--mode", targetMode], {
+          detached: true,
+          stdio: "ignore"
+        });
+        proc.unref();
+        console.log(`[SYSTEM] Dispatched switch_gateway_mode.py --mode ${targetMode} (PID ${proc.pid})`);
+      } catch (err: any) {
+        console.warn("[SYSTEM] Error spawning switch_gateway_mode.py:", err.message);
+      }
+    }
+
     res.json({
       success: true,
       tradingMode: targetMode,
