@@ -83,6 +83,11 @@ export default function App() {
       }
     }
     if (target) {
+      if (newView === "studio") {
+        try {
+          localStorage.setItem("alpha_last_symbol", target.toUpperCase());
+        } catch (_) {}
+      }
       setNavTarget(target);
       setTimeout(() => setNavTarget(null), 100);
     }

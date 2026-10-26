@@ -310,17 +310,42 @@ export function StrategyStudioPage() {
   // =========================================================================
   // 2. Strategy Parameters & Dynamic Instrument State
   // =========================================================================
-  const [symbol, setSymbol] = useState("ASML");
-  const [customTickerInput, setCustomTickerInput] = useState("ASML");
-  const [dynamicUniverse, setDynamicUniverse] = useState<Array<{ symbol: string; sector?: string }>>([
-    { symbol: "ASML", sector: "Euronext Semiconductor Leader" },
-    { symbol: "NVDA", sector: "AI Accelerated Compute" },
-    { symbol: "SAP", sector: "DAX 40 Enterprise Cloud" },
-    { symbol: "RWE", sector: "Euronext Clean Utilities" },
-    { symbol: "XLE", sector: "Energy Sector SPDR" }
-  ]);
+  const [symbol, setSymbol] = useState<string>(() => {
+    try {
+      return localStorage.getItem("alpha_last_symbol") || "";
+    } catch (_) {
+      return "";
+    }
+  });
+  const [customTickerInput, setCustomTickerInput] = useState<string>(() => {
+    try {
+      return localStorage.getItem("alpha_last_symbol") || "";
+    } catch (_) {
+      return "";
+    }
+  });
+  const [dynamicUniverse, setDynamicUniverse] = useState<Array<{ symbol: string; sector?: string }>>([]);
   const [resolvedInfo, setResolvedInfo] = useState<any>(null);
   const [resolvingSymbol, setResolvingSymbol] = useState(false);
+
+  // Helper to atomically update symbol and persist across user sessions
+  const updateActiveSymbol = (sym: string) => {
+    const clean = sym.trim().toUpperCase();
+    setSymbol(clean);
+    setCustomTickerInput(clean);
+    try {
+      if (clean) {
+        localStorage.setItem("alpha_last_symbol", clean);
+      } else {
+        localStorage.removeItem("alpha_last_symbol");
+      }
+    } catch (_) {}
+    if (clean) {
+      resolveContractForSymbol(clean);
+    } else {
+      setResolvedInfo(null);
+    }
+  };
 
   const [timeframe, setTimeframe] = useState("1h");
   const [startDate, setStartDate] = useState("2026-05-01");
@@ -364,7 +389,7 @@ export function StrategyStudioPage() {
       id: "msg_init",
       role: "assistant",
       content:
-        "👋 Welcome to the **Institutional Strategy Studio & Experiment Vault**.\n\nI am your quantitative reasoning agent wired directly into:\n- 🔬 **Wald-Wolfowitz Runs & Hurst Exponent Analysis** (`run_quant_discovery`)\n- ⚡ **16-Parameter Optimization Sweeps** audited under López de Prado's Deflated Sharpe Ratio (`run_strategy_sweep`)\n- 🏛️ **Verified Broker History & Direct TCP Sockets** (`run_strategy_backtest`)\n- 🔒 **Deterministic Local Experiment Vault** (`save_strategy_to_vault` / `get_strategy_vault`)\n\nAsk me anything: *'Run a 16-parameter sweep on ASML'*, *'Analyze the Hurst regime for NVDA'*, or *'Test with $25k capital and 1.5 ATR stop'*.",
+        "👋 Welcome to the **Institutional Strategy Studio & Experiment Vault**.\n\nI am your quantitative reasoning agent wired directly into:\n- 🔬 **Wald-Wolfowitz Runs & Hurst Exponent Analysis** (`run_quant_discovery`)\n- ⚡ **16-Parameter Optimization Sweeps** audited under López de Prado's Deflated Sharpe Ratio (`run_strategy_sweep`)\n- 🏛️ **Verified Broker History & Direct TCP Sockets** (`run_strategy_backtest`)\n- 🔒 **Deterministic Local Experiment Vault** (`save_strategy_to_vault` / `get_strategy_vault`)\n\nEnter any European or US equity ticker, or ask me: *'Run an optimization sweep'*, *'Analyze Hurst regime and persistence'*, or *'Test with 1.8 ATR stop'*.",
       timestamp: new Date().toLocaleTimeString()
     }
   ]);
@@ -426,10 +451,14 @@ export function StrategyStudioPage() {
   };
 
   useEffect(() => {
-    resolveContractForSymbol(symbol);
+    if (symbol && symbol.trim()) {
+      resolveContractForSymbol(symbol);
+    } else {
+      setResolvedInfo(null);
+    }
   }, [symbol]);
 
-  // Load dynamic universe
+  // Load dynamic universe from active live baskets
   useEffect(() => {
     const loadUniverse = async () => {
       try {
@@ -441,17 +470,12 @@ export function StrategyStudioPage() {
             const seen = new Set<string>();
             data.baskets.forEach((b: any) => {
               (b.tickers || []).forEach((t: string) => {
-                if (!seen.has(t)) {
-                  seen.add(t);
-                  list.push({ symbol: t, sector: b.sector });
+                const cleanT = (t || "").trim().toUpperCase();
+                if (cleanT && !seen.has(cleanT)) {
+                  seen.add(cleanT);
+                  list.push({ symbol: cleanT, sector: b.sector || "Candidate Basket" });
                 }
               });
-            });
-            ["ASML", "NVDA", "SAP", "RWE", "XLE"].forEach((t) => {
-              if (!seen.has(t)) {
-                seen.add(t);
-                list.push({ symbol: t, sector: "Core Dynamic Universe" });
-              }
             });
             setDynamicUniverse(list);
           }
@@ -528,6 +552,12 @@ export function StrategyStudioPage() {
     const activeSym = overrides?.symbol || symbol;
     const activeTf = overrides?.timeframe || timeframe;
 
+    if (!activeSym || !activeSym.trim()) {
+      setErrorMsg("Please enter or select an instrument symbol before running simulation.");
+      setLoading(false);
+      return;
+    }
+
     try {
       if (!baselineResult) {
         const baseRun = await executeSimulation({
@@ -573,6 +603,11 @@ export function StrategyStudioPage() {
   // 6. Direct Parameter Sweep (16 Trials via research_controller.py)
   // =========================================================================
   const handleRunSweep = async () => {
+    if (!symbol || !symbol.trim()) {
+      setErrorMsg("Please enter or select an instrument symbol before running optimization sweep.");
+      return;
+    }
+
     setSweeping(true);
     setErrorMsg(null);
 
@@ -646,6 +681,11 @@ export function StrategyStudioPage() {
   // 7. Direct Quant Discovery (Wald-Wolfowitz + Hurst Exponent)
   // =========================================================================
   const handleRunDiscovery = async () => {
+    if (!symbol || !symbol.trim()) {
+      setErrorMsg("Please enter or select an instrument symbol before running empirical microstructure discovery.");
+      return;
+    }
+
     setDiscovering(true);
     setErrorMsg(null);
 
@@ -1108,11 +1148,11 @@ export function StrategyStudioPage() {
 
   // Quick Action Chips
   const quickChips = [
-    `Run 16-parameter sweep on ${symbol}`,
-    `Analyze Hurst exponent & regime for ${symbol}`,
-    `Optimize with $25k capital and Deflated Sharpe hurdle`,
-    `Run single simulation with 2.2 ATR stop and 20 hold bars`,
-    `Preserve current strategy to Experiment Vault`
+    symbol ? `Run 16-parameter sweep on ${symbol}` : "Run 16-parameter optimization sweep",
+    symbol ? `Analyze Hurst exponent & regime for ${symbol}` : "Analyze Hurst exponent & regime",
+    "Optimize with $25k capital and Deflated Sharpe hurdle",
+    "Run single simulation with 1.8 ATR stop and 15 hold bars",
+    "Preserve current strategy to Experiment Vault"
   ];
 
   return (
@@ -1124,7 +1164,7 @@ export function StrategyStudioPage() {
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs terminal-badge-bid px-2.5 py-1 rounded-md font-mono font-bold flex items-center gap-1.5 shadow-sm">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-500 dark:text-[#00ff88]" /> AGENTIC STRATEGY STUDIO
+              <Sparkles className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" /> AGENTIC STRATEGY STUDIO
             </span>
             <span className="text-xs bg-blue-500/20 text-blue-500 dark:text-blue-300 border border-blue-500/30 px-2.5 py-1 rounded-md font-mono font-bold">
               VERIFIED BROKER BARS
@@ -1207,8 +1247,8 @@ export function StrategyStudioPage() {
       </div>
 
       {saveSuccessMsg && (
-        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-[#00ff88] font-mono flex items-center gap-2 animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 text-[#00ff88]" />
+        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-500 dark:text-emerald-400 font-mono flex items-center gap-2 animate-in fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
           <span>{saveSuccessMsg}</span>
         </div>
       )}
@@ -1229,7 +1269,7 @@ export function StrategyStudioPage() {
           <div className="p-4 border-b terminal-border terminal-elevated flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
-                <Bot className="w-4 h-4 text-emerald-500 dark:text-[#00ff88]" />
+                <Bot className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
               </div>
               <div>
                 <span className="text-xs font-mono font-bold text-primary block">STRATEGY OPTIMIZER AGENT</span>
@@ -1264,10 +1304,10 @@ export function StrategyStudioPage() {
             <div className="px-4 py-2 bg-emerald-950/40 border-b border-emerald-500/30 flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[10px] font-mono text-emerald-400 uppercase font-bold flex items-center gap-1">
-                  <RefreshCw className="w-3 h-3 animate-spin text-[#00ff88]" /> Invoking Tool:
+                  <RefreshCw className="w-3 h-3 animate-spin text-emerald-500 dark:text-emerald-400" /> Invoking Tool:
                 </span>
                 {activeTools.map((t, idx) => (
-                  <span key={idx} className="text-[10px] bg-emerald-500/20 text-[#00ff88] border border-emerald-500/40 px-2 py-0.5 rounded font-mono font-bold">
+                  <span key={idx} className="text-[10px] bg-emerald-500/20 text-emerald-500 dark:text-emerald-400 border border-emerald-500/40 px-2 py-0.5 rounded font-mono font-bold">
                     {t}
                   </span>
                 ))}
@@ -1315,7 +1355,7 @@ export function StrategyStudioPage() {
                 >
                   <div
                     className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${
-                      isAgent ? "bg-emerald-500/20 text-[#00ff88]" : "bg-indigo-600 text-white"
+                      isAgent ? "bg-emerald-500/20 text-emerald-500 dark:text-emerald-400" : "bg-indigo-600 text-white"
                     }`}
                   >
                     {isAgent ? <Bot className="w-3.5 h-3.5" /> : <span className="font-bold text-[10px]">YOU</span>}
@@ -1409,7 +1449,7 @@ export function StrategyStudioPage() {
             })}
             {(sweeping || discovering) && (
               <div className="flex gap-3 items-start animate-in fade-in">
-                <div className="w-6 h-6 rounded-md bg-emerald-500/20 text-emerald-500 dark:text-[#00ff88] flex items-center justify-center shrink-0 mt-0.5">
+                <div className="w-6 h-6 rounded-md bg-emerald-500/20 text-emerald-500 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                 </div>
                 <div className="p-3 rounded-2xl terminal-elevated text-emerald-500 dark:text-emerald-300 font-mono text-xs">
@@ -1443,7 +1483,7 @@ export function StrategyStudioPage() {
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Direct agent (e.g. Run 16-parameter sweep on ASML)..."
+              placeholder={symbol ? `Direct agent (e.g. Run 16-parameter sweep on ${symbol})...` : "Direct agent (e.g. Run 16-parameter sweep, test Hurst exponent)..."}
               disabled={isGenerating}
               className="flex-1 terminal-elevated rounded-xl px-3.5 py-2.5 text-xs text-primary font-mono placeholder:text-muted focus:outline-none focus:border-cyan"
             />
@@ -1468,149 +1508,160 @@ export function StrategyStudioPage() {
               <span className="text-xs text-secondary font-mono">Calibrated against IBKR Europe Rates</span>
             </div>
 
-            {/* Selector Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-              {/* Dynamic Ticker Resolution */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[11px] text-slate-300 uppercase font-mono font-bold">
-                    Ticker (Dynamic)
-                  </label>
-                  {resolvingSymbol ? (
-                    <span className="text-[10px] text-emerald-400 font-mono animate-pulse">Resolving...</span>
-                  ) : resolvedInfo ? (
-                    <span className="text-[10px] text-[#00ff88] font-mono font-semibold truncate max-w-[120px]">
-                      {resolvedInfo.exchange || "SMART"} • {resolvedInfo.currency || "USD"}
-                    </span>
-                  ) : null}
-                </div>
-                <div className="flex gap-1.5">
-                  <input
-                    type="text"
-                    value={customTickerInput}
-                    onChange={(e) => setCustomTickerInput(e.target.value.toUpperCase())}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        if (customTickerInput.trim()) {
-                          const s = customTickerInput.trim().toUpperCase();
-                          setSymbol(s);
-                          resolveContractForSymbol(s);
+            {/* Selector Grid: Organized in 2 spacious responsive tiers */}
+            <div className="space-y-3.5">
+              {/* Row 1: Asset, Timeframe, and Capital Allocation */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Dynamic Ticker Resolution */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] text-secondary uppercase font-mono font-bold">
+                      Ticker (Dynamic)
+                    </label>
+                    {resolvingSymbol ? (
+                      <span className="text-[10px] text-cyan-400 font-mono animate-pulse">Resolving...</span>
+                    ) : resolvedInfo ? (
+                      <span className="text-[10px] terminal-badge-bid font-mono font-semibold px-1.5 py-0.2 rounded">
+                        {resolvedInfo.exchange || "SMART"} • {resolvedInfo.currency || "USD"}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={customTickerInput}
+                      onChange={(e) => setCustomTickerInput(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          updateActiveSymbol(customTickerInput);
                         }
-                      }
-                    }}
-                    onBlur={() => {
-                      if (customTickerInput.trim() && customTickerInput.trim().toUpperCase() !== symbol) {
-                        const s = customTickerInput.trim().toUpperCase();
-                        setSymbol(s);
-                        resolveContractForSymbol(s);
-                      }
-                    }}
-                    placeholder="Ticker (e.g. ASML)..."
-                    className="flex-1 terminal-elevated rounded-lg px-2.5 py-1.5 text-xs text-primary font-mono uppercase font-bold focus:outline-none focus:border-cyan"
-                  />
+                      }}
+                      onBlur={() => {
+                        if (customTickerInput.trim().toUpperCase() !== symbol) {
+                          updateActiveSymbol(customTickerInput);
+                        }
+                      }}
+                      placeholder="Enter symbol..."
+                      className="flex-1 terminal-elevated rounded-lg px-2.5 py-1.5 text-xs text-primary font-mono uppercase font-bold focus:outline-none focus:border-cyan"
+                    />
+                    <select
+                      value={symbol}
+                      onChange={(e) => {
+                        updateActiveSymbol(e.target.value);
+                      }}
+                      className="w-36 terminal-elevated rounded-lg px-2 py-1.5 text-xs text-primary font-mono focus:outline-none focus:border-cyan font-bold"
+                    >
+                      <option value="">{dynamicUniverse.length > 0 ? "Select Symbol..." : "No universe"}</option>
+                      {dynamicUniverse.map((u) => (
+                        <option key={u.symbol} value={u.symbol}>
+                          {u.symbol}
+                        </option>
+                      ))}
+                      {symbol && !dynamicUniverse.some((u) => u.symbol.toUpperCase() === symbol.toUpperCase()) && (
+                        <option value={symbol}>{symbol} (Custom)</option>
+                      )}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Timeframe */}
+                <div>
+                  <label className="text-[11px] text-secondary uppercase font-mono font-bold block mb-1">Timeframe</label>
                   <select
-                    value={symbol}
-                    onChange={(e) => {
-                      setSymbol(e.target.value);
-                      setCustomTickerInput(e.target.value);
-                      resolveContractForSymbol(e.target.value);
-                    }}
-                    className="w-24 terminal-elevated rounded-lg px-2 py-1.5 text-xs text-primary font-mono focus:outline-none focus:border-cyan font-bold"
+                    value={timeframe}
+                    onChange={(e) => setTimeframe(e.target.value)}
+                    className="w-full terminal-elevated rounded-lg px-2.5 py-1.5 text-xs text-primary font-mono focus:outline-none focus:border-cyan font-bold"
                   >
-                    {dynamicUniverse.map((u) => (
-                      <option key={u.symbol} value={u.symbol}>
-                        {u.symbol}
-                      </option>
-                    ))}
-                    {!dynamicUniverse.some((u) => u.symbol === symbol) && (
-                      <option value={symbol}>{symbol}</option>
-                    )}
+                    <option value="5m">5 Min (Microstructure)</option>
+                    <option value="15m">15 Min (Intraday Drift)</option>
+                    <option value="1h">1 Hour (Session Swing)</option>
                   </select>
                 </div>
+
+                {/* Starting Capital */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-[11px] text-secondary uppercase font-mono font-bold">Capital ($)</label>
+                    <span className="text-xs text-emerald-500 font-mono font-bold">${capitalOverride.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1 w-1/2">
+                      {[5000, 25000, 100000].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setCapitalOverride(preset)}
+                          className={`flex-1 py-1 rounded text-[10px] font-mono cursor-pointer transition ${
+                            capitalOverride === preset
+                              ? "terminal-badge-bid font-bold"
+                              : "terminal-elevated text-secondary hover:text-primary"
+                          }`}
+                        >
+                          ${preset >= 1000 ? `${preset / 1000}k` : preset}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="number"
+                      min="500"
+                      max="10000000"
+                      step="1000"
+                      value={capitalOverride}
+                      onChange={(e) => setCapitalOverride(Math.max(500, parseFloat(e.target.value) || 500))}
+                      className="w-1/2 terminal-elevated rounded-lg px-2.5 py-1 text-xs text-primary font-mono focus:outline-none focus:border-cyan"
+                    />
+                  </div>
+                </div>
               </div>
 
-              {/* Timeframe */}
-              <div>
-                <label className="text-[11px] text-secondary uppercase font-mono font-bold block mb-1">Timeframe</label>
-                <select
-                  value={timeframe}
-                  onChange={(e) => setTimeframe(e.target.value)}
-                  className="w-full terminal-elevated rounded-lg px-2.5 py-1.5 text-xs text-primary font-mono focus:outline-none focus:border-cyan font-bold"
-                >
-                  <option value="5m">5 Min (Microstructure)</option>
-                  <option value="15m">15 Min (Intraday Drift)</option>
-                  <option value="1h">1 Hour (Session Swing)</option>
-                </select>
-              </div>
+              {/* Row 2: Algorithmic Stops & Holding Horizon */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-subtle">
+                {/* Stop ATR */}
+                <div className="terminal-elevated p-2.5 rounded-xl">
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-[11px] text-secondary uppercase font-mono font-bold flex items-center gap-1">
+                      Stop ATR Cushion <InfoTip id="atr" />
+                    </label>
+                    <span className="text-xs text-emerald-500 font-mono font-bold">{stopAtr.toFixed(1)}x ATR</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.8"
+                    max="3.5"
+                    step="0.1"
+                    value={stopAtr}
+                    onChange={(e) => setStopAtr(parseFloat(e.target.value))}
+                    className="w-full accent-emerald-500 cursor-pointer mt-1.5"
+                  />
+                  <div className="flex justify-between text-[9px] text-muted font-mono mt-0.5">
+                    <span>Tight (0.8x)</span>
+                    <span>Alpha Standard (1.8x)</span>
+                    <span>Wide (3.5x)</span>
+                  </div>
+                </div>
 
-              {/* Starting Capital */}
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-[11px] text-secondary uppercase font-mono font-bold">Capital ($)</label>
-                  <span className="text-xs text-emerald-500 dark:text-[#00ff88] font-mono font-bold">${capitalOverride.toLocaleString()}</span>
+                {/* Max Hold */}
+                <div className="terminal-elevated p-2.5 rounded-xl">
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-[11px] text-secondary uppercase font-mono font-bold">Max Hold Horizon</label>
+                    <span className="text-xs text-cyan-400 font-mono font-bold">{maxHoldBars} bars</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="40"
+                    step="1"
+                    value={maxHoldBars}
+                    onChange={(e) => setMaxHoldBars(parseInt(e.target.value, 10))}
+                    className="w-full accent-cyan-500 cursor-pointer mt-1.5"
+                  />
+                  <div className="flex justify-between text-[9px] text-muted font-mono mt-0.5">
+                    <span>Scalp (5b)</span>
+                    <span>Standard (15b)</span>
+                    <span>Swing (40b)</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 mb-1">
-                  {[5000, 25000, 100000].map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => setCapitalOverride(preset)}
-                      className={`flex-1 py-0.5 rounded text-[10px] font-mono cursor-pointer transition ${
-                        capitalOverride === preset
-                          ? "terminal-badge-bid font-bold"
-                          : "terminal-elevated text-secondary hover:text-primary"
-                      }`}
-                    >
-                      ${preset >= 1000 ? `${preset / 1000}k` : preset}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  type="number"
-                  min="500"
-                  max="10000000"
-                  step="1000"
-                  value={capitalOverride}
-                  onChange={(e) => setCapitalOverride(Math.max(500, parseFloat(e.target.value) || 500))}
-                  className="w-full terminal-elevated rounded-lg px-2.5 py-1 text-xs text-primary font-mono focus:outline-none focus:border-cyan"
-                />
-              </div>
-
-              {/* Stop ATR */}
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-[11px] text-slate-300 uppercase font-mono font-bold flex items-center gap-1">
-                    Stop ATR <InfoTip id="atr" />
-                  </label>
-                  <span className="text-xs text-emerald-400 font-mono font-bold">{stopAtr.toFixed(1)}x</span>
-                </div>
-                <input
-                  type="range"
-                  min="0.8"
-                  max="3.5"
-                  step="0.1"
-                  value={stopAtr}
-                  onChange={(e) => setStopAtr(parseFloat(e.target.value))}
-                  className="w-full accent-emerald-500 cursor-pointer mt-2"
-                />
-              </div>
-
-              {/* Max Hold */}
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-[11px] text-slate-300 uppercase font-mono font-bold">Max Hold</label>
-                  <span className="text-xs text-cyan-400 font-mono font-bold">{maxHoldBars} bars</span>
-                </div>
-                <input
-                  type="range"
-                  min="5"
-                  max="40"
-                  step="1"
-                  value={maxHoldBars}
-                  onChange={(e) => setMaxHoldBars(parseInt(e.target.value, 10))}
-                  className="w-full accent-cyan-500 cursor-pointer mt-2"
-                />
               </div>
             </div>
 
@@ -1720,9 +1771,11 @@ export function StrategyStudioPage() {
               <div className="space-y-4 animate-in fade-in duration-200">
                 <InstitutionalCandleChart
                   symbol={symbol}
+                  data={result?.priceHistory}
+                  trades={result?.tradesList}
                   timeframe={timeframe}
                   onTimeframeChange={(tf) => setTimeframe(tf)}
-                  height={460}
+                  height={500}
                 />
               </div>
             )}
@@ -1737,7 +1790,7 @@ export function StrategyStudioPage() {
                   <div className="terminal-elevated p-3 rounded-xl">
                     <span className="text-[10px] text-secondary block uppercase font-semibold">Net PnL</span>
                     <span className={`font-bold text-base mt-1 block ${
-                      (Number(result.totalPnL || 0)) >= 0 ? "text-emerald-500 dark:text-[#00ff88]" : "text-rose-500 dark:text-rose-400"
+                      (Number(result.totalPnL || 0)) >= 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"
                     }`}>
                       {(Number(result.totalPnL || 0)) >= 0 ? "+" : ""}${Number(result.totalPnL || 0).toFixed(2)}
                     </span>
@@ -1746,7 +1799,7 @@ export function StrategyStudioPage() {
 
                   <div className="terminal-elevated p-3 rounded-xl">
                     <span className="text-[10px] text-secondary block uppercase font-semibold">Annual Sharpe</span>
-                    <span className="font-bold text-base text-emerald-500 dark:text-[#00ff88] mt-1 block">
+                    <span className="font-bold text-base text-emerald-500 dark:text-emerald-400 mt-1 block">
                       {result.annualizedSharpe !== undefined ? result.annualizedSharpe : "0.00"}
                     </span>
                     <span className="text-[10px] text-muted">Roll-adjusted</span>
@@ -1757,7 +1810,7 @@ export function StrategyStudioPage() {
                       Deflated Sharpe <InfoTip id="dsr" />
                     </span>
                     <span className={`font-bold text-base mt-1 block ${
-                      result.passesDsrHurdle ? "text-emerald-500 dark:text-[#00ff88]" : "text-amber-500 dark:text-amber-400"
+                      result.passesDsrHurdle ? "text-emerald-500 dark:text-emerald-400" : "text-amber-500 dark:text-amber-400"
                     }`}>
                       {result.deflatedSharpeRatio !== undefined ? `${(Number(result.deflatedSharpeRatio) * 100).toFixed(1)}%` : "N/A"}
                     </span>
@@ -1880,7 +1933,7 @@ export function StrategyStudioPage() {
                     <div className="grid grid-cols-3 gap-3 pt-1 text-center">
                       <div className="terminal-card p-2 rounded-lg">
                         <span className="text-[10px] text-secondary block">HURST EXPONENT (H)</span>
-                        <span className="font-bold text-emerald-500 dark:text-[#00ff88] text-sm">
+                        <span className="font-bold text-emerald-500 dark:text-emerald-400 text-sm">
                           {Number(discoveryData.quant_discovery?.hurst_exponent?.hurst_exponent || 0.5).toFixed(3)}
                         </span>
                       </div>
@@ -1954,13 +2007,13 @@ export function StrategyStudioPage() {
                                 <td className="py-2 px-2 text-right text-white">{c.winRate}%</td>
                                 <td className="py-2 px-2 text-right text-emerald-400">{c.annualizedSharpe}</td>
                                 <td className={`py-2 px-2 text-right font-bold ${
-                                  c.passesDsrHurdle ? "text-[#00ff88]" : "text-amber-400"
+                                  c.passesDsrHurdle ? "text-emerald-500 dark:text-emerald-400" : "text-amber-400"
                                 }`}>
                                   {(Number(c.deflatedSharpeRatio || 0) * 100).toFixed(1)}%
                                 </td>
                                 <td className="py-2 px-2 text-right text-rose-400">-{c.maxDrawdownPercent}%</td>
                                 <td className={`py-2 px-2 text-right font-bold ${
-                                  Number(c.totalPnL || 0) >= 0 ? "text-[#00ff88]" : "text-rose-400"
+                                  Number(c.totalPnL || 0) >= 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-400"
                                 }`}>
                                   {Number(c.totalPnL || 0) >= 0 ? "+" : ""}${Number(c.totalPnL || 0).toFixed(2)}
                                 </td>
@@ -2041,7 +2094,7 @@ export function StrategyStudioPage() {
                                 </span>
                               </td>
                               <td className="py-2 px-3 text-right text-secondary">${Number(tr.commission || 0).toFixed(2)}</td>
-                              <td className={`py-2 px-3 text-right font-bold ${isWin ? "text-emerald-500 dark:text-[#00ff88]" : "text-rose-500 dark:text-rose-400"}`}>
+                              <td className={`py-2 px-3 text-right font-bold ${isWin ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}`}>
                                 {isWin ? "+" : ""}${Number(tr.realizedPnL || 0).toFixed(2)}
                               </td>
                             </tr>

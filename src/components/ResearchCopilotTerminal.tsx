@@ -176,24 +176,22 @@ export const ResearchCopilotTerminal: React.FC = () => {
         setSanitizedRisk(sanData.sanitized_parameters);
       }
 
-      // 2. Extract company name/ticker & resolve instrument
-      let targetQuery = "ASML";
-      if (q.toLowerCase().includes("rheinmetall")) targetQuery = "Rheinmetall";
-      else if (q.toLowerCase().includes("asml")) targetQuery = "ASML";
-      else if (q.toLowerCase().includes("sap")) targetQuery = "SAP";
-      else if (q.toLowerCase().includes("lvmh")) targetQuery = "LVMH";
-      else if (q.toLowerCase().includes("spy")) targetQuery = "SPY";
-      else if (q.toLowerCase().includes("nvda")) targetQuery = "NVDA";
+      // 2. Extract company name/ticker & resolve instrument dynamically
+      const words = q.trim().split(/\s+/);
+      const possibleTicker = words.find((w) => /^[A-Z]{1,5}$/.test(w));
+      const targetQuery = possibleTicker || words[0] || "";
 
-      const resRes = await fetch("/api/research/resolve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: targetQuery })
-      });
-      const resData = await resRes.json();
-      if (resData.success) {
-        setDisambiguation(resData);
-        setSelectedContract(resData.primary_contract);
+      if (targetQuery) {
+        const resRes = await fetch("/api/research/resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: targetQuery })
+        });
+        const resData = await resRes.json();
+        if (resData.success) {
+          setDisambiguation(resData);
+          setSelectedContract(resData.primary_contract);
+        }
       }
     } catch (e) {
       console.error("[RESEARCH TERMINAL] Error processing query:", e);

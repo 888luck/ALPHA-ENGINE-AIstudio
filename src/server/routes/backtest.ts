@@ -1,67 +1,52 @@
 import { Router } from "express";
 import { execFile } from "child_process";
 import path from "path";
+import fs from "fs";
 import { GoogleGenAI } from "@google/genai";
 import { dynamicBaskets } from "../state";
 import { getPythonExecutable } from "./research";
 
 export const backtestRouter = Router();
 
-// Pre-flight proactive simulator across multiple asset baskets
+// Pre-flight proactive simulator across multiple asset baskets (Rule 8 & 9)
 backtestRouter.get("/api/run-expectancy", (req, res) => {
   if (dynamicBaskets && dynamicBaskets.length > 0) {
     return res.json({ baskets: dynamicBaskets });
   }
-  const resultData = {
-    baskets: [
-      {
-        sector: "Energy Sector Trading Strategy",
-        tickers: ["XLE", "VLO", "COP"],
-        impliedOfiTrend: "BULLISH (Macro Divergence +)",
-        winRate: 58,
-        profitFactor: 1.45,
-        avgFrictionConsumed: 7.2
-      },
-      {
-        sector: "Utilities Structural Arbitrage",
-        tickers: ["XLU", "NEE", "DUK"],
-        impliedOfiTrend: "NEUTRAL / FLAT",
-        winRate: 54,
-        profitFactor: 1.28,
-        avgFrictionConsumed: 9.8
-      },
-      {
-        sector: "Clean Energy Tech Imbalances",
-        tickers: ["ICLN", "ENPH", "FSLR"],
-        impliedOfiTrend: "VOLATILE / DIVERGENT",
-        winRate: 51,
-        profitFactor: 1.15,
-        avgFrictionConsumed: 13.4
+
+  // Load dynamic candidate baskets from disk if available
+  const basketPath = path.join(process.cwd(), "dynamic_baskets.json");
+  if (fs.existsSync(basketPath)) {
+    try {
+      const loaded = JSON.parse(fs.readFileSync(basketPath, "utf-8"));
+      if (Array.isArray(loaded) && loaded.length > 0) {
+        return res.json({ baskets: loaded });
       }
-    ]
-  };
-  res.json(resultData);
+    } catch (_) {}
+  }
+
+  res.json({ baskets: [] });
 });
 
 backtestRouter.post("/api/backtest-audit", async (req, res) => {
   try {
-    const { backtestResults, provider } = req.body;
+    const { backtestResults, provider, modelId } = req.body;
     if (!backtestResults) {
       return res.status(400).json({ error: "Missing backtestResults parameter." });
     }
 
-    const selectedProvider = provider || "gemini-flash";
+    const selectedProvider = provider || "gemini";
+    const selectedModel = modelId || "gemini-2.5-flash";
 
-    const pricingTable: Record<string, { model: string; inPrice: number; outPrice: number; name: string }> = {
-      "gemini-flash": { model: "gemini-2.0-flash", inPrice: 0.10, outPrice: 0.40, name: "Gemini 2.0 Flash" },
-      "gemini-pro": { model: "gemini-2.0-pro", inPrice: 1.25, outPrice: 5.00, name: "Gemini 2.0 Pro" },
-      "nvidia-nim": { model: "llama3-free", inPrice: 0.00, outPrice: 0.00, name: "Llama 3 (Nvidia NIM Free)" },
-      "claude": { model: "claude-sonnet", inPrice: 3.00, outPrice: 15.00, name: "Claude 3.5 Sonnet" }
+    // Dynamic resolution based on active provider credentials
+    const config = {
+      model: selectedModel,
+      inPrice: 0.15,
+      outPrice: 0.60,
+      name: `${selectedProvider.toUpperCase()} (${selectedModel})`
     };
 
-    const config = pricingTable[selectedProvider] || pricingTable["gemini-flash"];
-
-    const symbol = backtestResults.symbol || "XLE";
+    const symbol = backtestResults.symbol || "ASML";
     const timeframe = backtestResults.timeframe || "1h";
     const start = backtestResults.startDate || "2026-05-01";
     const end = backtestResults.endDate || "2026-06-16";

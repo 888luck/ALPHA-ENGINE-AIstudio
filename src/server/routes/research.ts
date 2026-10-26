@@ -360,3 +360,115 @@ researchRouter.delete("/api/vault/strategies/:id", (req, res) => {
     return res.status(500).json({ error: "Failed to delete strategy from vault", details: err.message });
   }
 });
+
+// 10. GET /api/market/bars - Fetch verified historical market bars (Zero-Synthetic Rule 8)
+researchRouter.get("/api/market/bars", async (req, res) => {
+  try {
+    const rawSymbol = (req.query.symbol as string) || "ASML";
+    const symbol = rawSymbol.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+    const timeframe = ((req.query.timeframe as string) || "1h").toLowerCase();
+
+    // 1. Check verified local disk caches first
+    const candidates = [
+      path.join(process.cwd(), `historical_bars_${symbol}_${timeframe}.json`),
+      path.join(process.cwd(), `historical_bars_${symbol}.json`),
+      path.join(process.cwd(), "data", `historical_bars_${symbol}_${timeframe}.json`),
+      path.join(process.cwd(), "data", `historical_bars_${symbol}.json`),
+      path.join(process.cwd(), "..", `historical_bars_${symbol}_${timeframe}.json`),
+      path.join(process.cwd(), "..", `historical_bars_${symbol}.json`)
+    ];
+
+    for (const cPath of candidates) {
+      if (fs.existsSync(cPath)) {
+        try {
+          const content = fs.readFileSync(cPath, "utf-8");
+          const rawBars = JSON.parse(content);
+          if (Array.isArray(rawBars) && rawBars.length > 0) {
+            return res.json({
+              success: true,
+              source: "verified_local_cache",
+              symbol,
+              timeframe,
+              count: rawBars.length,
+              bars: rawBars
+            });
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 2. Query Frankfurt Edge TCP Bridge (port 4005) to IBKR Pro Gateway if available
+    const edgeHost = process.env.EDGE_NODE_HOST || process.env.EDGE_NODE_IP || "127.0.0.1";
+    const edgePort = parseInt(process.env.EDGE_TCP_PORT || "4005", 10);
+    const authToken = process.env.EDGE_AUTH_TOKEN || "ALPHA_EDGE_SECRET_2026";
+
+    const socketBars = await new Promise<any[] | null>((resolve) => {
+      const net = require("net");
+      const client = new net.Socket();
+      client.setTimeout(3500);
+
+      let buffer = "";
+      client.connect(edgePort, edgeHost, () => {
+        const payload = JSON.stringify({
+          cmd: "REQ_HISTORICAL_DATA",
+          symbol,
+          timeframe,
+          duration: "30 D",
+          token: authToken
+        }) + "\n";
+        client.write(payload);
+      });
+
+      client.on("data", (chunk: Buffer) => {
+        buffer += chunk.toString("utf-8");
+      });
+
+      client.on("end", () => {
+        try {
+          const resp = JSON.parse(buffer);
+          const bars = resp.bars || resp.result?.bars;
+          if (Array.isArray(bars) && bars.length > 0) {
+            resolve(bars);
+          } else {
+            resolve(null);
+          }
+        } catch (_) {
+          resolve(null);
+        }
+      });
+
+      client.on("error", () => resolve(null));
+      client.on("timeout", () => {
+        client.destroy();
+        resolve(null);
+      });
+    });
+
+    if (socketBars && socketBars.length > 0) {
+      try {
+        const cachePath = path.join(process.cwd(), `historical_bars_${symbol}_${timeframe}.json`);
+        fs.writeFileSync(cachePath, JSON.stringify(socketBars, null, 2), "utf-8");
+      } catch (_) {}
+
+      return res.json({
+        success: true,
+        source: "ibkr_pro_edge_bridge",
+        symbol,
+        timeframe,
+        count: socketBars.length,
+        bars: socketBars
+      });
+    }
+
+    // 3. Strict Rule 8 Compliance: Report transparently if no verified data exists
+    return res.status(404).json({
+      success: false,
+      error: `No verified broker bars found for ${symbol} (${timeframe}). Zero Synthetic Policy strictly prohibits artificial quotes. Please connect the IBKR Gateway (Port 4001) to request live history.`,
+      symbol,
+      timeframe,
+      bars: []
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: "Failed to fetch market bars: " + err.message });
+  }
+});

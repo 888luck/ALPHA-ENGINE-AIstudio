@@ -900,6 +900,38 @@ class CopilotTools:
                 items = []
         return {"status": "SUCCESS", "total_strategies": len(items), "strategies": items}
 
+    @staticmethod
+    def query_ibkr_broker(method: str, args: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Dispatches an on-demand inquiry for any official IBKR EClient API method to the edge node."""
+        args_payload = args or {}
+        # Auto-resolve contract dictionary if symbol passed casually
+        if "symbol" in args_payload and "contract" not in args_payload:
+            args_payload["contract"] = CopilotTools.parse_instrument_spec(
+                args_payload["symbol"],
+                sec_type=args_payload.get("secType") or args_payload.get("sec_type")
+            )
+        bridge_resp = query_edge_tcp_bridge({
+            "action": "DISPATCH_IBKR",
+            "method": method,
+            "args": args_payload
+        })
+        if isinstance(bridge_resp, dict) and bridge_resp.get("status") in ["SUCCESS", "OK"]:
+            return bridge_resp
+        try:
+            from connection import ConnectionManager
+            cm = ConnectionManager()
+            if getattr(cm, "is_connected", False):
+                return cm.dispatch_tool_call(method, args_payload)
+        except Exception:
+            pass
+        return bridge_resp or {
+            "status": "GATEWAY_OFFLINE",
+            "code": 504,
+            "method": method,
+            "error": "Interactive Brokers Gateway is offline or unreachable on port 4001/4002.",
+            "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+        }
+
 def execute_tool_call(tool_name: str, tool_args: Dict[str, Any]) -> Dict[str, Any]:
     """Execute dynamic tool dispatching across IBKR socket and regulatory adapters."""
     name = tool_name.lower().strip()
@@ -982,6 +1014,12 @@ def execute_tool_call(tool_name: str, tool_args: Dict[str, Any]) -> Dict[str, An
             return CopilotTools.get_energy_telemetry(
                 commodity=tool_args.get("commodity", "natural_gas")
             )
+        elif name in ["query_ibkr_broker", "query_broker_api", "execute_broker_endpoint", "req_ibkr_api"]:
+            method = tool_args.get("method") or tool_args.get("endpoint") or "reqContractDetails"
+            args = tool_args.get("args") or tool_args.get("arguments") or tool_args.get("parameters") or {}
+            if not args:
+                args = {k: v for k, v in tool_args.items() if k not in ["method", "endpoint"]}
+            return CopilotTools.query_ibkr_broker(method, args)
         else:
             # Full Reflection Dispatcher: Query Edge TCP Bridge on port 4005
             bridge_resp = query_edge_tcp_bridge({
@@ -1114,6 +1152,9 @@ Market Data & Operations Guidelines:
     You must ALWAYS call the appropriate tool immediately in the current turn and present the complete, finished data in your response. If a tool fails, times out, or returns GATEWAY_OFFLINE, immediately output:
     `⚠️ [EXECUTION STALLED: <exact failure reason>]`
     with the specific failed endpoint and suggested remediation. Never output placeholder promises without delivering the data in the same response.
+11. OFFICIAL IBKR API FULL REFLECTION VIA `query_ibkr_broker`:
+    You have direct, programmatic access to execute ANY official Interactive Brokers EClient API method on the live edge node (such as `reqContractDetails`, `reqScannerParameters`, `reqScannerSubscription`, `reqSecDefOptParams`, `reqNewsBulletins`, `reqCommissionRates`, `reqAccountUpdates`, `reqOpenOrders`, `calculateImpliedVolatility`) by calling `query_ibkr_broker(method="...", args={...})`.
+    NEVER claim that functions available to you are fixed, that the platform lacks an IBKR endpoint, or that you cannot query contract specs, scanner parameters, or commission rates. Always invoke `query_ibkr_broker` with the appropriate method and parameters.
 """
 
 def extract_provider_and_key(selected_model: str, client_headers: Dict[str, str], payload_keys: Optional[Dict[str, str]], raw_id_override: Optional[str] = None) -> tuple[str, str, str]:
@@ -1611,6 +1652,27 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
                         }
                     },
                     "required": ["name", "symbol", "parameters", "metrics"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "query_ibkr_broker",
+                "description": "Executes any official Interactive Brokers EClient API method directly on the Frankfurt edge node (e.g. reqContractDetails, reqScannerParameters, reqScannerSubscription, reqSecDefOptParams, reqNewsBulletins, reqCommissionRates, reqAccountUpdates, reqOpenOrders, calculateImpliedVolatility) and returns authentic live broker telemetry.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "method": {
+                            "type": "string",
+                            "description": "The exact official IBKR EClient method name, e.g. 'reqContractDetails', 'reqScannerParameters', 'reqNewsBulletins', 'reqSecDefOptParams', 'reqOpenOrders', 'reqPositions', 'reqCommissionRates'."
+                        },
+                        "args": {
+                            "type": "object",
+                            "description": "Optional dictionary of keyword arguments for the method (e.g. {'symbol': 'CAT', 'secType': 'STK'})."
+                        }
+                    },
+                    "required": ["method"]
                 }
             }
         }

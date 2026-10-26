@@ -248,6 +248,9 @@ class ConnectionManager(EWrapper, EClient):
             }
             self._request_events[reqId].set()
         
+        if hasattr(self, '_contract_events') and reqId in self._contract_events:
+            self._contract_events[reqId].set()
+        
         # IBKR Connectivity Code Handling
         if errorCode == 1100: # Connectivity between IB and TWS lost
             print("[GATEWAY ALERT] IBKR Connectivity Lost (Code 1100). Socket marked offline.")
@@ -477,13 +480,26 @@ class ConnectionManager(EWrapper, EClient):
         if hasattr(self, '_contract_events') and reqId in self._contract_events:
             self._contract_events[reqId].set()
 
-    def resolve_contract_details_blocking(self, contract: Any, timeout: float = 3.0) -> Optional[Dict[str, Any]]:
+    def resolve_contract_details_blocking(self, contract: Any, timeout: float = 4.0) -> Optional[Dict[str, Any]]:
         """
         Requests contract details via live socket and blocks until completed or timeout.
         Returns cached dictionary or None.
         """
         if not self.is_connected:
             return None
+
+        if isinstance(contract, str):
+            contract = self.create_contract(contract)
+        elif isinstance(contract, dict):
+            c = self.create_contract(
+                symbol=contract.get("symbol", ""),
+                sec_type=contract.get("secType", "STK"),
+                exchange=contract.get("exchange", "SMART"),
+                currency=contract.get("currency", "USD")
+            )
+            if contract.get("primaryExchange"):
+                c.primaryExchange = contract["primaryExchange"]
+            contract = c
 
         if not hasattr(self, '_contract_events'):
             self._contract_events = {}
@@ -593,9 +609,23 @@ class ConnectionManager(EWrapper, EClient):
             symbol = contract
             contract = self.create_contract(contract)
             arguments["contract"] = contract
+        elif isinstance(contract, dict):
+            symbol = contract.get("symbol", symbol)
+            c = self.create_contract(
+                symbol=symbol,
+                sec_type=contract.get("secType", "STK"),
+                exchange=contract.get("exchange", "SMART"),
+                currency=contract.get("currency", "USD")
+            )
+            if contract.get("primaryExchange"):
+                c.primaryExchange = contract["primaryExchange"]
+            contract = c
+            arguments["contract"] = contract
         elif not contract and symbol:
             contract = self.create_contract(symbol)
             arguments["contract"] = contract
+        elif hasattr(contract, "symbol") and not symbol:
+            symbol = contract.symbol
 
         if symbol:
             self.req_id_to_symbol[req_id] = symbol.upper().strip()
