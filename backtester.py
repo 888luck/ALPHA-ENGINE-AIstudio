@@ -3,7 +3,7 @@ import sys
 import json
 import random
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 # Standard mock-ready classes matching connection.py structure
 try:
@@ -57,12 +57,17 @@ class AlphaBacktestingEngine:
                      max_hold: int = 15, ofi_filter: bool = True, adaptive_stop: bool = True,
                      capital_override: float = None, risk_budget_pct: float = 0.01,
                      friction_ceiling_pct: float = 15.0, binary_blackout_hours: float = 0.0,
-                     trials_tested: int = 1, bars: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+                     trials_tested: int = 1, bars: List[Dict[str, Any]] = None,
+                     trailing_stop_atr: Optional[float] = None,
+                     trailing_activation_r: float = 1.5,
+                     trailing_step_atr: float = 0.25,
+                     trailing_type: str = "CHANDELIER") -> Dict[str, Any]:
         """
         Executes an algorithmic backtest over historical metrics with advanced institutional upgrades:
           - Adaptive Volatility ATR Stops: dynamic cushion to prevent premature stop-outs
           - Partial Profit Taking (Tranche scaling): Scale out 50% position at Target 1 (1.0x stop)
           - Breakeven locking: lock-in capital on target proximity
+          - Dynamic Trailing Profit: Chandelier / ATR / Fixed R / Parabolic trailing stops
           - Time-based decay exit: clear dead positions at max_hold bars limit
           - OFI Order Flow Imbalance direction filter: reject breakouts with discordant Level 2 order flows
           - Sanitized DRM Overrides: custom capital, risk budget r, friction ceiling, blackout window
@@ -115,6 +120,7 @@ class AlphaBacktestingEngine:
         total_setups_evaluated = 0
         tranche_1_scaled_out_count = 0
         tranche_2_hit_count = 0
+        trailing_stop_hits_count = 0
         total_slippage_friction_saved = 0.0
         
         for i in range(20, len(bars)):
@@ -145,6 +151,9 @@ class AlphaBacktestingEngine:
                 exit_reason = ""
                 
                 pos["bars_held"] += 1
+                pos["highest_high"] = max(pos.get("highest_high", bar["high"]), bar["high"])
+                pos["lowest_low"] = min(pos.get("lowest_low", bar["low"]), bar["low"])
+
                 direction_multiplier = 1 if pos["direction"] == "BUY" else -1
                 pips_in_favor = (current_close - pos["entry_price"]) * direction_multiplier
                 stop_distance_val = abs(pos["entry_price"] - pos["initial_stop"])
@@ -171,6 +180,7 @@ class AlphaBacktestingEngine:
                             pos["tranche_1_scaled_out"] = True
                             pos["scale_out_profit"] = t1_net
                             pos["stop_price"] = pos["entry_price"] # Drag stop to breakeven immediately
+                            pos["breakeven_applied"] = True
                             tranche_1_scaled_out_count += 1
                             
                 # B. Breakeven locking for standard/remaining position
@@ -178,13 +188,67 @@ class AlphaBacktestingEngine:
                     if pips_in_favor >= stop_distance_val * 0.8:
                         pos["stop_price"] = pos["entry_price"]
                         pos["breakeven_applied"] = True
+
+                # C. Dynamic Trailing Profit Ratchet
+                has_trailing = trailing_stop_atr is not None and float(trailing_stop_atr) > 0
+                if has_trailing:
+                    activation_hurdle = float(trailing_activation_r) * stop_distance_val
+                    if pips_in_favor >= activation_hurdle:
+                        pos["trailing_active"] = True
+
+                    if pos.get("trailing_active", False):
+                        t_type = (trailing_type or "CHANDELIER").upper().strip()
+                        k_trail = float(trailing_stop_atr)
+                        step_damper = max(0.01, float(trailing_step_atr) * current_atr)
+
+                        if t_type == "PARABOLIC":
+                            decay_ratio = min(1.0, pos["bars_held"] / max(1, max_hold))
+                            k_eff = max(0.5, k_trail * (1.0 - (0.5 * decay_ratio)))
+                        else:
+                            k_eff = k_trail
+
+                        if pos["direction"] == "BUY":
+                            if t_type in ["CHANDELIER", "PARABOLIC"]:
+                                cand_stop = round(pos["highest_high"] - (k_eff * current_atr), 2)
+                            elif t_type == "ATR":
+                                cand_stop = round(current_close - (k_eff * current_atr), 2)
+                            elif t_type == "FIXED_R":
+                                r_steps = int(pips_in_favor / max(0.01, stop_distance_val))
+                                cand_stop = round(pos["entry_price"] + ((r_steps - 1) * stop_distance_val * (k_eff / 2.0)), 2)
+                            else:
+                                cand_stop = round(pos["highest_high"] - (k_eff * current_atr), 2)
+
+                            if cand_stop >= (pos["stop_price"] + step_damper):
+                                pos["stop_price"] = cand_stop
+                                pos["is_trailing_stop"] = True
+
+                        else: # SELL
+                            if t_type in ["CHANDELIER", "PARABOLIC"]:
+                                cand_stop = round(pos["lowest_low"] + (k_eff * current_atr), 2)
+                            elif t_type == "ATR":
+                                cand_stop = round(current_close + (k_eff * current_atr), 2)
+                            elif t_type == "FIXED_R":
+                                r_steps = int(pips_in_favor / max(0.01, stop_distance_val))
+                                cand_stop = round(pos["entry_price"] - ((r_steps - 1) * stop_distance_val * (k_eff / 2.0)), 2)
+                            else:
+                                cand_stop = round(pos["lowest_low"] + (k_eff * current_atr), 2)
+
+                            if cand_stop <= (pos["stop_price"] - step_damper):
+                                pos["stop_price"] = cand_stop
+                                pos["is_trailing_stop"] = True
                 
                 # Check target and stop price violations
                 if pos["direction"] == "BUY":
                     if bar["low"] <= pos["stop_price"]:
                         exit_price = pos["stop_price"]
                         triggered_exit = True
-                        exit_reason = "STOP LOSS BREACH" if not pos.get("tranche_1_scaled_out", False) else "BREAKEVEN TRANCHE EXIT"
+                        if pos.get("is_trailing_stop", False):
+                            exit_reason = "TRAILING STOP LOSS HIT"
+                            trailing_stop_hits_count += 1
+                        elif not pos.get("tranche_1_scaled_out", False) and not pos.get("breakeven_applied", False):
+                            exit_reason = "STOP LOSS BREACH"
+                        else:
+                            exit_reason = "BREAKEVEN TRANCHE EXIT"
                     elif bar["high"] >= pos["target_price"]:
                         exit_price = pos["target_price"]
                         triggered_exit = True
@@ -195,7 +259,13 @@ class AlphaBacktestingEngine:
                     if bar["high"] >= pos["stop_price"]:
                         exit_price = pos["stop_price"]
                         triggered_exit = True
-                        exit_reason = "STOP LOSS BREACH" if not pos.get("tranche_1_scaled_out", False) else "BREAKEVEN TRANCHE EXIT"
+                        if pos.get("is_trailing_stop", False):
+                            exit_reason = "TRAILING STOP LOSS HIT"
+                            trailing_stop_hits_count += 1
+                        elif not pos.get("tranche_1_scaled_out", False) and not pos.get("breakeven_applied", False):
+                            exit_reason = "STOP LOSS BREACH"
+                        else:
+                            exit_reason = "BREAKEVEN TRANCHE EXIT"
                     elif bar["low"] <= pos["target_price"]:
                         exit_price = pos["target_price"]
                         triggered_exit = True
@@ -327,7 +397,11 @@ class AlphaBacktestingEngine:
                         "efficiency_ratio": efficiency_ratio,
                         "timestamp": bar["date"],
                         "bars_held": 0,
-                        "tranche_1_scaled_out": False
+                        "tranche_1_scaled_out": False,
+                        "highest_high": bar["high"],
+                        "lowest_low": bar["low"],
+                        "trailing_active": False,
+                        "is_trailing_stop": False
                     }
 
         # Handle formatting metrics
@@ -421,10 +495,16 @@ class AlphaBacktestingEngine:
             "rejectedTradesCount": rejected_trades_count,
             "tranche1ScaledOutCount": tranche_1_scaled_out_count,
             "tranche2HitCount": tranche_2_hit_count,
+            "trailingStopHitsCount": trailing_stop_hits_count,
             "slippageFrictionSaved": round(total_slippage_friction_saved, 2),
             "adaptiveStopApplied": adaptive_stop,
             "partialProfitApplied": partial_profit,
             "breakevenApplied": breakeven_lock,
+            "trailingStopApplied": trailing_stop_atr is not None and float(trailing_stop_atr) > 0,
+            "trailingStopAtr": float(trailing_stop_atr) if trailing_stop_atr and float(trailing_stop_atr) > 0 else None,
+            "trailingActivationR": float(trailing_activation_r) if trailing_stop_atr and float(trailing_stop_atr) > 0 else None,
+            "trailingStepAtr": float(trailing_step_atr) if trailing_stop_atr and float(trailing_step_atr) > 0 else None,
+            "trailingType": trailing_type if trailing_stop_atr and float(trailing_stop_atr) > 0 else None,
             "maxHoldApplied": max_hold,
             "gateAttribution": {
                 "gate1CapitalClamped": gate1_capital_clamped_count,
@@ -772,6 +852,32 @@ if __name__ == "__main__":
                 trials_tested = 1
         else:
             trials_tested = 1
+        if len(sys.argv) >= 17:
+            try:
+                raw_trail = sys.argv[16].lower().strip()
+                trailing_stop_atr = float(raw_trail) if raw_trail not in ["none", "null", "false", "0", "0.0"] else None
+            except (ValueError, TypeError):
+                trailing_stop_atr = None
+        else:
+            trailing_stop_atr = None
+        if len(sys.argv) >= 18:
+            try:
+                trailing_activation_r = float(sys.argv[17])
+            except (ValueError, TypeError):
+                trailing_activation_r = 1.5
+        else:
+            trailing_activation_r = 1.5
+        if len(sys.argv) >= 19:
+            try:
+                trailing_step_atr = float(sys.argv[18])
+            except (ValueError, TypeError):
+                trailing_step_atr = 0.25
+        else:
+            trailing_step_atr = 0.25
+        if len(sys.argv) >= 20:
+            trailing_type = sys.argv[19].upper().strip()
+        else:
+            trailing_type = "CHANDELIER"
     else:
         # Defaults
         ticker = "XLE"
@@ -783,6 +889,10 @@ if __name__ == "__main__":
         friction_ceiling_pct = 15.0
         binary_blackout_hours = 0.0
         trials_tested = 1
+        trailing_stop_atr = None
+        trailing_activation_r = 1.5
+        trailing_step_atr = 0.25
+        trailing_type = "CHANDELIER"
         
     engine = AlphaBacktestingEngine(starting_capital=capital_override if capital_override and capital_override > 0 else 100000.0)
     results = engine.run_backtest(
@@ -800,6 +910,10 @@ if __name__ == "__main__":
         risk_budget_pct=risk_budget_pct,
         friction_ceiling_pct=friction_ceiling_pct,
         binary_blackout_hours=binary_blackout_hours,
-        trials_tested=trials_tested
+        trials_tested=trials_tested,
+        trailing_stop_atr=trailing_stop_atr,
+        trailing_activation_r=trailing_activation_r,
+        trailing_step_atr=trailing_step_atr,
+        trailing_type=trailing_type
     )
     print(json.dumps(results))

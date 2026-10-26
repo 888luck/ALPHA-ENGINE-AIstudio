@@ -822,7 +822,11 @@ class CopilotTools:
         adaptive_stop: bool = True,
         days: int = 30,
         start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        end_date: Optional[str] = None,
+        trailing_stop_atr: Optional[float] = None,
+        trailing_activation_r: float = 1.5,
+        trailing_step_atr: float = 0.25,
+        trailing_type: str = "CHANDELIER"
     ) -> Dict[str, Any]:
         """Runs single simulation of the Alpha Strategy with audited DSR on verified broker bars."""
         sym = (symbol or "ASML").upper().strip()
@@ -847,7 +851,11 @@ class CopilotTools:
             max_hold=int(max_hold),
             ofi_filter=bool(ofi_filter),
             adaptive_stop=bool(adaptive_stop),
-            capital_override=float(capital)
+            capital_override=float(capital),
+            trailing_stop_atr=float(trailing_stop_atr) if trailing_stop_atr is not None and float(trailing_stop_atr) > 0 else None,
+            trailing_activation_r=float(trailing_activation_r) if trailing_activation_r is not None else 1.5,
+            trailing_step_atr=float(trailing_step_atr) if trailing_step_atr is not None else 0.25,
+            trailing_type=str(trailing_type or "CHANDELIER").upper().strip()
         )
 
     @staticmethod
@@ -967,7 +975,11 @@ def execute_tool_call(tool_name: str, tool_args: Dict[str, Any]) -> Dict[str, An
                 adaptive_stop=bool(tool_args.get("adaptive_stop", True)),
                 days=int(tool_args.get("days", 30)) if tool_args.get("days") else 30,
                 start_date=tool_args.get("start_date"),
-                end_date=tool_args.get("end_date")
+                end_date=tool_args.get("end_date"),
+                trailing_stop_atr=float(tool_args["trailing_stop_atr"]) if tool_args.get("trailing_stop_atr") is not None else None,
+                trailing_activation_r=float(tool_args.get("trailing_activation_r", 1.5)),
+                trailing_step_atr=float(tool_args.get("trailing_step_atr", 0.25)),
+                trailing_type=tool_args.get("trailing_type", "CHANDELIER")
             )
         elif name in ["save_strategy_to_vault", "save_experiment"]:
             return CopilotTools.save_strategy_to_vault(
@@ -1616,6 +1628,23 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
                         "end_date": {
                             "type": "string",
                             "description": "Optional end date in YYYY-MM-DD format. Defaults to current date."
+                        },
+                        "trailing_stop_atr": {
+                            "type": "number",
+                            "description": "ATR multiplier defining the trailing distance below the highest high (or above lowest low) since entry (e.g. 1.0, 1.5, 2.0). Omit or set to null/0 to disable dynamic trailing."
+                        },
+                        "trailing_activation_r": {
+                            "type": "number",
+                            "description": "Profit threshold in initial risk units R (or ATR) at which the trailing stop activates (e.g. 1.0, 1.5, 2.0). Defaults to 1.5."
+                        },
+                        "trailing_step_atr": {
+                            "type": "number",
+                            "description": "Minimum ATR increment required before the stop is ratcheted upward/downward (e.g. 0.25, 0.5). Reduces stop churning. Defaults to 0.25."
+                        },
+                        "trailing_type": {
+                            "type": "string",
+                            "enum": ["CHANDELIER", "ATR", "FIXED_R", "PARABOLIC"],
+                            "description": "Trailing methodology: CHANDELIER (highest high minus N*ATR), ATR (volatility-adjusted close trail), FIXED_R (step-ladder R multiples), or PARABOLIC (time-decay accelerated trail). Defaults to CHANDELIER."
                         }
                     },
                     "required": ["symbol"]

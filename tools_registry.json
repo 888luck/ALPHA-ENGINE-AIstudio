@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
-  "generated_at": "2026-10-17T12:43:01.574835+00:00",
+  "generated_at": "2026-10-26T14:54:28.052618+00:00",
   "ttl_seconds": 86400,
-  "total_tools": 78,
+  "total_tools": 83,
   "categories": [
     "biomedical_regulatory",
     "broker_account",
@@ -13,6 +13,7 @@
     "broker_orders",
     "broker_scanner",
     "commodity_energy",
+    "quant_strategy",
     "regulatory_sec"
   ],
   "tools": [
@@ -1881,7 +1882,7 @@
             "timeout": {
               "type": "number",
               "description": "Parameter timeout for resolve_contract_details_blocking",
-              "default": 3.0
+              "default": 4.0
             }
           },
           "required": [
@@ -2080,15 +2081,23 @@
           "properties": {
             "symbol": {
               "type": "string",
-              "description": "Ticker symbol (e.g. CAT, ASML, NVDA, SAP, TTE)"
+              "description": "Ticker symbol (e.g. ASML, SAP, NVDA, CAT)"
             },
             "timeframe": {
               "type": "string",
-              "description": "Bar interval: 5m, 15m, 1h, 1d (defaults to 1h for intraday analysis)"
+              "description": "Bar interval: 5m, 15m, 1h, 1d"
             },
             "days": {
               "type": "integer",
-              "description": "Lookback window in days (default: 30)"
+              "description": "Historical lookback period in calendar days (e.g. 30, 60, 90, 180, 365). Defaults to 30."
+            },
+            "start_date": {
+              "type": "string",
+              "description": "Optional start date in YYYY-MM-DD format."
+            },
+            "end_date": {
+              "type": "string",
+              "description": "Optional end date in YYYY-MM-DD format."
             }
           },
           "required": [
@@ -2096,36 +2105,44 @@
           ]
         }
       },
-      "category": "quantitative_discovery",
-      "source": "Alpha Engine Quant Discovery Engine"
+      "category": "quant_strategy",
+      "source": "Alpha Engine Quantitative Lab (backtester.py)"
     },
     {
       "type": "function",
       "function": {
         "name": "run_strategy_sweep",
-        "description": "Executes an autonomous multi-parameter quantitative exploration sweep across ATR stop cushions, hold durations, tranche scalers, and OFI filters. Strictly evaluates every candidate with Marcos López de Prado's Deflated Sharpe Ratio (DSR) adjusting for total trials (N) and returns the Pareto-optimal frontier.",
+        "description": "Executes an autonomous multi-parameter quantitative exploration sweep across ATR stop cushions, hold durations, tranche scalers, and OFI filters. Strictly evaluates every candidate with Marcos L\u00f3pez de Prado's Deflated Sharpe Ratio (DSR) adjusting for total trials (N) and returns the Pareto-optimal frontier.",
         "parameters": {
           "type": "object",
           "properties": {
             "symbol": {
               "type": "string",
-              "description": "Ticker symbol (e.g. CAT, ASML, NVDA, SAP, TTE)"
+              "description": "Ticker symbol (e.g. ASML, SAP, NVDA, CAT)"
             },
             "timeframe": {
               "type": "string",
-              "description": "Bar interval: 5m, 15m, 1h, 1d (defaults to 1h for intraday analysis)"
+              "description": "Bar interval: 5m, 15m, 1h, 1d"
             },
             "capital": {
               "type": "number",
-              "description": "Starting portfolio/strategy capital in USD (e.g. 5000, 25000, 100000)"
+              "description": "Starting capital in USD"
             },
             "trials": {
               "type": "integer",
-              "description": "Number of parameter permutations to explore (e.g. 8, 16, 24). Defaults to 16."
+              "description": "Number of sweep permutations (e.g. 16)"
             },
             "days": {
               "type": "integer",
-              "description": "Lookback window in days (default: 30)"
+              "description": "Historical lookback period in calendar days. Defaults to 30."
+            },
+            "start_date": {
+              "type": "string",
+              "description": "Optional start date in YYYY-MM-DD format."
+            },
+            "end_date": {
+              "type": "string",
+              "description": "Optional end date in YYYY-MM-DD format."
             }
           },
           "required": [
@@ -2133,24 +2150,24 @@
           ]
         }
       },
-      "category": "quantitative_optimization",
-      "source": "Alpha Engine Quant Backtester"
+      "category": "quant_strategy",
+      "source": "Alpha Engine Quantitative Lab (backtester.py)"
     },
     {
       "type": "function",
       "function": {
         "name": "run_strategy_backtest",
-        "description": "Runs a full single quantitative simulation of the Alpha Strategy on verified broker bars with exact capital, risk budget r, stop ATR multiplier, hold bars, and friction limits, returning audited trade blotter and equity curve.",
+        "description": "Runs a full single quantitative simulation of the Alpha Strategy on verified broker bars with exact capital, risk budget r, stop ATR multiplier, hold bars, dynamic trailing stop, and friction limits, returning audited trade blotter and equity curve.",
         "parameters": {
           "type": "object",
           "properties": {
             "symbol": {
               "type": "string",
-              "description": "Ticker symbol (e.g. CAT, ASML, NVDA, SAP, TTE)"
+              "description": "Ticker symbol (e.g. ASML, NVDA, SAP, CAT)"
             },
             "timeframe": {
               "type": "string",
-              "description": "Bar interval: 5m, 15m, 1h, 1d (defaults to 1h)"
+              "description": "Bar interval: 5m, 15m, 1h, 1d"
             },
             "capital": {
               "type": "number",
@@ -2178,7 +2195,37 @@
             },
             "days": {
               "type": "integer",
-              "description": "Lookback window in days (default: 30)"
+              "description": "Historical lookback period in calendar days. Defaults to 30."
+            },
+            "start_date": {
+              "type": "string",
+              "description": "Optional start date in YYYY-MM-DD format."
+            },
+            "end_date": {
+              "type": "string",
+              "description": "Optional end date in YYYY-MM-DD format."
+            },
+            "trailing_stop_atr": {
+              "type": "number",
+              "description": "ATR multiplier defining trailing distance below highest high since entry (e.g. 1.0, 1.5, 2.0). Omit or set to null/0 to disable dynamic trailing."
+            },
+            "trailing_activation_r": {
+              "type": "number",
+              "description": "Profit threshold in initial risk units R (or ATR) at which trailing stop activates (e.g. 1.0, 1.5, 2.0). Defaults to 1.5."
+            },
+            "trailing_step_atr": {
+              "type": "number",
+              "description": "Minimum ATR increment required before the stop is ratcheted upward (e.g. 0.25, 0.5). Reduces stop churning. Defaults to 0.25."
+            },
+            "trailing_type": {
+              "type": "string",
+              "enum": [
+                "CHANDELIER",
+                "ATR",
+                "FIXED_R",
+                "PARABOLIC"
+              ],
+              "description": "Trailing methodology: CHANDELIER (highest high minus N*ATR), ATR (volatility close trail), FIXED_R (step-ladder R multiples), or PARABOLIC (time-decay accelerated trail). Defaults to CHANDELIER."
             }
           },
           "required": [
@@ -2186,14 +2233,14 @@
           ]
         }
       },
-      "category": "quantitative_backtest",
-      "source": "Alpha Engine Quant Backtester"
+      "category": "quant_strategy",
+      "source": "Alpha Engine Quantitative Lab (backtester.py)"
     },
     {
       "type": "function",
       "function": {
         "name": "save_strategy_to_vault",
-        "description": "Preserves an audited strategy configuration along with performance metrics and equity curve into the persistent Strategy Vault.",
+        "description": "Persists an audited quantitative strategy and its backtest metrics to the deterministic atomic Experiment Vault.",
         "parameters": {
           "type": "object",
           "properties": {
@@ -2203,19 +2250,19 @@
             },
             "symbol": {
               "type": "string",
-              "description": "Target symbol"
+              "description": "Ticker symbol"
             },
             "timeframe": {
               "type": "string",
-              "description": "Bar interval"
+              "description": "Bar timeframe"
             },
             "parameters": {
               "type": "object",
-              "description": "Dictionary of verified execution parameters"
+              "description": "Strategy configuration parameters"
             },
             "metrics": {
               "type": "object",
-              "description": "Dictionary of audited backtest performance metrics"
+              "description": "Audited metrics (Sharpe, DSR, Win Rate, Drawdown)"
             }
           },
           "required": [
@@ -2226,8 +2273,8 @@
           ]
         }
       },
-      "category": "strategy_vault",
-      "source": "Alpha Engine Experiment Vault"
+      "category": "quant_strategy",
+      "source": "Alpha Engine Quantitative Lab (backtester.py)"
     },
     {
       "type": "function",
@@ -2240,8 +2287,8 @@
           "required": []
         }
       },
-      "category": "strategy_vault",
-      "source": "Alpha Engine Experiment Vault"
+      "category": "quant_strategy",
+      "source": "Alpha Engine Quantitative Lab (backtester.py)"
     }
   ]
 }

@@ -72,6 +72,7 @@ Analyze the following backtest simulation results for ${symbol} (${timeframe}) f
 - Adaptive Stop Applied: ${backtestResults.adaptiveStopApplied || false}
 - Partial Profit Applied: ${backtestResults.partialProfitApplied || false}
 - Breakeven Applied: ${backtestResults.breakevenApplied || false}
+- Trailing Stop Applied: ${backtestResults.trailingStopApplied || false} (${backtestResults.trailingType || "N/A"} @ ${backtestResults.trailingStopAtr || "N/A"} ATR)
 - Max Hold Applied: ${backtestResults.maxHoldApplied || 15}
 
 Provide a rigorous quantitative critique of this backtesting run.
@@ -164,7 +165,11 @@ backtestRouter.post("/api/backtest", (req, res) => {
     riskBudgetPct,
     frictionCeilingPct,
     binaryBlackoutHours,
-    trialsTested
+    trialsTested,
+    trailingStopAtr,
+    trailingActivationR,
+    trailingStepAtr,
+    trailingType
   } = req.body;
 
   if (!symbol || !timeframe || !startDate || !endDate) {
@@ -187,6 +192,12 @@ backtestRouter.post("/api/backtest", (req, res) => {
   const cleanFrictionCeiling = frictionCeilingPct !== undefined ? String(Number(frictionCeilingPct)) : "15.0";
   const cleanBlackout = binaryBlackoutHours !== undefined ? String(Number(binaryBlackoutHours)) : "0.0";
   const cleanTrials = trialsTested !== undefined ? String(Math.max(1, parseInt(trialsTested, 10) || 1)) : "1";
+  const cleanTrailingAtr = (trailingStopAtr !== undefined && trailingStopAtr !== null && Number(trailingStopAtr) > 0)
+    ? String(Number(trailingStopAtr))
+    : "none";
+  const cleanTrailingActivation = trailingActivationR !== undefined ? String(Number(trailingActivationR)) : "1.5";
+  const cleanTrailingStep = trailingStepAtr !== undefined ? String(Number(trailingStepAtr)) : "0.25";
+  const cleanTrailingType = trailingType ? String(trailingType).replace(/[^a-zA-Z_]/g, "").toUpperCase() : "CHANDELIER";
 
   const commandArgs = [
     cleanSymbol, 
@@ -203,7 +214,11 @@ backtestRouter.post("/api/backtest", (req, res) => {
     cleanRiskBudget,
     cleanFrictionCeiling,
     cleanBlackout,
-    cleanTrials
+    cleanTrials,
+    cleanTrailingAtr,
+    cleanTrailingActivation,
+    cleanTrailingStep,
+    cleanTrailingType
   ];
   const py = getPythonExecutable();
   const scriptPath = path.join(process.cwd(), "backtester.py");

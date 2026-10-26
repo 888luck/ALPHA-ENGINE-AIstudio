@@ -271,6 +271,214 @@ def reflect_institutional_feed_tools() -> List[Dict[str, Any]]:
     ]
     return feed_tools
 
+def reflect_quant_strategy_tools() -> List[Dict[str, Any]]:
+    """Reflect Alpha Engine Quantitative Strategy and Backtesting tools."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "run_quant_discovery",
+                "description": "Runs statistical null-hypothesis tests on an instrument's historical bars: Wald-Wolfowitz runs test for direction independence and Hurst Exponent (H) via diffusion scaling to identify mean-reverting (H < 0.45) vs trending (H > 0.55) vs random-walk (0.45 <= H <= 0.55) regimes.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {
+                            "type": "string",
+                            "description": "Ticker symbol (e.g. ASML, SAP, NVDA, CAT)"
+                        },
+                        "timeframe": {
+                            "type": "string",
+                            "description": "Bar interval: 5m, 15m, 1h, 1d"
+                        },
+                        "days": {
+                            "type": "integer",
+                            "description": "Historical lookback period in calendar days (e.g. 30, 60, 90, 180, 365). Defaults to 30."
+                        },
+                        "start_date": {
+                            "type": "string",
+                            "description": "Optional start date in YYYY-MM-DD format."
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "description": "Optional end date in YYYY-MM-DD format."
+                        }
+                    },
+                    "required": ["symbol"]
+                }
+            },
+            "category": "quant_strategy",
+            "source": "Alpha Engine Quantitative Lab (backtester.py)"
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "run_strategy_sweep",
+                "description": "Executes an autonomous multi-parameter quantitative exploration sweep across ATR stop cushions, hold durations, tranche scalers, and OFI filters. Strictly evaluates every candidate with Marcos López de Prado's Deflated Sharpe Ratio (DSR) adjusting for total trials (N) and returns the Pareto-optimal frontier.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {
+                            "type": "string",
+                            "description": "Ticker symbol (e.g. ASML, SAP, NVDA, CAT)"
+                        },
+                        "timeframe": {
+                            "type": "string",
+                            "description": "Bar interval: 5m, 15m, 1h, 1d"
+                        },
+                        "capital": {
+                            "type": "number",
+                            "description": "Starting capital in USD"
+                        },
+                        "trials": {
+                            "type": "integer",
+                            "description": "Number of sweep permutations (e.g. 16)"
+                        },
+                        "days": {
+                            "type": "integer",
+                            "description": "Historical lookback period in calendar days. Defaults to 30."
+                        },
+                        "start_date": {
+                            "type": "string",
+                            "description": "Optional start date in YYYY-MM-DD format."
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "description": "Optional end date in YYYY-MM-DD format."
+                        }
+                    },
+                    "required": ["symbol"]
+                }
+            },
+            "category": "quant_strategy",
+            "source": "Alpha Engine Quantitative Lab (backtester.py)"
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "run_strategy_backtest",
+                "description": "Runs a full single quantitative simulation of the Alpha Strategy on verified broker bars with exact capital, risk budget r, stop ATR multiplier, hold bars, dynamic trailing stop, and friction limits, returning audited trade blotter and equity curve.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {
+                            "type": "string",
+                            "description": "Ticker symbol (e.g. ASML, NVDA, SAP, CAT)"
+                        },
+                        "timeframe": {
+                            "type": "string",
+                            "description": "Bar interval: 5m, 15m, 1h, 1d"
+                        },
+                        "capital": {
+                            "type": "number",
+                            "description": "Starting capital in USD"
+                        },
+                        "stop_atr": {
+                            "type": "number",
+                            "description": "Stop-loss ATR multiplier (e.g. 1.5, 1.8, 2.2)"
+                        },
+                        "max_hold": {
+                            "type": "integer",
+                            "description": "Maximum holding period in bars before time-decay exit"
+                        },
+                        "partial_profit": {
+                            "type": "boolean",
+                            "description": "Whether to scale out 50% position at Target 1"
+                        },
+                        "breakeven_lock": {
+                            "type": "boolean",
+                            "description": "Whether to ratchet stop to breakeven after Target 1"
+                        },
+                        "ofi_filter": {
+                            "type": "boolean",
+                            "description": "Whether to gate entries with Order Flow Imbalance"
+                        },
+                        "days": {
+                            "type": "integer",
+                            "description": "Historical lookback period in calendar days. Defaults to 30."
+                        },
+                        "start_date": {
+                            "type": "string",
+                            "description": "Optional start date in YYYY-MM-DD format."
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "description": "Optional end date in YYYY-MM-DD format."
+                        },
+                        "trailing_stop_atr": {
+                            "type": "number",
+                            "description": "ATR multiplier defining trailing distance below highest high since entry (e.g. 1.0, 1.5, 2.0). Omit or set to null/0 to disable dynamic trailing."
+                        },
+                        "trailing_activation_r": {
+                            "type": "number",
+                            "description": "Profit threshold in initial risk units R (or ATR) at which trailing stop activates (e.g. 1.0, 1.5, 2.0). Defaults to 1.5."
+                        },
+                        "trailing_step_atr": {
+                            "type": "number",
+                            "description": "Minimum ATR increment required before the stop is ratcheted upward (e.g. 0.25, 0.5). Reduces stop churning. Defaults to 0.25."
+                        },
+                        "trailing_type": {
+                            "type": "string",
+                            "enum": ["CHANDELIER", "ATR", "FIXED_R", "PARABOLIC"],
+                            "description": "Trailing methodology: CHANDELIER (highest high minus N*ATR), ATR (volatility close trail), FIXED_R (step-ladder R multiples), or PARABOLIC (time-decay accelerated trail). Defaults to CHANDELIER."
+                        }
+                    },
+                    "required": ["symbol"]
+                }
+            },
+            "category": "quant_strategy",
+            "source": "Alpha Engine Quantitative Lab (backtester.py)"
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "save_strategy_to_vault",
+                "description": "Persists an audited quantitative strategy and its backtest metrics to the deterministic atomic Experiment Vault.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Human-readable label for strategy candidate"
+                        },
+                        "symbol": {
+                            "type": "string",
+                            "description": "Ticker symbol"
+                        },
+                        "timeframe": {
+                            "type": "string",
+                            "description": "Bar timeframe"
+                        },
+                        "parameters": {
+                            "type": "object",
+                            "description": "Strategy configuration parameters"
+                        },
+                        "metrics": {
+                            "type": "object",
+                            "description": "Audited metrics (Sharpe, DSR, Win Rate, Drawdown)"
+                        }
+                    },
+                    "required": ["name", "symbol", "parameters", "metrics"]
+                }
+            },
+            "category": "quant_strategy",
+            "source": "Alpha Engine Quantitative Lab (backtester.py)"
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_strategy_vault",
+                "description": "Retrieves all saved quantitative strategies, parameter configurations, and historical benchmark metrics from the persistent Strategy Vault.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }
+            },
+            "category": "quant_strategy",
+            "source": "Alpha Engine Quantitative Lab (backtester.py)"
+        }
+    ]
+
 def build_full_tools_catalog() -> Dict[str, Any]:
     """Dynamically inspects EClient, ConnectionManager, and adapters to build the unified catalog."""
     tools: List[Dict[str, Any]] = []
@@ -317,6 +525,10 @@ def build_full_tools_catalog() -> Dict[str, Any]:
     # 3. Add Institutional Feed Tools
     feed_tools = reflect_institutional_feed_tools()
     tools.extend(feed_tools)
+
+    # 4. Add Quant & Strategy Studio Copilot Tools (including dynamic trailing stops)
+    quant_tools = reflect_quant_strategy_tools()
+    tools.extend(quant_tools)
     
     categories = list(set(t.get("category", "general") for t in tools))
     

@@ -75,6 +75,10 @@ export interface StrategyStudioExperiment {
     riskBudgetPct: number;
     frictionCeilingPct: number;
     binaryBlackoutHours?: number;
+    trailingStopAtr?: number | null;
+    trailingActivationR?: number;
+    trailingStepAtr?: number;
+    trailingType?: "CHANDELIER" | "ATR" | "FIXED_R" | "PARABOLIC";
   };
   metrics: {
     totalPnL: number;
@@ -365,6 +369,11 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
   const [riskBudgetPct, setRiskBudgetPct] = useState(0.01);
   const [frictionCeiling, setFrictionCeiling] = useState(15.0);
   const [dsrHurdlePct, setDsrHurdlePct] = useState(95.0);
+  const [trailingStopEnabled, setTrailingStopEnabled] = useState(false);
+  const [trailingStopAtr, setTrailingStopAtr] = useState(1.5);
+  const [trailingActivationR, setTrailingActivationR] = useState(1.5);
+  const [trailingStepAtr, setTrailingStepAtr] = useState(0.25);
+  const [trailingType, setTrailingType] = useState<"CHANDELIER" | "ATR" | "FIXED_R" | "PARABOLIC">("CHANDELIER");
 
   // Live Execution Pool Deployment State
   const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
@@ -593,6 +602,10 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
     adaptiveStop: boolean;
     riskBudgetPct: number;
     frictionCeilingPct: number;
+    trailingStopAtr: number | null;
+    trailingActivationR: number;
+    trailingStepAtr: number;
+    trailingType: string;
   }>) => {
     const s = overrides?.symbol || symbol;
     const tf = overrides?.timeframe || timeframe;
@@ -605,6 +618,12 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
     const adaptive = overrides?.adaptiveStop !== undefined ? overrides.adaptiveStop : adaptiveStop;
     const risk = overrides?.riskBudgetPct !== undefined ? overrides.riskBudgetPct : riskBudgetPct;
     const friction = overrides?.frictionCeilingPct !== undefined ? overrides.frictionCeilingPct : frictionCeiling;
+    const trailAtr = overrides?.trailingStopAtr !== undefined 
+      ? overrides.trailingStopAtr 
+      : (trailingStopEnabled ? trailingStopAtr : null);
+    const trailAct = overrides?.trailingActivationR !== undefined ? overrides.trailingActivationR : trailingActivationR;
+    const trailStep = overrides?.trailingStepAtr !== undefined ? overrides.trailingStepAtr : trailingStepAtr;
+    const trailType = overrides?.trailingType !== undefined ? overrides.trailingType : trailingType;
 
     const res = await fetch("/api/backtest", {
       method: "POST",
@@ -623,7 +642,11 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
         adaptiveStop: adaptive,
         riskBudgetPct: risk,
         frictionCeilingPct: friction,
-        binaryBlackoutHours: 0
+        binaryBlackoutHours: 0,
+        trailingStopAtr: trailAtr,
+        trailingActivationR: trailAct,
+        trailingStepAtr: trailStep,
+        trailingType: trailType
       })
     });
 
@@ -655,7 +678,8 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
           partialProfit: false,
           breakevenLock: false,
           adaptiveStop: false,
-          ofiFilter: false
+          ofiFilter: false,
+          trailingStopAtr: null
         });
         if (baseRun.ok) {
           setBaselineResult(baseRun.data);
@@ -1121,7 +1145,11 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
         ofiFilter,
         adaptiveStop,
         riskBudgetPct,
-        frictionCeilingPct: frictionCeiling
+        frictionCeilingPct: frictionCeiling,
+        trailingStopAtr: trailingStopEnabled ? trailingStopAtr : null,
+        trailingActivationR: trailingStopEnabled ? trailingActivationR : undefined,
+        trailingStepAtr: trailingStopEnabled ? trailingStepAtr : undefined,
+        trailingType: trailingStopEnabled ? trailingType : undefined
       },
       metrics: {
         totalPnL: Number(result.totalPnL || result.netProfit || 0),
@@ -1177,6 +1205,15 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
     setAdaptiveStop(exp.parameters.adaptiveStop);
     setRiskBudgetPct(exp.parameters.riskBudgetPct);
     setFrictionCeiling(exp.parameters.frictionCeilingPct);
+    if (exp.parameters.trailingStopAtr !== undefined && exp.parameters.trailingStopAtr !== null && exp.parameters.trailingStopAtr > 0) {
+      setTrailingStopEnabled(true);
+      setTrailingStopAtr(exp.parameters.trailingStopAtr);
+      if (exp.parameters.trailingActivationR !== undefined) setTrailingActivationR(exp.parameters.trailingActivationR);
+      if (exp.parameters.trailingStepAtr !== undefined) setTrailingStepAtr(exp.parameters.trailingStepAtr);
+      if (exp.parameters.trailingType !== undefined) setTrailingType(exp.parameters.trailingType as any);
+    } else {
+      setTrailingStopEnabled(false);
+    }
 
     setResult({
       success: true,
@@ -1944,6 +1981,97 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
                 </span>
               </label>
             </div>
+
+            {/* Dynamic Trailing Profit Gate (Chandelier / ATR / Fixed R / Parabolic) */}
+            <div className="pt-3 border-t terminal-border space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-mono">
+                  <input
+                    type="checkbox"
+                    checked={trailingStopEnabled}
+                    onChange={(e) => setTrailingStopEnabled(e.target.checked)}
+                    className="rounded terminal-elevated text-emerald-500 focus:ring-0"
+                  />
+                  <span className="text-secondary font-bold flex items-center gap-1.5">
+                    <span className="text-emerald-400">⚡ Dynamic Trailing Stop</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Institutional Ratchet</span>
+                  </span>
+                </label>
+                {trailingStopEnabled && (
+                  <span className="text-[11px] font-mono text-emerald-400">
+                    Active: {trailingType} ({trailingStopAtr} ATR trail, act @ {trailingActivationR}R)
+                  </span>
+                )}
+              </div>
+
+              {trailingStopEnabled && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded-lg bg-surface/30 border border-emerald-500/20 text-xs font-mono">
+                  <div>
+                    <label className="text-muted-foreground block mb-1">Trailing Distance (ATR)</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="4.0"
+                        step="0.1"
+                        value={trailingStopAtr}
+                        onChange={(e) => setTrailingStopAtr(parseFloat(e.target.value))}
+                        className="w-full accent-emerald-500 cursor-pointer"
+                      />
+                      <input
+                        type="number"
+                        min="0.5"
+                        max="4.0"
+                        step="0.1"
+                        value={trailingStopAtr}
+                        onChange={(e) => setTrailingStopAtr(parseFloat(e.target.value) || 1.5)}
+                        className="w-14 p-1 rounded bg-background border border-border text-center text-foreground font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-muted-foreground block mb-1">Activation Hurdle (R)</label>
+                    <input
+                      type="number"
+                      min="0.5"
+                      max="5.0"
+                      step="0.1"
+                      value={trailingActivationR}
+                      onChange={(e) => setTrailingActivationR(parseFloat(e.target.value) || 1.5)}
+                      className="w-full p-1.5 rounded bg-background border border-border text-center text-foreground font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-muted-foreground block mb-1">Ratchet Step (ATR)</label>
+                    <input
+                      type="number"
+                      min="0.05"
+                      max="2.0"
+                      step="0.05"
+                      value={trailingStepAtr}
+                      onChange={(e) => setTrailingStepAtr(parseFloat(e.target.value) || 0.25)}
+                      className="w-full p-1.5 rounded bg-background border border-border text-center text-foreground font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-muted-foreground block mb-1">Methodology</label>
+                    <select
+                      value={trailingType}
+                      onChange={(e) => setTrailingType(e.target.value as any)}
+                      className="w-full p-1.5 rounded bg-background border border-border text-foreground font-mono cursor-pointer"
+                    >
+                      <option value="CHANDELIER">Chandelier (Peak − N×ATR)</option>
+                      <option value="ATR">ATR Dynamic Close</option>
+                      <option value="FIXED_R">Step-Ladder Fixed R</option>
+                      <option value="PARABOLIC">Parabolic Time-Decay</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Results Tab Navigation (Candles / Performance / Pareto Frontier / Blotter / Vault) */}
@@ -2324,7 +2452,15 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
                               <td className="py-2 px-3 text-right text-secondary">${Number(tr.entryPrice).toFixed(2)}</td>
                               <td className="py-2 px-3 text-right text-secondary">${Number(tr.exitPrice).toFixed(2)}</td>
                               <td className="py-2 px-3 text-secondary">
-                                <span className="terminal-elevated text-secondary px-1.5 py-0.5 rounded text-[10px]">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                  tr.reason?.includes("TRAILING")
+                                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                    : tr.reason?.includes("BREAKEVEN")
+                                    ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                                    : tr.reason?.includes("PROFIT")
+                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                    : "terminal-elevated text-secondary"
+                                }`}>
                                   {tr.reason}
                                 </span>
                               </td>
