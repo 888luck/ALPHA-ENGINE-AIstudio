@@ -241,6 +241,14 @@ export default function App() {
       : (configuredPaper || existingAccount);
 
     if (nextMode === "LIVE") {
+      const liveUser = systemState?.settings?.ibkrLiveUsername || getStoredVaultValue("ibkrLiveUsername");
+      const livePass = systemState?.settings?.ibkrLivePassword || getStoredVaultValue("ibkrLivePassword");
+      if (!liveUser || !livePass) {
+        alert("LIVE PRODUCTION CREDENTIALS REQUIRED:\n\nPlease configure your live IBKR Username and Password in the 4-Pillar Vault (Alt+6) before launching the Live production lane.");
+        handleNavigate("config", "broker");
+        return;
+      }
+
       const confirmed = window.confirm(
         "CAUTION: Switching execution lane to LIVE PRODUCTION (Port 4001).\n\nReal capital will be routed under direct IBKR DMA execution. Proceed?"
       );
@@ -706,6 +714,18 @@ export default function App() {
           <VaultConsole
             initialTab={navTarget as any}
             settings={systemState?.settings}
+            onSaveSetting={async (k, v) => {
+              setSystemState((prev: any) => ({
+                ...prev,
+                settings: { ...prev?.settings, [k]: v }
+              }));
+            }}
+            onSaveMultipleSettings={async (updates) => {
+              setSystemState((prev: any) => ({
+                ...prev,
+                settings: { ...prev?.settings, ...updates }
+              }));
+            }}
           />
         )}
         {view === "copilot" && (

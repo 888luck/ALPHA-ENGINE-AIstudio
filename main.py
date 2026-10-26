@@ -314,7 +314,7 @@ def main_loop():
                 print(f"[TRADING MODE SWITCH] Switch requested via TCP Bridge: {current_mode} -> {new_mode}")
                 script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "switch_gateway_mode.py")
                 if os.path.exists(script_path):
-                    subprocess.Popen(["python3", script_path, "--mode", new_mode], start_new_session=True)
+                    subprocess.Popen(["sudo", "python3", script_path, "--mode", new_mode], start_new_session=True)
         return {"acknowledged": True}
 
     def handle_direct_telemetry():

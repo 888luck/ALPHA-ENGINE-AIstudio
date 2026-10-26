@@ -38,6 +38,33 @@ systemRouter.get("/api/diagnostics", (req, res) => {
   });
 });
 
+systemRouter.all("/api/system/state", async (req, res) => {
+  try {
+    let edgeTelemetry: any = null;
+    let tcpLatencyMs = 0;
+    try {
+      tcpLatencyMs = await edgeBridge.measureLatency();
+      const telemResp = await edgeBridge.sendCommand({ action: "GET_TELEMETRY" }, 1500);
+      if (telemResp && telemResp.status === "OK") {
+        edgeTelemetry = telemResp.telemetry;
+      }
+    } catch {}
+
+    res.json({
+      success: true,
+      status: "CONNECTED",
+      latencyMs: tcpLatencyMs || 1,
+      message: `Frankfurt Edge Node (${systemSettings.ibkrHost}:4005) & 12-factor Vault connected.`,
+      settings: getMaskedSettings(systemSettings),
+      telemetry: edgeTelemetry,
+      activeTradesCount: activeTrades.length,
+      basketsCount: dynamicBaskets.length
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 systemRouter.get("/api/state", (req, res) => {
   try {
     let baskets = dynamicBaskets;
@@ -124,6 +151,19 @@ systemRouter.post("/api/system/toggle-lane", authMiddleware, async (req, res) =>
       ? (String(req.body.mode).toUpperCase() === "LIVE" ? "LIVE" : "PAPER") 
       : (currentMode === "LIVE" ? "PAPER" : "LIVE");
     const targetPort = req.body.port ? Number(req.body.port) : (targetMode === "LIVE" ? 4001 : 4002);
+
+    // Dynamic Live Credential Guard: Prevent entering an unauthenticated loop if live credentials are not configured
+    if (targetMode === "LIVE") {
+      const creds = loadVaultCredentials();
+      const hasLiveUser = !!(req.body.ibkrLiveUsername || creds.ibkrLiveUsername || process.env.IBKR_LIVE_USERNAME);
+      const hasLivePass = !!(req.body.ibkrLivePassword || creds.ibkrLivePassword || process.env.IBKR_LIVE_PASSWORD);
+      if (!hasLiveUser || !hasLivePass) {
+        return res.status(400).json({
+          success: false,
+          error: "LIVE Credentials Required: Configure your IBKR Live Username and Password in the 4-Pillar Vault (Alt+6) before launching LIVE DMA execution."
+        });
+      }
+    }
 
     systemSettings.tradingMode = targetMode;
     systemSettings.ibkrPort = targetPort;
@@ -331,6 +371,24 @@ systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
     ibkrAccountNumber: systemSettings.ibkrAccountNumber
   }).catch(() => {});
 
+  // If tradingMode or ibkrPort was updated in set-settings, trigger mode switcher if on Linux host
+  if (req.body.tradingMode || req.body.ibkrPort) {
+    const switcherPath = path.join(process.cwd(), "switch_gateway_mode.py");
+    if (fs.existsSync(switcherPath) && process.platform === "linux") {
+      try {
+        const { spawn } = require("child_process");
+        const proc = spawn("sudo", ["python3", switcherPath, "--mode", systemSettings.tradingMode], {
+          detached: true,
+          stdio: "ignore"
+        });
+        proc.unref();
+        console.log(`[SYSTEM] Dispatched switch_gateway_mode.py from set-settings for mode ${systemSettings.tradingMode}`);
+      } catch (err: any) {
+        console.warn("[SYSTEM] Error spawning switch_gateway_mode.py from set-settings:", err.message);
+      }
+    }
+  }
+
   res.json({ success: true, settings: getMaskedSettings(systemSettings) });
 });
 
@@ -364,20 +422,20 @@ systemRouter.post("/api/gateway/trigger-login", authMiddleware, async (req, res)
   }
 });
 
-systemRouter.post("/api/test-broker-connection", (req, res) => {
+systemRouter.all("/api/test-broker-connection", (req, res) => {
   const isCloudRun = !!process.env.K_SERVICE;
   const vaultCreds = loadVaultCredentials();
   const dynamicEdgeHost = process.env.EDGE_NODE_HOST || process.env.EDGE_NODE_IP || vaultCreds.edgeNodeHost || (isCloudRun ? "10.156.0.2" : "127.0.0.1");
 
   // Dynamic Bridge Endpoint Routing: If running on Cloud Run and request specifies 127.0.0.1 (or empty),
   // automatically route socket traffic to the dynamic edge host across the VPC connector!
-  let host = req.body.host;
+  let host = req.body?.host || req.query?.host;
   let rerouted = false;
   if (!host || (isCloudRun && host === "127.0.0.1")) {
     host = dynamicEdgeHost;
-    rerouted = (req.body.host === "127.0.0.1");
+    rerouted = (req.body?.host === "127.0.0.1" || req.query?.host === "127.0.0.1");
   }
-  const port = Number(req.body.port) || systemSettings.ibkrPort || 4002;
+  const port = Number(req.body?.port || req.query?.port) || systemSettings.ibkrPort || 4002;
   const startTime = Date.now();
   
   const socket = new net.Socket();

@@ -60,6 +60,12 @@ riskRouter.get("/api/risk/status", async (req, res) => {
       if (telem.trading_mode) {
         systemSettings.tradingMode = telem.trading_mode;
       }
+      if (typeof telem.connected === "boolean") {
+        systemSettings.gatewayConnectionActive = telem.connected;
+      }
+      if (telem.gateway_auth?.port) {
+        systemSettings.ibkrPort = Number(telem.gateway_auth.port);
+      }
     }
   } catch {
     // Keep cached settings if bridge query times out

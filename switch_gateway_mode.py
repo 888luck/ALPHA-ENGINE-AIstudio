@@ -198,22 +198,29 @@ def switch_lane(mode: str, password: Optional[str] = None, username: Optional[st
     print(f"  ALPHAENGINE MODE SWITCH: -> {mode} (PORT {target_port})")
     print(f"==================================================")
 
-    # Resolve credentials from .env if not explicitly provided
+    # Resolve credentials from 12-factor secrets hierarchy (/etc/alpha-engine/secrets.env first, then .env)
     env_vars = {}
-    if os.path.exists(ENV_PATH):
-        try:
-            with open(ENV_PATH, "r") as f:
-                for line in f:
-                    line = line.strip()
-                    if "=" in line and not line.startswith("#"):
-                        k, v = line.split("=", 1)
-                        env_vars[k.strip()] = v.strip().strip('"').strip("'")
-        except Exception:
-            pass
+    for env_candidate in ["/etc/alpha-engine/secrets.env", ENV_PATH]:
+        if os.path.exists(env_candidate):
+            try:
+                with open(env_candidate, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if "=" in line and not line.startswith("#"):
+                            k, v = line.split("=", 1)
+                            clean_k = k.strip()
+                            clean_v = v.strip().strip('"').strip("'")
+                            if clean_k not in env_vars and clean_v:
+                                env_vars[clean_k] = clean_v
+            except Exception as e:
+                print(f"[SWITCHER] Notice reading {env_candidate}: {e}")
 
     if mode == "LIVE":
         resolved_user = username or env_vars.get("IBKR_LIVE_USERNAME") or env_vars.get("IBKR_USERNAME")
         resolved_pass = password or env_vars.get("IBKR_LIVE_PASSWORD") or env_vars.get("IBKR_PASSWORD")
+        if not resolved_user or not resolved_pass:
+            print(f"[SWITCHER] ABORT: Cannot switch to LIVE production mode. IBKR_LIVE_USERNAME and IBKR_LIVE_PASSWORD are not configured in /etc/alpha-engine/secrets.env.")
+            return False
     else:
         resolved_user = username or env_vars.get("IBKR_PAPER_USERNAME") or env_vars.get("IBKR_USERNAME") or "mstouff17"
         resolved_pass = password or env_vars.get("IBKR_PAPER_PASSWORD") or env_vars.get("IBKR_PASSWORD")
@@ -237,6 +244,12 @@ def switch_lane(mode: str, password: Optional[str] = None, username: Optional[st
 
     # 6. Re-bind alpha-engine.service to connect to the active port
     restart_service("alpha-engine.service")
+
+    # 7. Restart alpha-ui.service so the web plane immediately reflects updated lane and port
+    try:
+        restart_service("alpha-ui.service")
+    except Exception as e:
+        print(f"[SWITCHER] Notice restarting alpha-ui: {e}")
 
     print(f"==================================================")
     print(f"  SUCCESS: {mode} LANE ACTIVE & CONNECTED (PORT {target_port})")

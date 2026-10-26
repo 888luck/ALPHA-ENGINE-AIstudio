@@ -71,6 +71,13 @@ target_port = 4001 if is_live else 4002
 if is_live:
     user = env_vars.get('IBKR_LIVE_USERNAME') or env_vars.get('IBKR_USERNAME', '')
     passwd = env_vars.get('IBKR_LIVE_PASSWORD') or env_vars.get('IBKR_PASSWORD', '')
+    if not user or not passwd:
+        print('[IBGATEWAY-DAEMON] WARNING: TRADING_MODE=LIVE requested, but IBKR_LIVE_USERNAME/PASSWORD are not configured. Falling back to PAPER simulation on port 4002.')
+        is_live = False
+        target_mode = 'paper'
+        target_port = 4002
+        user = env_vars.get('IBKR_PAPER_USERNAME') or env_vars.get('IBKR_USERNAME', 'mstouff17')
+        passwd = env_vars.get('IBKR_PAPER_PASSWORD') or env_vars.get('IBKR_PASSWORD', '')
 else:
     user = env_vars.get('IBKR_PAPER_USERNAME') or env_vars.get('IBKR_USERNAME', 'mstouff17')
     passwd = env_vars.get('IBKR_PAPER_PASSWORD') or env_vars.get('IBKR_PASSWORD', '')
@@ -101,10 +108,11 @@ if os.path.exists(ibc_ini):
     except Exception as e:
         print(f'[IBGATEWAY-DAEMON] Warning updating IBC config: {e}')
 "
-if [ -f /etc/alpha-engine/secrets.env ] && grep -qi '^TRADING_MODE=["'"'"']*LIVE' /etc/alpha-engine/secrets.env; then
+# Only launch live if both TRADING_MODE=LIVE and live credentials exist
+if grep -qi '^TRADING_MODE=["'"'"']*LIVE' /etc/alpha-engine/secrets.env 2>/dev/null && grep -qi '^IBKR_LIVE_USERNAME=["'"'"']*[a-zA-Z0-9]' /etc/alpha-engine/secrets.env 2>/dev/null; then
   TARGET_MODE="live"
-elif [ -f /opt/alpha-engine/.env ] && grep -qi '^TRADING_MODE=["'"'"']*LIVE' /opt/alpha-engine/.env; then
-  TARGET_MODE="live"
+else
+  TARGET_MODE="paper"
 fi
 
 echo "[IBGATEWAY-DAEMON] Launching official IB Gateway via IBC standard (mode: ${TARGET_MODE})..."

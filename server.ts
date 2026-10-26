@@ -59,8 +59,25 @@ async function startServer() {
 
   if (process.env.NODE_ENV === "production" || distExists) {
     console.log("[ALPHA SERVER] Serving production static bundle from /dist");
-    app.use(express.static(distPath));
+    // Serve hashed assets with immutable caching (cache-busted via Vite content hash)
+    app.use("/assets", express.static(path.join(distPath, "assets"), {
+      maxAge: "1y",
+      immutable: true
+    }));
+    // Serve static files, ensuring HTML is never cached by browser
+    app.use(express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith(".html")) {
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+          res.setHeader("Pragma", "no-cache");
+          res.setHeader("Expires", "0");
+        }
+      }
+    }));
     app.get("*", (req, res) => {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
       res.sendFile(path.join(distPath, "index.html"));
     });
   } else {
