@@ -45,24 +45,29 @@ To test strategy changes prior to live/paper routing, developers must use the in
 
 ---
 
-## 🐳 4. GCE Companion & Docker Orchestrator UI
+## 🔬 4. Quant Research Lab & Strategy Studio Architecture
 
-The `GcpCompanion` component hosts the system control panels. Maintain 5 core tabs:
-1.  **Direct-to-Git Sync Panel:** Bridges secure workspace synchronization to GitHub for easy Cloud Shell pulls.
-2.  **Container Orchestration:** Automates Method B Headless Docker + IBC runtime setups in GCP, showing real-time console emulation.
-3.  **Quant Backtester:** Select ticker, candle interval, and calendar triggers, run the backtester sub-process, and trace the Recharts equity line.
-4.  **GCP Shell Script:** Details ready-to-run copyable terminal commands for provisioning GCE.
-5.  **Topology Matrix:** Visualizes Frankfurt node network pathways and real latency targets.
+Quant research, parameter sweeps, and execution pool deployment are divided across two institutional modules:
+1.  **Quant Research Lab (`QuantResearchLab.tsx` / `Alt+4`):** Hosts 3 real-time market lenses:
+    *   *Catalyst Radar:* SEC 8-K/10-Q primary filings, clinical trial readouts, and FDA alerts.
+    *   *PEAD Momentum Radar:* Post-Earnings Announcement Drift tracking and earnings surprise momentum.
+    *   *Microstructure Screener:* Order flow imbalance spikes and bid-ask spread efficiency.
+2.  **Strategy Studio (`StrategyStudioPage.tsx` / `Alt+5`):** Hosts 16-trial Deflated Sharpe Ratio (DSR) sweeps (Bailey & López de Prado), authentic historical broker bars, dual-control quant gates (tactile sliders + exact numeric input for 5–30% friction ceiling and 50–99.9% DSR hurdle), and 1-click candidate pool deployment (`dynamic_baskets.json`) over TCP port 4005.
 
 ---
 
-## 📁 5. Folder Hierarchy & Modular Writing Rules
+## 📁 5. The 7 Institutional Tabs & Modular Component Hierarchy
 
-Keep code split modularly to prevent token-limit trashing or syntax corruption:
-*   Do NOT dump all UI functions directly into `App.tsx`.
-*   Maintain `src/components/GcpCompanion.tsx` for all cloud and backtesting control modules.
-*   Maintain `src/components/Dashboard.tsx` for layout, regulatory telemetry, active trades ledger, and live indicators.
-*   Run `lint_applet` and `compile_applet` to verify compilation health after edits.
+Maintain code cleanly split across the 7 modular operational components to ensure compile safety and token efficiency:
+*   Do NOT dump monolithic logic into `App.tsx`.
+*   Maintain `src/components/LiveCockpit.tsx` for executive KPI ribbon, L2 order depth & OFI tape, and SEC Rule 15c3-5 risk gates.
+*   Maintain `src/components/ActiveHoldingsTable.tsx` for active positions and MiFID II RTS-22 shortcodes.
+*   Maintain `src/components/TcaAuditTable.tsx` for post-trade transaction cost analysis (TCA).
+*   Maintain `src/components/QuantResearchLab.tsx` for the 3 market lenses.
+*   Maintain `src/pages/StrategyStudioPage.tsx` for quant parameter sweeps and dual-control gates.
+*   Maintain `src/components/VaultConsole.tsx` for the full-screen 4-Pillar Vault and 12-factor POSIX secrets.
+*   Maintain `src/pages/CopilotPage.tsx` for conversational trading reasoning and dynamic model discovery.
+*   Verify compilation health with `npm run lint` (`tsc --noEmit`) and `npm run build` after edits.
 
 ---
 
