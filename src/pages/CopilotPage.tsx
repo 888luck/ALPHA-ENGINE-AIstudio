@@ -23,6 +23,7 @@ import {
   Check,
   AlertTriangle,
   Search,
+  SlidersHorizontal,
   X
 } from "lucide-react";
 
@@ -92,7 +93,12 @@ const TIER0_OFFLINE_MODEL: ModelItem = {
   isFree: true
 };
 
-export function CopilotPage({ onNavigateHome }: { onNavigateHome?: () => void }) {
+export interface CopilotPageProps {
+  onNavigateHome?: () => void;
+  onNavigate?: (view: "mission-control" | "blotter" | "risk" | "lab" | "config" | "copilot" | "studio", target?: string) => void;
+}
+
+export function CopilotPage({ onNavigateHome, onNavigate }: CopilotPageProps = {}) {
   const [availableModels, setAvailableModels] = useState<ModelItem[]>([TIER0_OFFLINE_MODEL]);
   const [isVaultOpen, setIsVaultOpen] = useState(false);
   const [vaultSettings, setVaultSettings] = useState<any>(() => getAllStoredVaultSettings());
@@ -670,16 +676,16 @@ Click any quick query below or type your request:`,
   const quotaPct = Math.min(100, Math.round((stats.daily_requests / stats.daily_quota) * 100));
 
   return (
-    <div className="min-h-screen terminal-canvas text-primary flex flex-col font-sans">
-      {/* Institutional Top Header */}
-      <header className="sticky top-0 z-40 terminal-card border-b terminal-border px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-4 font-sans text-primary">
+      {/* Institutional Copilot Executive Telemetry Ribbon */}
+      <div className="terminal-card border terminal-border rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3">
-          {onNavigateHome && (
+          {(onNavigateHome || onNavigate) && (
             <button
               type="button"
-              onClick={onNavigateHome}
+              onClick={() => onNavigate ? onNavigate("mission-control") : (onNavigateHome ? onNavigateHome() : undefined)}
               className="p-1.5 rounded-lg terminal-elevated hover:border-accent text-secondary hover:text-primary transition cursor-pointer"
-              title="Return to Dashboard"
+              title="Return to Mission Control"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
@@ -782,10 +788,10 @@ Click any quick query below or type your request:`,
             onOpenVault={() => setIsVaultOpen(true)}
           />
         </div>
-      </header>
+      </div>
 
       {/* Main Chat Workspace */}
-      <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 flex flex-col justify-between">
+      <div className="terminal-card border terminal-border rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col justify-between max-w-5xl mx-auto w-full">
         {/* Messages Feed */}
         <div className="space-y-4 mb-4">
           {messages.map((msg) => (
@@ -843,6 +849,41 @@ Click any quick query below or type your request:`,
                   </div>
                 )}
 
+                {msg.role === "assistant" && onNavigate && (
+                  <div className="mt-3 pt-2 border-t terminal-border flex flex-wrap items-center gap-2">
+                    {(msg.content.toLowerCase().includes("strategy") || msg.content.toLowerCase().includes("backtest") || msg.content.toLowerCase().includes("sweep") || msg.content.toLowerCase().includes("dsr") || msg.content.toLowerCase().includes("hurst")) && (
+                      <button
+                        type="button"
+                        onClick={() => onNavigate("studio")}
+                        className="px-2.5 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 hover:text-emerald-300 font-mono text-[11px] font-bold flex items-center gap-1.5 transition cursor-pointer"
+                      >
+                        <SlidersHorizontal className="w-3 h-3 text-emerald-400" />
+                        <span>Open in Strategy Studio</span>
+                      </button>
+                    )}
+                    {(msg.content.toLowerCase().includes("position") || msg.content.toLowerCase().includes("blotter") || msg.content.toLowerCase().includes("execution") || msg.content.toLowerCase().includes("cash balance") || msg.content.toLowerCase().includes("holdings")) && (
+                      <button
+                        type="button"
+                        onClick={() => onNavigate("blotter")}
+                        className="px-2.5 py-1 rounded bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-400 hover:text-indigo-300 font-mono text-[11px] font-bold flex items-center gap-1.5 transition cursor-pointer"
+                      >
+                        <Activity className="w-3 h-3 text-indigo-400" />
+                        <span>Inspect in Blotter</span>
+                      </button>
+                    )}
+                    {(msg.content.toLowerCase().includes("risk") || msg.content.toLowerCase().includes("circuit breaker") || msg.content.toLowerCase().includes("drawdown") || msg.content.toLowerCase().includes("gate")) && (
+                      <button
+                        type="button"
+                        onClick={() => onNavigate("risk")}
+                        className="px-2.5 py-1 rounded bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 hover:text-amber-300 font-mono text-[11px] font-bold flex items-center gap-1.5 transition cursor-pointer"
+                      >
+                        <ShieldAlert className="w-3 h-3 text-amber-400" />
+                        <span>Check Risk Gates</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {/* Per-Message Telemetry Badge */}
                 {msg.telemetry && (
                   <div className="mt-4 pt-3 border-t terminal-border flex flex-wrap items-center gap-2 text-[10px] font-mono text-secondary">
@@ -893,7 +934,9 @@ Click any quick query below or type your request:`,
               "What are my current IBKR positions and cash balance?",
               "What are the latest SEC filings for NVDA?",
               "Show me recent FDA alerts or Phase 3 trial updates.",
-              "Check U.S. EIA energy storage telemetry for natural gas."
+              "Check U.S. EIA energy storage telemetry for natural gas.",
+              "Analyze Hurst regime and runs test for NVDA",
+              "Optimize intraday strategy with 1.8 ATR stop for AAPL"
             ].map((preset, idx) => (
               <button
                 key={idx}

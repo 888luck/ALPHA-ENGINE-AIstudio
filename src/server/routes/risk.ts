@@ -89,6 +89,9 @@ riskRouter.get("/api/risk/status", async (req, res) => {
     marketScope: systemSettings.marketScope || "ALL",
     killSwitchEngaged: systemSettings.killSwitchEngaged,
     tradingMode: systemSettings.tradingMode,
+    tradeRiskPercent: systemSettings.tradeRiskPercent ?? 1.0,
+    dailyLossMode: systemSettings.dailyLossMode ?? "R_MULTIPLE",
+    dailyLossRMultiple: systemSettings.dailyLossRMultiple ?? 4,
     tcpLatencyMs,
     netLiquidation: netLiq,
     maintenanceMargin: maintMargin,
@@ -98,10 +101,34 @@ riskRouter.get("/api/risk/status", async (req, res) => {
 });
 
 riskRouter.post("/api/risk/settings", authMiddleware, (req, res) => {
-  const { dailyCapitalCeiling, dailyMaxLossCutoff, fractionalTradingEnabled, intradayFlatteningEnabled, tradingMode, marketScope, liveConfirmationToken } = req.body;
+  const { 
+    dailyCapitalCeiling, 
+    dailyMaxLossCutoff, 
+    tradeRiskPercent, 
+    dailyLossMode, 
+    dailyLossRMultiple, 
+    fractionalTradingEnabled, 
+    intradayFlatteningEnabled, 
+    tradingMode, 
+    marketScope, 
+    liveConfirmationToken 
+  } = req.body;
   
   if (dailyCapitalCeiling !== undefined) systemSettings.dailyCapitalCeiling = Number(dailyCapitalCeiling);
-  if (dailyMaxLossCutoff !== undefined) systemSettings.dailyMaxLossCutoff = Number(dailyMaxLossCutoff);
+  if (tradeRiskPercent !== undefined) systemSettings.tradeRiskPercent = Math.max(0.05, Math.min(10.0, Number(tradeRiskPercent)));
+  if (dailyLossMode !== undefined && ["R_MULTIPLE", "CASH"].includes(dailyLossMode)) {
+    systemSettings.dailyLossMode = dailyLossMode;
+  }
+  if (dailyLossRMultiple !== undefined) systemSettings.dailyLossRMultiple = Math.max(1, Math.min(20, Number(dailyLossRMultiple)));
+
+  if (systemSettings.dailyLossMode === "R_MULTIPLE") {
+    const netLiq = systemSettings.netLiquidation > 0 ? systemSettings.netLiquidation : 100000;
+    const rDollar = netLiq * ((systemSettings.tradeRiskPercent || 1.0) / 100);
+    systemSettings.dailyMaxLossCutoff = Math.round(rDollar * (systemSettings.dailyLossRMultiple || 4));
+  } else if (dailyMaxLossCutoff !== undefined) {
+    systemSettings.dailyMaxLossCutoff = Number(dailyMaxLossCutoff);
+  }
+
   if (fractionalTradingEnabled !== undefined) systemSettings.fractionalTradingEnabled = Boolean(fractionalTradingEnabled);
   if (intradayFlatteningEnabled !== undefined) systemSettings.intradayFlatteningEnabled = Boolean(intradayFlatteningEnabled);
   
@@ -119,7 +146,7 @@ riskRouter.post("/api/risk/settings", authMiddleware, (req, res) => {
     systemSettings.marketScope = marketScope;
   }
 
-  console.log(`[RISK CONFIG UPDATED] Ceiling: $${systemSettings.dailyCapitalCeiling} | Loss Cutoff: $${systemSettings.dailyMaxLossCutoff} | Scope: ${systemSettings.marketScope} | Mode: ${systemSettings.tradingMode}`);
+  console.log(`[RISK CONFIG UPDATED] Ceiling: $${systemSettings.dailyCapitalCeiling} | Loss Cutoff: $${systemSettings.dailyMaxLossCutoff} (Mode: ${systemSettings.dailyLossMode}, ${systemSettings.dailyLossRMultiple}r, ${systemSettings.tradeRiskPercent}%) | Scope: ${systemSettings.marketScope} | Mode: ${systemSettings.tradingMode}`);
   persistSettings();
   res.json({ success: true, settings: getMaskedSettings(systemSettings) });
 });

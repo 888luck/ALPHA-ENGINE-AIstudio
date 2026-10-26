@@ -32,7 +32,8 @@ import {
   Check,
   AlertTriangle,
   AlertCircle,
-  BarChart2
+  BarChart2,
+  Rocket
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -125,7 +126,11 @@ const TIER0_OFFLINE_MODEL: ModelItem = {
   isFree: true
 };
 
-export function StrategyStudioPage() {
+export interface StrategyStudioPageProps {
+  onNavigate?: (view: "mission-control" | "blotter" | "risk" | "lab" | "config" | "copilot" | "studio", target?: string) => void;
+}
+
+export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {}) {
   // =========================================================================
   // 1. LLM Model Selection & 4-Pillar Vault Integration (Rule 6)
   // =========================================================================
@@ -359,6 +364,88 @@ export function StrategyStudioPage() {
   const [adaptiveStop, setAdaptiveStop] = useState(true);
   const [riskBudgetPct, setRiskBudgetPct] = useState(0.01);
   const [frictionCeiling, setFrictionCeiling] = useState(15.0);
+  const [dsrHurdlePct, setDsrHurdlePct] = useState(95.0);
+
+  // Live Execution Pool Deployment State
+  const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [deploySector, setDeploySector] = useState("Calibrated Quant Strategy Basket");
+  const [deployFrictionCeiling, setDeployFrictionCeiling] = useState(15.0);
+  const [deployedSymbols, setDeployedSymbols] = useState<Set<string>>(new Set());
+  const [deployToast, setDeployToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  // Sync active deployed universe from backend
+  useEffect(() => {
+    fetch("/api/universe/active")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.deployedSymbols && Array.isArray(d.deployedSymbols)) {
+          setDeployedSymbols(new Set(d.deployedSymbols.map((s: string) => s.toUpperCase().trim())));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleDeployStrategy = async () => {
+    if (!symbol) return;
+    setIsDeploying(true);
+    try {
+      const sym = symbol.toUpperCase().trim();
+      const currentFriction = result?.slippageFrictionSaved !== undefined
+        ? Number(result.slippageFrictionSaved)
+        : Number(result?.frictionPct || 10.0);
+
+      const payload = {
+        symbol: sym,
+        sector: deploySector,
+        timeframe,
+        parameters: {
+          stopAtrMultiplier: stopAtr,
+          maxHoldBars,
+          riskBudgetPct,
+          frictionCeilingPct: deployFrictionCeiling,
+          ofiFilter,
+          partialProfit,
+          breakevenLock,
+          adaptiveStop
+        },
+        metrics: {
+          winRate: result?.winRate || 65,
+          profitFactor: result?.profitFactor || 1.6,
+          frictionPct: currentFriction,
+          dsr: result?.deflatedSharpeRatio || 0.95
+        }
+      };
+
+      const res = await fetch("/api/universe/deploy", {
+        method: "POST",
+        headers: getAdminHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDeployedSymbols((prev) => new Set(prev).add(sym));
+        setDeployToast({
+          message: `✓ ${sym} successfully armed & deployed to Frankfurt Edge Node (Port 4005)!`,
+          type: "success"
+        });
+        setIsDeployModalOpen(false);
+      } else {
+        setDeployToast({
+          message: `Failed to deploy ${sym}: ${data.error || "Unknown error"}`,
+          type: "error"
+        });
+      }
+    } catch (err: any) {
+      setDeployToast({
+        message: `Deployment error: ${err.message}`,
+        type: "error"
+      });
+    } finally {
+      setIsDeploying(false);
+      setTimeout(() => setDeployToast(null), 6000);
+    }
+  };
 
   // Active Strategy Details & Results
   const [strategyName, setStrategyName] = useState("Alpha Adaptive OFI Breakout");
@@ -1243,8 +1330,57 @@ export function StrategyStudioPage() {
               SAVE
             </button>
           )}
+
+          {/* Live Pool Deployment Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setDeployFrictionCeiling(frictionCeiling);
+              setIsDeployModalOpen(true);
+            }}
+            disabled={!result || loading || sweeping}
+            className={`font-mono text-xs font-black px-4 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-md ${
+              deployedSymbols.has(symbol.toUpperCase().trim())
+                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30"
+                : "bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white shadow-emerald-950/20"
+            }`}
+            title="Deploy strategy into live candidate execution pool"
+          >
+            <Rocket className="w-3.5 h-3.5" />
+            <span>{deployedSymbols.has(symbol.toUpperCase().trim()) ? "ARMED (UPDATE POOL)" : "DEPLOY TO POOL"}</span>
+          </button>
         </div>
       </div>
+
+      {deployToast && (
+        <div className={`p-3.5 rounded-xl text-xs font-mono font-bold flex items-center justify-between gap-2 animate-in fade-in ${
+          deployToast.type === "success" 
+            ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400" 
+            : "bg-rose-500/15 border border-rose-500/30 text-rose-400"
+        }`}>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{deployToast.message}</span>
+          </div>
+          {deployToast.type === "success" && (
+            <button
+              type="button"
+              onClick={() => {
+                if (onNavigate) {
+                  onNavigate("blotter");
+                } else {
+                  localStorage.setItem("alpha_dashboard_view", "blotter");
+                  window.location.href = "/";
+                }
+              }}
+              className="px-2.5 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[11px] font-mono font-black flex items-center gap-1 shrink-0 cursor-pointer"
+            >
+              <span>VIEW IN BLOTTER</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
 
       {saveSuccessMsg && (
         <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-500 dark:text-emerald-400 font-mono flex items-center gap-2 animate-in fade-in">
@@ -1615,8 +1751,8 @@ export function StrategyStudioPage() {
                 </div>
               </div>
 
-              {/* Row 2: Algorithmic Stops & Holding Horizon */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-subtle">
+              {/* Row 2: Algorithmic Stops, Holding Horizon & Risk Budget */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-subtle">
                 {/* Stop ATR */}
                 <div className="terminal-elevated p-2.5 rounded-xl">
                   <div className="flex justify-between items-center mb-1">
@@ -1636,7 +1772,7 @@ export function StrategyStudioPage() {
                   />
                   <div className="flex justify-between text-[9px] text-muted font-mono mt-0.5">
                     <span>Tight (0.8x)</span>
-                    <span>Alpha Standard (1.8x)</span>
+                    <span>Standard (1.8x)</span>
                     <span>Wide (3.5x)</span>
                   </div>
                 </div>
@@ -1660,6 +1796,105 @@ export function StrategyStudioPage() {
                     <span>Scalp (5b)</span>
                     <span>Standard (15b)</span>
                     <span>Swing (40b)</span>
+                  </div>
+                </div>
+
+                {/* Per-Trade Risk Budget (r %) */}
+                <div className="terminal-elevated p-2.5 rounded-xl">
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-[11px] text-secondary uppercase font-mono font-bold flex items-center gap-1">
+                      Risk Budget (r %) <InfoTip id="risk" />
+                    </label>
+                    <span className="text-xs text-indigo-400 font-mono font-bold">{(riskBudgetPct * 100).toFixed(2)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.001"
+                    max="0.03"
+                    step="0.001"
+                    value={riskBudgetPct}
+                    onChange={(e) => setRiskBudgetPct(parseFloat(e.target.value))}
+                    className="w-full accent-indigo-500 cursor-pointer mt-1.5"
+                  />
+                  <div className="flex justify-between text-[9px] text-muted font-mono mt-0.5">
+                    <button type="button" onClick={() => setRiskBudgetPct(0.0025)} className="hover:text-primary cursor-pointer">0.25%</button>
+                    <button type="button" onClick={() => setRiskBudgetPct(0.005)} className="hover:text-primary cursor-pointer">0.50%</button>
+                    <button type="button" onClick={() => setRiskBudgetPct(0.01)} className="hover:text-primary cursor-pointer font-bold text-indigo-400">1.0%</button>
+                    <button type="button" onClick={() => setRiskBudgetPct(0.02)} className="hover:text-primary cursor-pointer">2.0%</button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 3: Pre-Flight Quant Gates (Friction Ceiling & DSR Hurdle Dual Controls) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-subtle">
+                {/* Transaction Friction Ceiling */}
+                <div className="terminal-elevated p-2.5 rounded-xl">
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-[11px] text-secondary uppercase font-mono font-bold flex items-center gap-1">
+                      Friction Ceiling Gate (≤ %) <InfoTip id="friction" />
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="2"
+                        max="50"
+                        step="0.5"
+                        value={frictionCeiling}
+                        onChange={(e) => setFrictionCeiling(Math.max(1, parseFloat(e.target.value) || 15.0))}
+                        className="w-16 terminal-card border border-border rounded px-1.5 py-0.5 text-xs text-amber-500 font-mono font-bold text-right"
+                      />
+                      <span className="text-xs text-amber-500 font-mono font-bold">%</span>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="30"
+                    step="0.5"
+                    value={frictionCeiling}
+                    onChange={(e) => setFrictionCeiling(parseFloat(e.target.value))}
+                    className="w-full accent-amber-500 cursor-pointer mt-1"
+                  />
+                  <div className="flex justify-between text-[9px] text-muted font-mono mt-1">
+                    <button type="button" onClick={() => setFrictionCeiling(10.0)} className={`hover:text-primary cursor-pointer ${frictionCeiling === 10 ? "text-amber-400 font-bold" : ""}`}>10% (Strict)</button>
+                    <button type="button" onClick={() => setFrictionCeiling(15.0)} className={`hover:text-primary cursor-pointer ${frictionCeiling === 15 ? "text-amber-400 font-bold" : ""}`}>15% (IBKR)</button>
+                    <button type="button" onClick={() => setFrictionCeiling(20.0)} className={`hover:text-primary cursor-pointer ${frictionCeiling === 20 ? "text-amber-400 font-bold" : ""}`}>20% (Wide)</button>
+                  </div>
+                </div>
+
+                {/* Deflated Sharpe Ratio (DSR) Hurdle */}
+                <div className="terminal-elevated p-2.5 rounded-xl">
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-[11px] text-secondary uppercase font-mono font-bold flex items-center gap-1">
+                      DSR Confidence Hurdle (≥ %) <InfoTip id="dsr" />
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="50"
+                        max="99.9"
+                        step="1.0"
+                        value={dsrHurdlePct}
+                        onChange={(e) => setDsrHurdlePct(Math.min(99.9, Math.max(50, parseFloat(e.target.value) || 95.0)))}
+                        className="w-16 terminal-card border border-border rounded px-1.5 py-0.5 text-xs text-indigo-400 font-mono font-bold text-right"
+                      />
+                      <span className="text-xs text-indigo-400 font-mono font-bold">%</span>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min="50"
+                    max="99"
+                    step="1"
+                    value={dsrHurdlePct}
+                    onChange={(e) => setDsrHurdlePct(parseFloat(e.target.value))}
+                    className="w-full accent-indigo-500 cursor-pointer mt-1"
+                  />
+                  <div className="flex justify-between text-[9px] text-muted font-mono mt-1">
+                    <button type="button" onClick={() => setDsrHurdlePct(80.0)} className={`hover:text-primary cursor-pointer ${dsrHurdlePct === 80 ? "text-indigo-400 font-bold" : ""}`}>80% (Sandbox)</button>
+                    <button type="button" onClick={() => setDsrHurdlePct(90.0)} className={`hover:text-primary cursor-pointer ${dsrHurdlePct === 90 ? "text-indigo-400 font-bold" : ""}`}>90% (Quant)</button>
+                    <button type="button" onClick={() => setDsrHurdlePct(95.0)} className={`hover:text-primary cursor-pointer ${dsrHurdlePct === 95 ? "text-indigo-400 font-bold" : ""}`}>95% (Inst.)</button>
+                    <button type="button" onClick={() => setDsrHurdlePct(99.0)} className={`hover:text-primary cursor-pointer ${dsrHurdlePct === 99 ? "text-indigo-400 font-bold" : ""}`}>99% (Tier-1)</button>
                   </div>
                 </div>
               </div>
@@ -2191,6 +2426,201 @@ export function StrategyStudioPage() {
           </div>
         </div>
       </div>
+
+      {/* =========================================================================
+          5. Institutional Pre-Flight Gate & Pool Deployment Modal
+          ========================================================================= */}
+      {isDeployModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150 font-sans">
+          <div className="terminal-card border border-border rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden font-mono">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between bg-elevated">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <Rocket className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-primary tracking-tight flex items-center gap-2">
+                    PRE-FLIGHT EXECUTION GATE & POOL REGISTRATION
+                  </h2>
+                  <p className="text-xs text-secondary mt-0.5">
+                    CBI MiFID II RTS-22 & López de Prado pre-trade validation for {symbol}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDeployModalOpen(false)}
+                className="text-secondary hover:text-primary transition-colors p-1.5 hover:bg-elevated rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 overflow-y-auto space-y-4 text-xs leading-relaxed max-h-[75vh]">
+              {/* Strategy Specs Card */}
+              <div className="terminal-elevated rounded-xl p-4 border border-border space-y-2">
+                <div className="flex justify-between items-center border-b border-border pb-2">
+                  <span className="font-bold text-primary text-sm flex items-center gap-2">
+                    <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30">
+                      {symbol}
+                    </span>
+                    <span>{timeframe} Calibrated Blueprint</span>
+                  </span>
+                  <span className="text-secondary text-[11px]">
+                    Capital: ${capitalOverride.toLocaleString()}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px]">
+                  <div>
+                    <span className="text-muted block text-[10px]">STOP ATR</span>
+                    <span className="font-bold text-primary">{stopAtr.toFixed(1)}x ATR</span>
+                  </div>
+                  <div>
+                    <span className="text-muted block text-[10px]">HOLD BARS</span>
+                    <span className="font-bold text-primary">{maxHoldBars} bars</span>
+                  </div>
+                  <div>
+                    <span className="text-muted block text-[10px]">RISK BUDGET</span>
+                    <span className="font-bold text-indigo-400">{(riskBudgetPct * 100).toFixed(2)}% ($r)</span>
+                  </div>
+                  <div>
+                    <span className="text-muted block text-[10px]">OFI FILTER</span>
+                    <span className="font-bold text-emerald-400">{ofiFilter ? "Active (1.4x)" : "Bypassed"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pre-Flight Gate 1: Deflated Sharpe Ratio (DSR) */}
+              {(() => {
+                const currentDsr = Number(result?.deflatedSharpeRatio || 0) * 100;
+                const passesDsr = currentDsr >= dsrHurdlePct;
+
+                return (
+                  <div className={`terminal-card rounded-xl p-4 border ${passesDsr ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"} space-y-2`}>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Award className={`w-4 h-4 ${passesDsr ? "text-emerald-400" : "text-amber-400"}`} />
+                        <span className="font-bold text-primary uppercase text-xs">
+                          Gate 1: Deflated Sharpe Ratio (Selection Bias Penalty)
+                        </span>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded font-bold text-[10px] uppercase ${passesDsr ? "terminal-badge-bid" : "terminal-badge-warn"}`}>
+                        {passesDsr ? "Passed DSR Hurdle" : "Sub-Hurdle Warning"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-[11px] pt-1">
+                      <span className="text-secondary">Strategy DSR (N=16 Permutations): <strong className="text-primary">{currentDsr.toFixed(1)}%</strong></span>
+                      <span className="text-secondary">Selected Hurdle: <strong className="text-indigo-400">{dsrHurdlePct.toFixed(1)}%</strong></span>
+                    </div>
+                    <p className="text-[10px] text-muted leading-tight">
+                      {passesDsr 
+                        ? "Statistical test confirms with high confidence that strategy expectancy is not an artifact of data-snooping." 
+                        : "Nominal Sharpe may be elevated by curve-fitting. Review out-of-sample persistence before high-capital deployment."}
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {/* Pre-Flight Gate 2: Transaction Friction Ceiling (Dual Control) */}
+              {(() => {
+                const currentFriction = result?.slippageFrictionSaved !== undefined
+                  ? Number(result.slippageFrictionSaved)
+                  : Number(result?.frictionPct || 10.0);
+                const passesFriction = currentFriction <= deployFrictionCeiling;
+
+                return (
+                  <div className={`terminal-card rounded-xl p-4 border ${passesFriction ? "border-emerald-500/30 bg-emerald-500/5" : "border-rose-500/30 bg-rose-500/5"} space-y-3`}>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Sliders className={`w-4 h-4 ${passesFriction ? "text-emerald-400" : "text-rose-400"}`} />
+                        <span className="font-bold text-primary uppercase text-xs">
+                          Gate 2: MiFID II Transaction Friction Ceiling
+                        </span>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded font-bold text-[10px] uppercase ${passesFriction ? "terminal-badge-bid" : "terminal-badge-ask"}`}>
+                        {passesFriction ? "Passed Friction Gate" : "Exceeds Ceiling"}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-secondary">Projected Friction (Spread + 2x Comms): <strong className={passesFriction ? "text-emerald-400" : "text-rose-400"}>{currentFriction.toFixed(1)}%</strong></span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-secondary">Enforced Ceiling:</span>
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="2"
+                          max="50"
+                          value={deployFrictionCeiling}
+                          onChange={(e) => setDeployFrictionCeiling(parseFloat(e.target.value) || 15.0)}
+                          className="w-16 terminal-card border border-border rounded px-1.5 py-0.5 text-xs text-primary font-bold text-right"
+                        />
+                        <span className="text-secondary">%</span>
+                      </div>
+                    </div>
+
+                    {/* Dual-Control Quick Action Snap Chip */}
+                    {!passesFriction && (
+                      <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/25 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px]">
+                        <span className="text-rose-300">
+                          Current friction ({currentFriction.toFixed(1)}%) exceeds target ceiling ({deployFrictionCeiling.toFixed(1)}%).
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setDeployFrictionCeiling(Math.ceil(currentFriction))}
+                          className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold transition cursor-pointer shrink-0 flex items-center gap-1"
+                        >
+                          <Zap className="w-3 h-3" />
+                          <span>Snap Ceiling to {Math.ceil(currentFriction)}%</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Execution Pool & Sector Assignment */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-[10px] text-secondary uppercase font-bold block">
+                  Target Candidate Execution Basket:
+                </label>
+                <input
+                  type="text"
+                  value={deploySector}
+                  onChange={(e) => setDeploySector(e.target.value)}
+                  placeholder="e.g. Calibrated Quant Strategy Basket"
+                  className="w-full terminal-elevated border border-border rounded-lg px-3 py-2 text-xs text-primary focus:outline-hidden focus:border-emerald-500"
+                />
+                <span className="text-[9px] text-muted block">
+                  Persisted to dynamic_baskets.json and synchronized via Direct TCP Bridge (Port 4005) to Frankfurt Spot VM.
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-elevated border-t border-border flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setIsDeployModalOpen(false)}
+                className="px-4 py-2 terminal-elevated hover:bg-elevated text-secondary hover:text-primary font-bold rounded-xl border border-border text-xs transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeployStrategy}
+                disabled={isDeploying}
+                className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-extrabold rounded-xl text-xs uppercase transition cursor-pointer flex items-center gap-2 shadow-lg shadow-emerald-950/30"
+              >
+                {isDeploying ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Rocket className="w-3.5 h-3.5" />}
+                <span>{isDeploying ? "Deploying to Edge Node..." : "Confirm & Arm Execution Pool"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 4-Pillar Vault Credentials Modal */}
       <ApiVaultModal

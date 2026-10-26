@@ -57,6 +57,9 @@ export interface SystemSettings {
   virtualCapitalCeiling: number;
   dailyCapitalCeiling: number;
   dailyMaxLossCutoff: number;
+  tradeRiskPercent?: number;
+  dailyLossMode?: "R_MULTIPLE" | "CASH";
+  dailyLossRMultiple?: number;
   fractionalTradingEnabled: boolean;
   intradayFlatteningEnabled: boolean;
   intradayFlattenTimeEST: string;

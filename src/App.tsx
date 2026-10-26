@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import Dashboard from "./components/Dashboard";
+import { VaultConsole } from "./components/VaultConsole";
 import { LiveCockpit } from "./components/LiveCockpit";
 import { QuantResearchLab } from "./components/QuantResearchLab";
 import { CopilotPage } from "./pages/CopilotPage";
@@ -700,9 +700,20 @@ export default function App() {
         {view === "mission-control" && <LiveCockpit systemState={systemState} onRefresh={() => {}} activeView="mission-control" />}
         {view === "blotter" && <LiveCockpit systemState={systemState} onRefresh={() => {}} activeView="blotter" />}
         {view === "risk" && <LiveCockpit systemState={systemState} onRefresh={() => {}} activeView="risk" />}
-        {view === "lab" && <QuantResearchLab />}
-        {view === "studio" && <StrategyStudioPage />}
-        {view === "config" && <Dashboard onNavigate={handleNavigate} navTarget={navTarget} activeTabOverride="credentials" />}
+        {view === "lab" && <QuantResearchLab onNavigate={handleNavigate} />}
+        {view === "studio" && <StrategyStudioPage onNavigate={handleNavigate} />}
+        {view === "config" && (
+          <VaultConsole
+            initialTab={navTarget as any}
+            settings={systemState?.settings}
+          />
+        )}
+        {view === "copilot" && (
+          <CopilotPage
+            onNavigateHome={() => handleNavigate("mission-control")}
+            onNavigate={handleNavigate}
+          />
+        )}
       </main>
 
       {/* =========================================================================
