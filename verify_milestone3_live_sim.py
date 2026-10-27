@@ -35,19 +35,19 @@ def run_verification():
     strat = AlphaStrategy(cm, "ALGO_DEC_992", "ALGO_EXE_554")
 
     # Long setup with negative polarity (-0.82) -> Must be rejected by Gate 5
-    veto_long = not strat.evaluate_trade_setup("NVDA", "SPY", 450.0, macro_bullish=True, catalyst_polarity=-0.82)
+    veto_long = not strat.screen_macro_driver_congruence("SPY", "NVDA", 450.0, macro_bullish=True, catalyst_polarity=-0.82)
     print(f"[CHECK 3] Gate 5 Adverse Veto on Long (+450 OFI with -0.82 Polarity): {'PASS (VETOED)' if veto_long else 'FAIL'}")
 
     # Long setup with positive PEAD polarity (+0.78) -> Must be approved by Gate 5
-    approve_long = strat.evaluate_trade_setup("NVDA", "SPY", 450.0, macro_bullish=True, catalyst_polarity=0.78)
+    approve_long = strat.screen_macro_driver_congruence("SPY", "NVDA", 450.0, macro_bullish=True, catalyst_polarity=0.78)
     print(f"[CHECK 4] Gate 5 Approval on Long (+450 OFI with +0.78 Polarity): {'PASS (APPROVED)' if approve_long else 'FAIL'}")
 
     # Short setup with positive polarity (+0.75) -> Must be rejected by Gate 5
-    veto_short = not strat.evaluate_trade_setup("NVDA", "SPY", -450.0, macro_bullish=False, catalyst_polarity=0.75)
+    veto_short = not strat.screen_macro_driver_congruence("SPY", "NVDA", -450.0, macro_bullish=False, catalyst_polarity=0.75)
     print(f"[CHECK 5] Gate 5 Adverse Veto on Short (-450 OFI with +0.75 Polarity): {'PASS (VETOED)' if veto_short else 'FAIL'}")
 
     # Short setup with negative polarity (-0.75) -> Must be approved by Gate 5
-    approve_short = strat.evaluate_trade_setup("NVDA", "SPY", -450.0, macro_bullish=False, catalyst_polarity=-0.75)
+    approve_short = strat.screen_macro_driver_congruence("SPY", "NVDA", -450.0, macro_bullish=False, catalyst_polarity=-0.75)
     print(f"[CHECK 6] Gate 5 Approval on Short (-450 OFI with -0.75 Polarity): {'PASS (APPROVED)' if approve_short else 'FAIL'}")
 
     # 4. Test Trailing Modulation in Backtester
