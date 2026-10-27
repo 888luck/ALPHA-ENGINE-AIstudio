@@ -31,7 +31,7 @@ def run_verification():
     print(f"[CHECK 2] Edge TCP Bridge Port 4005 Socket Liveliness: {'ONLINE (LISTEN)' if p4005_live else 'OFFLINE'}")
 
     # 3. Test Gate 5 NLP Dual Veto in AlphaStrategy
-    cm = ConnectionManager("127.0.0.1", 4002, 99)
+    cm = ConnectionManager(trading_mode="PAPER")
     strat = AlphaStrategy(cm, "ALGO_DEC_992", "ALGO_EXE_554")
 
     # Long setup with negative polarity (-0.82) -> Must be rejected by Gate 5
