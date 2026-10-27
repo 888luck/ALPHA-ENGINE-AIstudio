@@ -8,7 +8,12 @@
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "deploy": "node scripts/deploy_edge.js",
+    "deploy:edge": "node scripts/deploy_edge.js",
+    "deploy:standby": "node scripts/deploy_cloudrun.js",
+    "deploy:cloudrun": "node scripts/deploy_cloudrun.js",
+    "deploy:all": "node scripts/deploy_edge.js --with-standby"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",

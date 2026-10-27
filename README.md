@@ -84,41 +84,60 @@ Adhere strictly to the institutional engineering invariants codified in [`AGENTS
 
 ---
 
-## 🚀 Quickstart & Service Runbook
+## 🚀 Single-Command Deployment Pipeline
+
+Alpha Engine provides an automated, high-speed deployment pipeline prioritizing the **Frankfurt Edge Node VM (`https://misha-vm-gcp.duckdns.org`)** as the primary execution and control plane, with Google Cloud Run maintained as an optional standby mirror:
+
+### 1. Primary Edge VM Deployment (<20 seconds)
+```bash
+# Deploys directly to Frankfurt Edge VM (pulls commits, builds UI, restarts services & probes health)
+npm run deploy:edge
+# (or simply: npm run deploy)
+```
+- **Primary Domain**: [`https://misha-vm-gcp.duckdns.org`](https://misha-vm-gcp.duckdns.org) (Port 443 SSL -> Node.js 3000)
+- **IBKR Gateway Remote VNC**: [`https://misha-vm-gcp.duckdns.org:8443`](https://misha-vm-gcp.duckdns.org:8443) (Port 8443 SSL -> noVNC 6080)
+- **Edge Execution Socket**: Direct TCP loopback `127.0.0.1:4005` (<1ms latency)
+
+### 2. Secondary Standby Cloud Run Deployment (~3-4 minutes)
+```bash
+# Deploys container revision to Google Cloud Run as an optional standby mirror
+npm run deploy:standby
+```
+- **Standby Endpoint**: [`https://alpha-engine-aistudio-138990607360.europe-west3.run.app`](https://alpha-engine-aistudio-138990607360.europe-west3.run.app)
+- **Zero Overhead**: Scales to zero instances during non-use ($0 standby cost).
+
+### 3. Synchronized Dual Deployment
+```bash
+# Deploys to Frankfurt Edge Node first, then updates Cloud Run standby
+npm run deploy:all
+```
+
+---
+
+## 🛠️ Service Runbook & Local Development
 
 For comprehensive operational protocols, consult the dedicated [`RUNBOOK.md`](./RUNBOOK.md).
 
-### 1. Web Control Plane (Port 3000)
+### Local Control Plane (Port 3000)
 ```bash
 # Compile SPA & Express bundle
 npm run build
 
-# Start production web control plane
+# Start production web control plane locally
 node dist/server.cjs
 ```
 - Local URL: `http://localhost:3000`
-- Production Cloud Run Endpoint: `https://alpha-engine-aistudio-138990607360.europe-west3.run.app`
-- Production Frankfurt Edge VM Web UI: `https://misha-vm-gcp.duckdns.org`
-- Production IBKR Gateway noVNC GUI: `https://misha-vm-gcp.duckdns.org:8443`
 
-### 2. Edge Execution Daemon on Frankfurt VM (Port 4005)
-```bash
-# Start edge trading daemon and Direct TCP Bridge
-python3 main.py
-```
-- Direct TCP Bridge Server: Port `4005`.
-- Connects to IBKR Gateway: Port `4001` (Live) or `4002` (Paper).
-
-### 3. Frankfurt VM Service Management (systemd)
+### Frankfurt VM Service Management (systemd)
 ```bash
 # Inspect all Alpha Engine services
 sudo systemctl status alpha-engine.service alpha-ui.service ibgateway.service
 
-# Restart services after code sync
+# Restart services after manual changes
 sudo systemctl restart alpha-engine.service alpha-ui.service
 ```
 
-### 4. Dynamic Tool Catalog Invalidation
+### Dynamic Tool Catalog Invalidation
 ```bash
 python3 tools_reflector.py --force
 ```

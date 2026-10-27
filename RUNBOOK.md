@@ -115,14 +115,50 @@ sudo journalctl -u ibgateway.service -f -n 100
 ```
 
 ### Code Deployment & Synchronization
-When updates are committed and pushed to GitHub:
+
+Alpha Engine provides automated single-command deployment routines:
+
+#### A. Primary Edge Deployment (<20 seconds) — Daily Operational Standard
+```bash
+# From local workspace (Windows PowerShell or Bash):
+npm run deploy:edge
+# (or simply: npm run deploy)
+```
+**Automated Execution Pipeline**:
+1. Pre-flight TypeScript compilation verification (`npm run lint` / `tsc --noEmit`).
+2. Pushes local commits to `origin/main`.
+3. SSH into Frankfurt VM (`alpha-edge-node` in `europe-west3-a`).
+4. Preserves active runtime risk state (`copilot_quota_state.json`, `dynamic_baskets.json`, `risk_limits.json`).
+5. Pulls latest commits (`git fetch origin main && git reset --hard origin/main`).
+6. Restores live runtime state.
+7. Compiles frontend & Express server bundle (`npm run build`).
+8. Gracefully restarts services (`alpha-ui.service`, `alpha-engine.service`).
+9. Probes live endpoints on `https://misha-vm-gcp.duckdns.org` with real-time latency reporting.
+
+#### B. Secondary Cloud Run Standby Deployment (~3-4 minutes) — Optional Mirror
+```bash
+# Deploys container revision to Cloud Run as a secondary mirror:
+npm run deploy:standby
+# (or npm run deploy:cloudrun)
+```
+- Endpoint: `https://alpha-engine-aistudio-138990607360.europe-west3.run.app`
+- Auto-scales to zero instances when idle ($0 standby overhead).
+
+#### C. Full Platform Dual Deployment
+```bash
+# Deploys to Frankfurt Edge Node first, then updates Cloud Run standby:
+npm run deploy:all
+```
+
+#### D. Manual Edge VM Deployment (Fallback / SSH)
+If manual deployment inside the VM is ever required:
 ```bash
 # 1. Navigate to production root
 cd /opt/alpha-engine
 
 # 2. Fetch and pull latest commits
 git fetch origin main
-git pull origin main
+git reset --hard origin/main
 
 # 3. Build frontend bundle and server
 npm run build
