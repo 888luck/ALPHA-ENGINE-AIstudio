@@ -169,7 +169,8 @@ backtestRouter.post("/api/backtest", (req, res) => {
     trailingStopAtr,
     trailingActivationR,
     trailingStepAtr,
-    trailingType
+    trailingType,
+    catalystPolarity
   } = req.body;
 
   if (!symbol || !timeframe || !startDate || !endDate) {
@@ -198,6 +199,9 @@ backtestRouter.post("/api/backtest", (req, res) => {
   const cleanTrailingActivation = trailingActivationR !== undefined ? String(Number(trailingActivationR)) : "1.5";
   const cleanTrailingStep = trailingStepAtr !== undefined ? String(Number(trailingStepAtr)) : "0.25";
   const cleanTrailingType = trailingType ? String(trailingType).replace(/[^a-zA-Z_]/g, "").toUpperCase() : "CHANDELIER";
+  const cleanCatalystPolarity = (catalystPolarity !== undefined && catalystPolarity !== null && !isNaN(Number(catalystPolarity)))
+    ? String(Number(catalystPolarity))
+    : "none";
 
   const commandArgs = [
     cleanSymbol, 
@@ -218,7 +222,8 @@ backtestRouter.post("/api/backtest", (req, res) => {
     cleanTrailingAtr,
     cleanTrailingActivation,
     cleanTrailingStep,
-    cleanTrailingType
+    cleanTrailingType,
+    cleanCatalystPolarity
   ];
   const py = getPythonExecutable();
   const scriptPath = path.join(process.cwd(), "backtester.py");

@@ -898,6 +898,14 @@ if __name__ == "__main__":
             trailing_type = sys.argv[19].upper().strip()
         else:
             trailing_type = "CHANDELIER"
+        if len(sys.argv) >= 21:
+            try:
+                v = sys.argv[20].strip().lower()
+                catalyst_polarity = None if v in ("none", "null", "") else float(sys.argv[20])
+            except (ValueError, TypeError):
+                catalyst_polarity = None
+        else:
+            catalyst_polarity = None
     else:
         # Defaults
         ticker = "XLE"
@@ -913,6 +921,7 @@ if __name__ == "__main__":
         trailing_activation_r = 1.5
         trailing_step_atr = 0.25
         trailing_type = "CHANDELIER"
+        catalyst_polarity = None
         
     engine = AlphaBacktestingEngine(starting_capital=capital_override if capital_override and capital_override > 0 else 100000.0)
     results = engine.run_backtest(
@@ -934,6 +943,7 @@ if __name__ == "__main__":
         trailing_stop_atr=trailing_stop_atr,
         trailing_activation_r=trailing_activation_r,
         trailing_step_atr=trailing_step_atr,
-        trailing_type=trailing_type
+        trailing_type=trailing_type,
+        catalyst_polarity=catalyst_polarity
     )
     print(json.dumps(results))

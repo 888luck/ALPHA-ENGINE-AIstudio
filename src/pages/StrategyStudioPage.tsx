@@ -79,6 +79,7 @@ export interface StrategyStudioExperiment {
     trailingActivationR?: number;
     trailingStepAtr?: number;
     trailingType?: "CHANDELIER" | "ATR" | "FIXED_R" | "PARABOLIC";
+    catalystPolarity?: number | null;
   };
   metrics: {
     totalPnL: number;
@@ -378,6 +379,8 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
   const [trailingActivationR, setTrailingActivationR] = useState(1.5);
   const [trailingStepAtr, setTrailingStepAtr] = useState(0.25);
   const [trailingType, setTrailingType] = useState<"CHANDELIER" | "ATR" | "FIXED_R" | "PARABOLIC">("CHANDELIER");
+  const [catalystPolarityEnabled, setCatalystPolarityEnabled] = useState(false);
+  const [catalystPolarity, setCatalystPolarity] = useState(0.80);
 
   // Live Execution Pool Deployment State
   const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
@@ -387,7 +390,7 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
   const [deployedSymbols, setDeployedSymbols] = useState<Set<string>>(new Set());
   const [deployToast, setDeployToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
-  // Sync active deployed universe from backend
+  // Sync active deployed universe from backend & check incoming catalyst polarity
   useEffect(() => {
     fetch("/api/universe/active")
       .then((r) => r.json())
@@ -397,6 +400,18 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
         }
       })
       .catch(() => {});
+
+    try {
+      const incomingPolarity = localStorage.getItem("alpha_catalyst_polarity");
+      if (incomingPolarity !== null && incomingPolarity !== "") {
+        const val = parseFloat(incomingPolarity);
+        if (!isNaN(val)) {
+          setCatalystPolarityEnabled(true);
+          setCatalystPolarity(val);
+        }
+        localStorage.removeItem("alpha_catalyst_polarity");
+      }
+    } catch (_) {}
   }, []);
 
   const handleDeployStrategy = async () => {
@@ -610,6 +625,7 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
     trailingActivationR: number;
     trailingStepAtr: number;
     trailingType: string;
+    catalystPolarity: number | null;
   }>) => {
     const s = overrides?.symbol || symbol;
     const tf = overrides?.timeframe || timeframe;
@@ -628,6 +644,9 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
     const trailAct = overrides?.trailingActivationR !== undefined ? overrides.trailingActivationR : trailingActivationR;
     const trailStep = overrides?.trailingStepAtr !== undefined ? overrides.trailingStepAtr : trailingStepAtr;
     const trailType = overrides?.trailingType !== undefined ? overrides.trailingType : trailingType;
+    const catPol = overrides?.catalystPolarity !== undefined
+      ? overrides.catalystPolarity
+      : (catalystPolarityEnabled ? catalystPolarity : null);
 
     const res = await fetch("/api/backtest", {
       method: "POST",
@@ -650,7 +669,8 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
         trailingStopAtr: trailAtr,
         trailingActivationR: trailAct,
         trailingStepAtr: trailStep,
-        trailingType: trailType
+        trailingType: trailType,
+        catalystPolarity: catPol
       })
     });
 
@@ -1153,7 +1173,8 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
         trailingStopAtr: trailingStopEnabled ? trailingStopAtr : null,
         trailingActivationR: trailingStopEnabled ? trailingActivationR : undefined,
         trailingStepAtr: trailingStopEnabled ? trailingStepAtr : undefined,
-        trailingType: trailingStopEnabled ? trailingType : undefined
+        trailingType: trailingStopEnabled ? trailingType : undefined,
+        catalystPolarity: catalystPolarityEnabled ? catalystPolarity : null
       },
       metrics: {
         totalPnL: Number(result.totalPnL || result.netProfit || 0),
@@ -1217,6 +1238,12 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
       if (exp.parameters.trailingType !== undefined) setTrailingType(exp.parameters.trailingType as any);
     } else {
       setTrailingStopEnabled(false);
+    }
+    if (exp.parameters.catalystPolarity !== undefined && exp.parameters.catalystPolarity !== null) {
+      setCatalystPolarityEnabled(true);
+      setCatalystPolarity(exp.parameters.catalystPolarity);
+    } else {
+      setCatalystPolarityEnabled(false);
     }
 
     setResult({
@@ -2073,6 +2100,118 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
                       <option value="PARABOLIC">Parabolic Time-Decay</option>
                     </select>
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Catalyst Polarity & Gate 5 NLP Dual Veto Control Panel */}
+            <div className="terminal-card p-4 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <label className="flex items-center gap-2 cursor-pointer text-xs">
+                  <input
+                    type="checkbox"
+                    checked={catalystPolarityEnabled}
+                    onChange={(e) => setCatalystPolarityEnabled(e.target.checked)}
+                    className="rounded terminal-elevated text-cyan-500 focus:ring-0"
+                  />
+                  <span className="text-secondary font-bold flex items-center gap-1.5">
+                    <span className="text-cyan-400">⚡ Catalyst Polarity & Gate 5 NLP Veto</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">Tier-0 Dual-Head</span>
+                  </span>
+                </label>
+                {catalystPolarityEnabled && (
+                  <div className="flex items-center gap-2 text-[11px] font-mono">
+                    {catalystPolarity >= 0.60 ? (
+                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                        🚀 PEAD Catalyst (+{catalystPolarity.toFixed(2)}) • Trailing Expands 1.25×
+                      </span>
+                    ) : catalystPolarity <= -0.60 ? (
+                      <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1">
+                        🛑 Adverse Polarity ({catalystPolarity.toFixed(2)}) • Gate 5 Long Veto Active (0.75× Trail)
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded bg-slate-500/20 text-slate-300 border border-slate-500/30">
+                        ⚖️ Neutral Polarity ({catalystPolarity >= 0 ? `+${catalystPolarity.toFixed(2)}` : catalystPolarity.toFixed(2)})
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {catalystPolarityEnabled && (
+                <div className="space-y-3 p-3 rounded-lg bg-surface/30 border border-cyan-500/20 text-xs font-mono">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-muted-foreground">Catalyst Polarity P(pos) - P(neg)</label>
+                        <span className={`font-bold ${catalystPolarity > 0 ? "text-emerald-400" : catalystPolarity < 0 ? "text-rose-400" : "text-muted-foreground"}`}>
+                          {catalystPolarity >= 0 ? `+${catalystPolarity.toFixed(2)}` : catalystPolarity.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-rose-400 font-bold">-1.00</span>
+                        <input
+                          type="range"
+                          min="-1.0"
+                          max="1.0"
+                          step="0.05"
+                          value={catalystPolarity}
+                          onChange={(e) => setCatalystPolarity(parseFloat(e.target.value))}
+                          className="w-full accent-cyan-500 cursor-pointer"
+                        />
+                        <span className="text-[10px] text-emerald-400 font-bold">+1.00</span>
+                        <input
+                          type="number"
+                          min="-1.0"
+                          max="1.0"
+                          step="0.05"
+                          value={catalystPolarity}
+                          onChange={(e) => setCatalystPolarity(Math.max(-1, Math.min(1, parseFloat(e.target.value) || 0)))}
+                          className="w-16 p-1 rounded bg-background border border-border text-center text-foreground font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 self-end sm:self-center">
+                      <button
+                        type="button"
+                        onClick={() => setCatalystPolarity(0.80)}
+                        className={`px-2 py-1 rounded text-[11px] border transition ${
+                          catalystPolarity === 0.80
+                            ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300 font-bold"
+                            : "bg-surface border-border text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        +0.80 PEAD
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCatalystPolarity(0.00)}
+                        className={`px-2 py-1 rounded text-[11px] border transition ${
+                          catalystPolarity === 0.00
+                            ? "bg-slate-500/20 border-slate-500/50 text-slate-200 font-bold"
+                            : "bg-surface border-border text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        0.00 Neutral
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCatalystPolarity(-0.80)}
+                        className={`px-2 py-1 rounded text-[11px] border transition ${
+                          catalystPolarity === -0.80
+                            ? "bg-rose-500/20 border-rose-500/50 text-rose-300 font-bold"
+                            : "bg-surface border-border text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        -0.80 Veto
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    Gate 5 NLP Dual Veto evaluates wire headline sentiment: Long orders are strictly vetoed if polarity &le; -0.60; Short orders are vetoed if polarity &ge; +0.60. Active PEAD catalysts (&ge; +0.60) modulate the dynamic trailing ratchet to 1.25&times; width to capture post-earnings drift without premature shakeout.
+                  </p>
                 </div>
               )}
             </div>
