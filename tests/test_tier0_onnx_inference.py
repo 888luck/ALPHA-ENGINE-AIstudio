@@ -44,7 +44,7 @@ from news_event_correlator import (  # noqa: E402
 from quant_discovery import QuantDiscoveryEngine  # noqa: E402
 from backtester import AlphaBacktestingEngine  # noqa: E402
 
-MEMORY_BUDGET_MB = 200.0
+MEMORY_BUDGET_MB = 250.0
 
 # --------------------------------------------------------------------------------------------
 # Real primary-source headlines (verbatim release titles).
