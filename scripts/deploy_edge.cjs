@@ -9,7 +9,7 @@
  * Usage:
  *   npm run deploy:edge
  *   npm run deploy
- *   node scripts/deploy_edge.js [options]
+ *   node scripts/deploy_edge.cjs [options]
  *
  * Options:
  *   --with-standby   Also trigger Cloud Run deployment as secondary standby
@@ -209,7 +209,7 @@ async function main() {
     console.log(`\n${c.bold}[5/5] Secondary Cloud Run Standby Status${c.reset}`);
     if (withStandby && !dryRun) {
       console.log(`  ${c.cyan}[INFO]${c.reset} Invoking Cloud Run Standby Deployer...`);
-      const standbyScript = path.join(__dirname, 'deploy_cloudrun.js');
+      const standbyScript = path.join(__dirname, 'deploy_cloudrun.cjs');
       spawnSync('node', [standbyScript], { stdio: 'inherit', shell: true });
     } else {
       console.log(`  ${c.dim}[STANDBY POISED]${c.reset} Cloud Run standby left untouched.`);

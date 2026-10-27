@@ -6,7 +6,7 @@ param(
     [switch]$DryRun
 )
 
-$nodeArgs = @("$PSScriptRoot/deploy_edge.js")
+$nodeArgs = @("$PSScriptRoot/deploy_edge.cjs")
 if ($WithStandby) { $nodeArgs += "--with-standby" }
 if ($SkipLint)    { $nodeArgs += "--skip-lint" }
 if ($SkipPush)    { $nodeArgs += "--skip-push" }

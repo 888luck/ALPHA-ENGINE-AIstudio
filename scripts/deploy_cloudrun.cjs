@@ -7,9 +7,9 @@
  * standby mirror (https://alpha-engine-aistudio-138990607360.europe-west3.run.app).
  *
  * Usage:
- *   node scripts/deploy_cloudrun.js [options]
  *   npm run deploy:standby
  *   npm run deploy:cloudrun
+ *   node scripts/deploy_cloudrun.cjs [options]
  * ==============================================================================
  */
 
