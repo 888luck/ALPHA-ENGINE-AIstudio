@@ -172,7 +172,8 @@ async function main() {
       process.stdout.write(`  ${c.dim}[SSH CONNECTING]${c.reset} Executing remote update pipeline on Frankfurt VM... \n`);
 
       const b64Payload = Buffer.from(remoteCommands).toString('base64');
-      const encodedCommand = `echo ${b64Payload} | base64 -d | bash`;
+      const pipeChar = process.platform === 'win32' ? '^|' : '|';
+      const encodedCommand = `echo ${b64Payload} ${pipeChar} base64 -d ${pipeChar} bash`;
 
       const sshResult = spawnSync(
         'gcloud',
