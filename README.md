@@ -13,8 +13,9 @@ Alpha Engine is an institutional two-tier algorithmic execution, quantitative re
 |                                                                                   |
 |  - 7 Institutional Control Tabs (Vite + React SPA)                                |
 |  - High-Throughput Node.js API Gateway (dist/server.cjs)                          |
-|  - Master 12-Factor Decoupled Vault Engine (/api/vault)                           |
-|  - Live Endpoint: https://alpha-engine-aistudio-138990607360.europe-west3.run.app |
+|  - Live Cloud Run Control Plane: https://alpha-engine-aistudio-138990607360.europe-west3.run.app |
+|  - Live Frankfurt Edge Node Domain: https://misha-vm-gcp.duckdns.org (Port 3000 SSL Proxy)       |
+|  - Live IBKR Gateway Remote VNC GUI: https://misha-vm-gcp.duckdns.org:8443 (Port 6080 SSL Proxy)  |
 +-----------------------------------------------------------------------------------+
                                         |
        Encrypted Low-Latency TCP Socket Streaming (<5ms, token-authenticated)
@@ -97,6 +98,8 @@ node dist/server.cjs
 ```
 - Local URL: `http://localhost:3000`
 - Production Cloud Run Endpoint: `https://alpha-engine-aistudio-138990607360.europe-west3.run.app`
+- Production Frankfurt Edge VM Web UI: `https://misha-vm-gcp.duckdns.org`
+- Production IBKR Gateway noVNC GUI: `https://misha-vm-gcp.duckdns.org:8443`
 
 ### 2. Edge Execution Daemon on Frankfurt VM (Port 4005)
 ```bash
