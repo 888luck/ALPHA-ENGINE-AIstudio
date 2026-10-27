@@ -4,6 +4,35 @@ All notable changes, architectural evolutions, and institutional fixes to the Al
 
 ---
 
+## [v2.6.0] - 2026-10-27: Tier 0 Frontier Dual-Head Encoder Architecture & Information Coefficient Factor Engine
+
+### 🌟 Major Evolutions & Enhancements
+
+#### 1. Tier 0 Frontier Dual-Head Architecture (`news_event_correlator.py`)
+- **Canonical Model Directory & Surgical Decommissioning**:
+  - Migrated and unified model storage under `models/tier0-encoder/` (purging deprecated `models/finbert-int8/`).
+  - Standardized model identification across frontend UI, Express routing, and Python Copilot to `local/tier0-encoder` ($0 cost Tier 0 offline model).
+- **Dual-Head Execution Pipelines**:
+  - `score_wire(text: str) -> HeadlineScore`: Low-latency (<10ms) 3-class sequence classification ($[P_{pos}, P_{neg}, P_{neu}]$, polarity $P_{pos} - P_{neg}$) on CPU with probability simplex enforcement ($\sum P_i = 1.0 \pm 10^{-5}$).
+  - `embed_document(text: str, max_length: int = 8192) -> List[float]`: 8,192-token document vectorization for SEC 8-K Items and 10-Q MD&A sections, generating 768-dimensional $L_2$-normalized unit vectors with pure-Python deterministic fallback.
+- **Resilience & Backward Compatibility**:
+  - Maintained backward-compatible aliases `FinBertOnnxClassifier = Tier0OnnxClassifier`, `score_headline = score_wire`, and `modernbert_available = tier0_available`.
+  - 3-strike circuit breaker automatically trips to the deterministic Loughran-McDonald lexicon / IDF keyword engine without throwing exceptions.
+
+#### 2. Statistical Information Coefficient (IC) Factor Engine (`quant_discovery.py`, `research_controller.py`)
+- **Spearman Rank Correlation ($\text{IC}$)**:
+  - Added `QuantDiscoveryEngine.compute_information_coefficient(sentiment_scores, forward_returns)` adhering to institutional factor modeling standards (Grinold & Kahn).
+  - Calculates Spearman's $\text{IC}$, Student's $t$-statistic, and two-tailed $p$-value; classifies signals into `STRONG_ALPHA_SIGNAL`, `MODERATE_ALPHA_SIGNAL`, or `NOISE_OR_SPURIOUS`.
+  - Attaches IC validation directly to `handle_analyze` in the Quantitative Research Lab.
+
+#### 3. Polarity-Aware Dynamic Trailing & Gate 5 NLP Dual Veto (`backtester.py`, `alpha_strategy.py`)
+- **Gate 5 NLP Dual Veto**:
+  - Rejects Long breakout setups when primary catalyst polarity is strongly negative ($\le -0.60$) and Short setups when polarity is strongly positive ($\ge +0.60$).
+- **Catalyst-Modulated Trailing Stops**:
+  - Dynamically modulates the runner trailing distance: expands trailing cushion ($k_{trail} \times 1.25$) when trade is driven by a confirmed catalyst ($\ge +0.60$) to capture post-earnings announcement drift (PEAD); tightens cushion ($k_{trail} \times 0.75$) when negative ($\le -0.60$) to protect capital.
+
+---
+
 ## [v2.5.0] - 2026-10-26: Dynamic Trailing Profit Engine, Chandelier Ratchet & 83-Tool Reflection Evolution
 
 ### 🌟 Major Evolutions & Enhancements

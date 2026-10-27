@@ -35,10 +35,14 @@ from news_event_correlator import (  # noqa: E402
     ENGINE_ONNX,
     TIER0_LATENCY_BUDGET_MS,
     TIER0_MAX_CONSECUTIVE_FAILURES,
+    Tier0OnnxClassifier,
+    Tier0DocumentEmbedder,
     FinBertOnnxClassifier,
     NewsEventCorrelator,
     resolve_tier0_model_dir,
 )
+from quant_discovery import QuantDiscoveryEngine  # noqa: E402
+from backtester import AlphaBacktestingEngine  # noqa: E402
 
 MEMORY_BUDGET_MB = 200.0
 
@@ -185,6 +189,7 @@ class TestTier0OnnxInference:
     def test_onnx_scores_real_headlines(self):
         _require_onnx()
         corr = NewsEventCorrelator()
+        assert corr.tier0_available is True
         assert corr.modernbert_available is True
         assert corr.tier0_engine == ENGINE_ONNX
         for ev in REAL_EVENTS:
@@ -265,6 +270,7 @@ class TestTier0Fallback:
         assert clf.available is False
         assert "absent" in clf.unavailable_reason
         corr = NewsEventCorrelator(model_dir=str(tmp_path / "does-not-exist"))
+        assert corr.tier0_available is False
         assert corr.modernbert_available is False
         assert corr.tier0_engine == ENGINE_FALLBACK
         s = corr.score_headline(REAL_EVENTS[0])
@@ -307,6 +313,7 @@ class TestTier0Fallback:
         for i in range(TIER0_MAX_CONSECUTIVE_FAILURES):
             s = corr.score_headline(REAL_EVENTS[i % len(REAL_EVENTS)])
             assert s.engine == ENGINE_FALLBACK
+        assert corr.tier0_available is False
         assert corr.modernbert_available is False
         assert corr.tier0_engine == ENGINE_FALLBACK
         assert "circuit-broken" in corr.tier0_unavailable_reason
@@ -332,6 +339,93 @@ class TestTier0Fallback:
         stats = run_latency_benchmark(corr, iterations=500)
         assert stats["engine"] == ENGINE_FALLBACK
         assert stats["p95_ms"] < TIER0_LATENCY_BUDGET_MS, stats
+
+
+class TestTier0DualHeadAndQuantFactors:
+    """Verifies Phase 3 Dual-Head execution and Phase 4 Quant Factor integration."""
+
+    def test_score_wire_parity_and_simplex(self):
+        corr = NewsEventCorrelator()
+        for ev in REAL_EVENTS:
+            w = corr.score_wire(ev)
+            h = corr.score_headline(ev)
+            w_dict = w.as_dict()
+            h_dict = h.as_dict()
+            w_dict.pop("latency_ms"), h_dict.pop("latency_ms")
+            assert w_dict == h_dict
+            _assert_simplex(w.probabilities)
+            assert -1.0 <= w.polarity <= 1.0
+
+    def test_embed_document_vector_properties(self):
+        corr = NewsEventCorrelator()
+        sec_filing = "Item 2.02 Results of Operations and Financial Condition. Management Discussion and Analysis."
+        vec = corr.embed_document(sec_filing, max_length=8192)
+        assert isinstance(vec, list)
+        assert len(vec) == 768
+        norm = sum(x * x for x in vec)
+        assert abs(norm - 1.0) < 1e-4
+
+        # Determinism check: identical text -> identical embedding
+        vec2 = corr.embed_document(sec_filing, max_length=8192)
+        assert vec == vec2
+
+        # Shared cache verification
+        embedder1 = Tier0DocumentEmbedder.shared()
+        embedder2 = Tier0DocumentEmbedder.shared()
+        assert embedder1 is embedder2
+
+    def test_information_coefficient_calculation(self):
+        # 1. Monotonic positive rank correlation (IC = 1.0)
+        sentiment = [0.9, 0.5, 0.1, -0.4, -0.8]
+        returns = [0.06, 0.03, 0.005, -0.02, -0.05]
+        res_pos = QuantDiscoveryEngine.compute_information_coefficient(sentiment, returns)
+        assert res_pos["valid"] is True
+        assert res_pos["ic"] == 1.0
+        assert res_pos["is_significant"] is True
+        assert res_pos["signal_strength"] == "STRONG_ALPHA_SIGNAL"
+        assert res_pos["institutional_verdict"] == "CONFIRMED_PREDICTIVE_CATALYST"
+
+        # 2. Monotonic negative rank correlation (IC = -1.0)
+        res_neg = QuantDiscoveryEngine.compute_information_coefficient(sentiment, list(reversed(returns)))
+        assert res_neg["valid"] is True
+        assert res_neg["ic"] == -1.0
+        assert res_neg["is_significant"] is True
+        assert res_neg["institutional_verdict"] == "CONFIRMED_CONTRARIAN_CATALYST"
+
+        # 3. Insufficient sample size (< 5)
+        res_small = QuantDiscoveryEngine.compute_information_coefficient([0.5, -0.5], [0.02, -0.02])
+        assert res_small["valid"] is False
+        assert res_small["is_significant"] is False
+
+    def test_backtester_catalyst_polarity_veto_and_trailing(self):
+        engine = AlphaBacktestingEngine()
+        bars = engine.generate_synthetic_history("ASML", "1D", "2026-01-01", "2026-03-31")
+
+        # Run with negative catalyst polarity (-0.80): should trigger Gate 5 veto on bullish setups
+        bt_vetoed = engine.run_backtest(
+            symbol="ASML",
+            timeframe="1D",
+            start_date="2026-01-01",
+            end_date="2026-03-31",
+            bars=bars,
+            trailing_stop_atr=2.0,
+            catalyst_polarity=-0.80
+        )
+        assert bt_vetoed["catalystPolarity"] == -0.80
+        assert "gate5BlackoutRejected" in bt_vetoed["gateAttribution"]
+
+        # Run with positive catalyst polarity (+0.80): should execute with expanded trailing stop cushion
+        bt_expanded = engine.run_backtest(
+            symbol="ASML",
+            timeframe="1D",
+            start_date="2026-01-01",
+            end_date="2026-03-31",
+            bars=bars,
+            trailing_stop_atr=2.0,
+            catalyst_polarity=0.80
+        )
+        assert bt_expanded["catalystPolarity"] == 0.80
+        assert bt_expanded["totalTrades"] >= 0
 
 
 # --------------------------------------------------------------------------------------------

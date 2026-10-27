@@ -45,10 +45,13 @@ logger = logging.getLogger("alpha_engine.tier0")
 # Tier 0 configuration
 # ---------------------------------------------------------------------------
 TIER0_LATENCY_BUDGET_MS = 15.0
-ENGINE_ONNX = "FINBERT_ONNX_INT8"
+ENGINE_ONNX = "TIER0_ONNX_INT8"
 ENGINE_FALLBACK = "KEYWORD_WEIGHT_FALLBACK"
 
-DEFAULT_TIER0_MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "finbert-int8")
+DEFAULT_TIER0_ENCODER_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "tier0-encoder")
+LEGACY_TIER0_MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "finbert-int8")
+DEFAULT_TIER0_DOC_MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "tier0-arctic-int8")
+DEFAULT_TIER0_MODEL_DIR = DEFAULT_TIER0_ENCODER_DIR
 TIER0_MODEL_FILE = "model_int8.onnx"
 TIER0_TOKENIZER_FILE = "tokenizer.json"
 TIER0_CONFIG_FILE = "config.json"
@@ -62,8 +65,29 @@ TIER0_MAX_CONSECUTIVE_FAILURES = 3
 
 
 def resolve_tier0_model_dir(model_dir: Optional[str] = None) -> str:
-    """Resolution order: explicit argument > ALPHA_TIER0_MODEL_DIR env var > ./models/finbert-int8."""
-    return os.path.abspath(model_dir or os.environ.get("ALPHA_TIER0_MODEL_DIR") or DEFAULT_TIER0_MODEL_DIR)
+    """Resolution order: explicit argument > ALPHA_TIER0_MODEL_DIR env var > ./models/tier0-encoder (with fallback to ./models/finbert-int8)."""
+    if model_dir:
+        return os.path.abspath(model_dir)
+    env_dir = os.environ.get("ALPHA_TIER0_MODEL_DIR")
+    if env_dir:
+        return os.path.abspath(env_dir)
+    if os.path.isdir(DEFAULT_TIER0_ENCODER_DIR):
+        return os.path.abspath(DEFAULT_TIER0_ENCODER_DIR)
+    if os.path.isdir(LEGACY_TIER0_MODEL_DIR):
+        return os.path.abspath(LEGACY_TIER0_MODEL_DIR)
+    return os.path.abspath(DEFAULT_TIER0_ENCODER_DIR)
+
+
+def resolve_tier0_doc_model_dir(model_dir: Optional[str] = None) -> str:
+    """Resolution order: explicit argument > ALPHA_TIER0_DOC_MODEL_DIR env var > ./models/tier0-arctic-int8."""
+    if model_dir and os.path.basename(os.path.normpath(model_dir)) in ("tier0-arctic-int8", "arctic-int8"):
+        return os.path.abspath(model_dir)
+    env_dir = os.environ.get("ALPHA_TIER0_DOC_MODEL_DIR")
+    if env_dir:
+        return os.path.abspath(env_dir)
+    if os.path.isdir(DEFAULT_TIER0_DOC_MODEL_DIR):
+        return os.path.abspath(DEFAULT_TIER0_DOC_MODEL_DIR)
+    return os.path.abspath(DEFAULT_TIER0_DOC_MODEL_DIR)
 
 
 def _default_thread_count() -> int:
@@ -97,16 +121,16 @@ class HeadlineScore:
         return asdict(self)
 
 
-class FinBertOnnxClassifier:
+class Tier0OnnxClassifier:
     """
-    INT8 FinBERT sequence classifier on onnxruntime (CPU).
+    Tier 0 Institutional Sequence Classifier on onnxruntime (CPU).
 
     Construction never raises: on any failure `available` is False and `unavailable_reason`
     carries the root cause (logged at WARNING with traceback). `predict()` DOES raise on
     runtime failure so callers can account for it explicitly (see NewsEventCorrelator).
     """
 
-    _shared_cache: Dict[Tuple[str, int, int], "FinBertOnnxClassifier"] = {}
+    _shared_cache: Dict[Tuple[str, int, int], "Tier0OnnxClassifier"] = {}
     _shared_lock = threading.Lock()
 
     def __init__(self, model_dir: Optional[str] = None, max_seq_len: int = TIER0_MAX_SEQ_LEN,
@@ -214,9 +238,152 @@ class FinBertOnnxClassifier:
 
     # -- process-wide cache -------------------------------------------------
     @classmethod
-    def shared(cls, model_dir: Optional[str] = None) -> "FinBertOnnxClassifier":
+    def shared(cls, model_dir: Optional[str] = None) -> "Tier0OnnxClassifier":
         """One session per (model_dir, seq_len, threads) per process; ORT sessions are thread-safe for run()."""
         key = (resolve_tier0_model_dir(model_dir), TIER0_MAX_SEQ_LEN, _default_thread_count())
+        with cls._shared_lock:
+            inst = cls._shared_cache.get(key)
+            if inst is None:
+                inst = cls(model_dir=key[0], max_seq_len=key[1], intra_op_threads=key[2])
+                cls._shared_cache[key] = inst
+            return inst
+
+    @classmethod
+    def clear_shared_cache(cls) -> None:
+        with cls._shared_lock:
+            cls._shared_cache.clear()
+
+
+# Deprecated backward compatibility alias
+FinBertOnnxClassifier = Tier0OnnxClassifier
+
+
+class Tier0DocumentEmbedder:
+    """
+    Tier 0 Institutional Document Vectorizer (8,192 tokens, 768 dimensions).
+    Primary: Snowflake Arctic INT8 ONNX embedder on onnxruntime CPU.
+    Fallback: Deterministic feature-hashed TF-IDF unit vector (pure Python/numpy)
+              yielding 768-dim L2-normalized float embeddings.
+    """
+
+    _shared_cache: Dict[Tuple[str, int, int], "Tier0DocumentEmbedder"] = {}
+    _shared_lock = threading.Lock()
+
+    def __init__(self, model_dir: Optional[str] = None, max_seq_len: int = 8192,
+                 intra_op_threads: Optional[int] = None, warmup: bool = False):
+        self.model_dir = resolve_tier0_doc_model_dir(model_dir)
+        self.max_seq_len = max_seq_len
+        self.intra_op_threads = intra_op_threads or _default_thread_count()
+        self.available = False
+        self.unavailable_reason: Optional[str] = None
+        self.load_ms: float = 0.0
+        self._session = None
+        self._tokenizer = None
+        self._np = None
+        self._input_names: List[str] = []
+        self._dim = 768
+
+        t0 = time.perf_counter()
+        try:
+            self._load(warmup)
+            self.available = True
+        except Exception as exc:
+            self.unavailable_reason = f"{type(exc).__name__}: {exc}"
+            logger.debug("Tier 0 document ONNX embedder unavailable (%s); using deterministic L2 fallback.", exc)
+        finally:
+            self.load_ms = (time.perf_counter() - t0) * 1000.0
+
+    def _load(self, warmup: bool) -> None:
+        model_path = os.path.join(self.model_dir, TIER0_MODEL_FILE)
+        tok_path = os.path.join(self.model_dir, TIER0_TOKENIZER_FILE)
+        if not os.path.isfile(model_path) or not os.path.isfile(tok_path):
+            raise _Tier0Unavailable(f"embedder artifacts absent in {self.model_dir}")
+
+        import numpy as np
+        import onnxruntime as ort
+        from tokenizers import Tokenizer
+
+        tokenizer = Tokenizer.from_file(tok_path)
+        tokenizer.enable_truncation(max_length=self.max_seq_len)
+        tokenizer.no_padding()
+
+        opts = ort.SessionOptions()
+        opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        opts.intra_op_num_threads = self.intra_op_threads
+        opts.inter_op_num_threads = 1
+        opts.log_severity_level = 3
+        session = ort.InferenceSession(model_path, sess_options=opts, providers=["CPUExecutionProvider"])
+        outputs = session.get_outputs()
+        out_shape = outputs[0].shape
+        last_dim = out_shape[-1] if out_shape and isinstance(out_shape[-1], int) else None
+        if last_dim is not None and last_dim < 64:
+            raise _Tier0Unavailable(f"model output dimension {last_dim} is a classification head, not an embedding projection (>= 64 required)")
+
+        self._np = np
+        self._tokenizer = tokenizer
+        self._session = session
+        self._input_names = [i.name for i in session.get_inputs()]
+        if warmup:
+            self.embed("SEC Form 8-K primary filing disclosure.", max_length=self.max_seq_len)
+
+    def _fallback_embed(self, text: str) -> List[float]:
+        """
+        Deterministic, stateless 768-dimensional unit embedding using token hashing & IDF weighting.
+        Guarantees unit L2 norm (|v| == 1.0) and deterministic vector mapping.
+        """
+        dim = self._dim
+        vec = [0.0] * dim
+        tokens = re.findall(r"\w+", (text or "").lower())
+        if not tokens:
+            vec[0] = 1.0
+            return vec
+
+        import hashlib
+        for idx, token in enumerate(tokens):
+            h = int(hashlib.md5(token.encode("utf-8")).hexdigest(), 16)
+            pos = h % dim
+            sign = 1.0 if ((h >> 16) & 1) == 0 else -1.0
+            pos_weight = 1.0 / (1.0 + math.log(1.0 + idx))
+            vec[pos] += sign * pos_weight
+
+        norm = math.sqrt(sum(x * x for x in vec))
+        if norm > 1e-12:
+            return [round(x / norm, 6) for x in vec]
+        vec[0] = 1.0
+        return vec
+
+    def embed(self, text: str, max_length: int = 8192) -> List[float]:
+        """Embeds text into a 768-dimensional L2-normalized vector."""
+        if not self.available or self._session is None or self._tokenizer is None:
+            return self._fallback_embed(text)
+        try:
+            np = self._np
+            enc = self._tokenizer.encode(text or "")
+            input_ids = enc.ids[:max_length]
+            attn_mask = [1] * len(input_ids)
+            feeds = {"input_ids": np.asarray([input_ids], dtype=np.int64)}
+            if "attention_mask" in self._input_names:
+                feeds["attention_mask"] = np.asarray([attn_mask], dtype=np.int64)
+            if "token_type_ids" in self._input_names:
+                feeds["token_type_ids"] = np.asarray([[0] * len(input_ids)], dtype=np.int64)
+            outputs = self._session.run(None, feeds)
+            raw = outputs[0][0]
+            if raw.ndim == 2:
+                emb = raw.mean(axis=0)
+            else:
+                emb = raw
+            norm = np.linalg.norm(emb)
+            if norm > 1e-12:
+                emb = emb / norm
+            return [round(float(x), 6) for x in emb[:self._dim]]
+        except Exception as exc:
+            logger.warning("Document embedder runtime failure (%s); using deterministic fallback.", exc)
+            return self._fallback_embed(text)
+
+    @classmethod
+    def shared(cls, model_dir: Optional[str] = None) -> "Tier0DocumentEmbedder":
+        key = (resolve_tier0_doc_model_dir(model_dir), 8192, _default_thread_count())
         with cls._shared_lock:
             inst = cls._shared_cache.get(key)
             if inst is None:
@@ -265,27 +432,36 @@ class NewsEventCorrelator:
         self._enable_onnx = enable_onnx
         self._compile_keyword_engine()
         self._init_embedder()
+        self._embedder = Tier0DocumentEmbedder.shared(self._model_dir)
 
     def _init_embedder(self):
         """
         Initializes the Tier 0 headline scorer.
-        Primary: INT8 FinBERT on onnxruntime CPU (shared per process). Fallback: the deterministic
+        Primary: INT8 Transformer on onnxruntime CPU (shared per process). Fallback: the deterministic
         CATALYST_WEIGHTS keyword-weight engine, which avoids unstable binary DLL hooks on Windows
-        environments. `modernbert_available` is retained for backward compatibility and reports
-        whether the transformer (ONNX) path is live.
+        environments. `tier0_available` reports whether the ONNX transformer pipeline is active.
         """
-        self._onnx: Optional[FinBertOnnxClassifier] = None
+        self._onnx: Optional[Tier0OnnxClassifier] = None
         self._onnx_consecutive_failures = 0
         self.tier0_unavailable_reason: Optional[str] = None
         if self._enable_onnx:
-            clf = FinBertOnnxClassifier.shared(self._model_dir)
+            clf = Tier0OnnxClassifier.shared(self._model_dir)
             if clf.available:
                 self._onnx = clf
             else:
                 self.tier0_unavailable_reason = clf.unavailable_reason
         else:
             self.tier0_unavailable_reason = "disabled by configuration (enable_onnx=False)"
-        self.modernbert_available = self._onnx is not None
+        self.tier0_available = self._onnx is not None
+
+    @property
+    def modernbert_available(self) -> bool:
+        """Deprecated alias for tier0_available maintained for backward compatibility."""
+        return getattr(self, "tier0_available", False)
+
+    @modernbert_available.setter
+    def modernbert_available(self, value: bool) -> None:
+        self.tier0_available = value
 
     @property
     def tier0_engine(self) -> str:
@@ -329,11 +505,12 @@ class NewsEventCorrelator:
         denom = float(pos + neg + 1)
         return {"positive": pos / denom, "negative": neg / denom, "neutral": 1.0 / denom}
 
-    def score_headline(self, item: Union[NewsEvent, str]) -> HeadlineScore:
+    def score_wire(self, item: Union[NewsEvent, str]) -> HeadlineScore:
         """
-        Tier 0 headline scoring. Never raises for model/runtime faults: an ONNX failure degrades
-        to the keyword engine for that call, and TIER0_MAX_CONSECUTIVE_FAILURES consecutive
-        failures circuit-break the ONNX path for the lifetime of this correlator.
+        Tier 0 low-latency wire scoring (<10ms). Never raises for model/runtime faults:
+        an ONNX failure degrades to the keyword engine for that call, and TIER0_MAX_CONSECUTIVE_FAILURES
+        consecutive failures circuit-break the ONNX path for the lifetime of this correlator.
+        Outputs 3-class simplex [P_pos, P_neg, P_neu] and polarity P_pos - P_neg.
         """
         t0 = time.perf_counter()
         event_id = item.event_id if isinstance(item, NewsEvent) else None
@@ -355,7 +532,7 @@ class NewsEventCorrelator:
                 if self._onnx_consecutive_failures >= TIER0_MAX_CONSECUTIVE_FAILURES:
                     self.tier0_unavailable_reason = f"circuit-broken after repeated inference failures: {exc}"
                     self._onnx = None
-                    self.modernbert_available = False
+                    self.tier0_available = False
         if probs is None:
             probs = self._keyword_sentiment(text_lc)
 
@@ -372,6 +549,17 @@ class NewsEventCorrelator:
             latency_ms=round((time.perf_counter() - t0) * 1000.0, 3),
             event_id=event_id,
         )
+
+    def score_headline(self, item: Union[NewsEvent, str]) -> HeadlineScore:
+        """Canonical wire scoring (backward compatible alias for score_wire)."""
+        return self.score_wire(item)
+
+    def embed_document(self, text: str, max_length: int = 8192) -> List[float]:
+        """
+        Embeds document text (SEC 8-K / 10-Q MD&A) up to max_length (default 8,192) tokens.
+        Outputs 768-dimensional L2-normalized float vector.
+        """
+        return self._embedder.embed(text, max_length=max_length)
 
     def correlate_anomalies_with_events(
         self,
@@ -449,7 +637,7 @@ class NewsEventCorrelator:
                 anom["headline"] = primary_ev.headline
                 anom["source"] = primary_ev.source
                 anom["event_type"] = primary_ev.event_type
-                anom["tier0_score"] = self.score_headline(primary_ev).as_dict()
+                anom["tier0_score"] = self.score_wire(primary_ev).as_dict()
                 exogenous_days_count += 1
             else:
                 anom["classification"] = "ENDOGENOUS_MICROSTRUCTURE"

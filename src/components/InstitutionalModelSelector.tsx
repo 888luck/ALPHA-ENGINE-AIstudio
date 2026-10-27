@@ -125,8 +125,8 @@ export const InstitutionalModelSelector: React.FC<InstitutionalModelSelectorProp
     if (found) return found;
     return (
       availableModels[0] || {
-        id: "local/finbert-int8",
-        name: "FinBERT INT8 ONNX (CPU Offline)",
+        id: "local/tier0-encoder",
+        name: "Tier 0 Institutional Encoder (CPU Offline)",
         provider: "Local Tier 0",
         tier: "Tier 0 Offline",
         badge: "UNMETERED / <15ms",

@@ -81,10 +81,10 @@ def emit_sse(event: str, data: Any) -> str:
 def get_model_pricing(model_id: str) -> Dict[str, Any]:
     """Calculate vendor pricing dynamically based on model string patterns."""
     mid = (model_id or "").lower()
-    if "local" in mid or "finbert" in mid:
+    if "local" in mid or "finbert" in mid or "tier0" in mid:
         return {
             "provider": "Local Tier 0",
-            "name": "INT8 ONNX FinBERT (CPU Offline)",
+            "name": "Tier 0 Institutional Encoder (CPU Offline)",
             "prompt_per_m": 0.0,
             "completion_per_m": 0.0,
             "daily_limit": 999999
@@ -133,9 +133,9 @@ def discover_active_models(api_keys: Optional[Dict[str, str]] = None) -> List[Di
     keys = api_keys or {}
     models: List[Dict[str, Any]] = [
         {
-            "id": "local/finbert-int8",
-            "rawId": "finbert-int8",
-            "name": "INT8 ONNX FinBERT (CPU Offline)",
+            "id": "local/tier0-encoder",
+            "rawId": "tier0-encoder",
+            "name": "Tier 0 Institutional Encoder (CPU Offline)",
             "provider": "Local Tier 0",
             "tier": "Tier 0 Offline",
             "badge": "$0 Cost / <15ms",
@@ -1078,7 +1078,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: List[ChatMessage] = []
-    model: str = "local/finbert-int8"
+    model: str = "local/tier0-encoder"
     raw_id: Optional[str] = None
     temperature: float = 0.2
     max_tokens: int = 4096
@@ -1214,7 +1214,7 @@ def extract_provider_and_key(selected_model: str, client_headers: Dict[str, str]
         key = client_headers.get("x-custom-api-key") or keys.get("custom") or os.environ.get("CUSTOM_AI_API_KEY", "")
         return "custom", raw_id, key
     else:
-        return "local", "finbert-int8", ""
+        return "local", "tier0-encoder", ""
 
 def get_fallback_provider_candidate(current_provider: str, current_model: str, client_headers: Dict[str, str], payload_keys: Optional[Dict[str, str]], excluded_providers: Optional[set] = None) -> Optional[tuple[str, str, str, str]]:
     """
@@ -1264,13 +1264,13 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
     # Circuit Breaker check
     circuit_breaker_triggered = daily_spent >= ceiling
     selected_model = request.model
-    if circuit_breaker_triggered and selected_model != "local/finbert-int8":
-        selected_model = "local/finbert-int8"
+    if circuit_breaker_triggered and selected_model not in ["local/tier0-encoder", "local/finbert-int8"]:
+        selected_model = "local/tier0-encoder"
         yield emit_sse("delta", {"content": f"> ⚠️ **CIRCUIT BREAKER ENGAGED**: Daily spending ceiling of ${round(ceiling, 2)} reached. Routed to $0 Local Tier 0 ONNX model.\n\n"})
 
     provider, raw_model_id, api_key = extract_provider_and_key(selected_model, client_headers, request.keys, request.raw_id)
 
-    async def stream_local_finbert(req: ChatRequest, st: Dict[str, Any], cl: float, start_t: float, custom_notice: Optional[str] = None):
+    async def stream_local_tier0_encoder(req: ChatRequest, st: Dict[str, Any], cl: float, start_t: float, custom_notice: Optional[str] = None):
         if custom_notice:
             yield emit_sse("delta", {"content": custom_notice})
             
@@ -1335,10 +1335,10 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
             neu_pct = round(score.get("neutral", 0) * 100, 1)
             
             reply = (
-                f"### ⚡ Local Tier 0 INT8 FinBERT Response ($0.00 Cost)\n\n"
+                f"### ⚡ Local Tier 0 Institutional Encoder Response ($0.00 Cost)\n\n"
                 f"Analyzed query in `<15ms` using quantized local ONNX transformer on CPU:\n\n"
                 f"- **Sentiment Inference**: Positive: `{pos_pct}%` | Negative: `{neg_pct}%` | Neutral: `{neu_pct}%`\n"
-                f"- **Engine**: `{nec.tier0_engine}` | Model: `ProsusAI/finbert` INT8\n"
+                f"- **Engine**: `{nec.tier0_engine}` | Model: `Tier 0 Institutional Foundation ONNX`\n"
                 f"- **Zero-Egress Invariant**: Executed entirely on local CPU with zero network egress or API tokens consumed.\n\n"
                 f"To access live Interactive Brokers DMA telemetry, SEC filings, or FDA regulatory catalysts, configure provider API keys in the **4-Pillar Vault**."
             )
@@ -1348,11 +1348,11 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
             time.sleep(0.01)
             
         t_end = time.perf_counter()
-        pricing = get_model_pricing("local/finbert-int8")
+        pricing = get_model_pricing("local/tier0-encoder")
         yield emit_sse("telemetry", {
             "provider": "Local Tier 0",
-            "model": "local/finbert-int8",
-            "model_name": "INT8 ONNX FinBERT",
+            "model": "local/tier0-encoder",
+            "model_name": "Tier 0 Institutional Encoder",
             "prompt_tokens": len(last_msg) // 4,
             "completion_tokens": len(reply) // 4,
             "total_tokens": (len(last_msg) + len(reply)) // 4,
@@ -1366,8 +1366,8 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
         yield emit_sse("done", {"status": "finished"})
 
     # 1. Tier 0 Local CPU Model ($0 cost, offline ONNX)
-    if provider == "local" or selected_model == "local/finbert-int8":
-        async for chunk in stream_local_finbert(request, state, ceiling, t_start):
+    if provider == "local" or selected_model in ["local/tier0-encoder", "local/finbert-int8"]:
+        async for chunk in stream_local_tier0_encoder(request, state, ceiling, t_start):
             yield chunk
         return
 
@@ -1384,8 +1384,8 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
             api_key = fb_key
             selected_model = f"{fb_provider}/{fb_raw_id}"
         else:
-            notice = f"> ℹ️ [Auto-routed via Local Tier 0 FinBERT because {provider.upper()} key is unconfigured]\n\n"
-            async for chunk in stream_local_finbert(request, state, ceiling, t_start, custom_notice=notice):
+            notice = f"> ℹ️ [Auto-routed via Local Tier 0 Institutional Encoder because {provider.upper()} key is unconfigured]\n\n"
+            async for chunk in stream_local_tier0_encoder(request, state, ceiling, t_start, custom_notice=notice):
                 yield chunk
             return
 
@@ -1949,9 +1949,9 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
                 continue
             else:
                 notice = (
-                    f"> ℹ️ [Auto-routed via Local Tier 0 FinBERT due to upstream HTTP {he.code} error: {clean_msg[:120]}]\n\n"
+                    f"> ℹ️ [Auto-routed via Local Tier 0 Institutional Encoder due to upstream HTTP {he.code} error: {clean_msg[:120]}]\n\n"
                 )
-                async for chunk in stream_local_finbert(request, state, ceiling, t_start, custom_notice=notice):
+                async for chunk in stream_local_tier0_encoder(request, state, ceiling, t_start, custom_notice=notice):
                     yield chunk
                 return
         except Exception as e:
@@ -1977,15 +1977,15 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
                 continue
             else:
                 notice = (
-                    f"> ℹ️ [Auto-routed via Local Tier 0 FinBERT due to execution error: {str(e)[:100]}]\n\n"
+                    f"> ℹ️ [Auto-routed via Local Tier 0 Institutional Encoder due to execution error: {str(e)[:100]}]\n\n"
                 )
-                async for chunk in stream_local_finbert(request, state, ceiling, t_start, custom_notice=notice):
+                async for chunk in stream_local_tier0_encoder(request, state, ceiling, t_start, custom_notice=notice):
                     yield chunk
                 return
 
     if not execution_success:
-        notice = "> ℹ️ [Auto-routed via Local Tier 0 FinBERT because upstream provider produced no valid response]\n\n"
-        async for chunk in stream_local_finbert(request, state, ceiling, t_start, custom_notice=notice):
+        notice = "> ℹ️ [Auto-routed via Local Tier 0 Institutional Encoder because upstream provider produced no valid response]\n\n"
+        async for chunk in stream_local_tier0_encoder(request, state, ceiling, t_start, custom_notice=notice):
             yield chunk
         return
 
@@ -2051,7 +2051,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="AlphaEngine Copilot CLI / Server")
     parser.add_argument("--query", type=str, help="Run an ad-hoc query directly via CLI")
-    parser.add_argument("--model", type=str, default="local/finbert-int8", help="Target model")
+    parser.add_argument("--model", type=str, default="local/tier0-encoder", help="Target model")
     parser.add_argument("--stdin", action="store_true", help="Read ChatRequest JSON from stdin and stream SSE")
     args = parser.parse_args()
 

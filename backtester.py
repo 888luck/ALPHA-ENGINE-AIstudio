@@ -61,7 +61,8 @@ class AlphaBacktestingEngine:
                      trailing_stop_atr: Optional[float] = None,
                      trailing_activation_r: float = 1.5,
                      trailing_step_atr: float = 0.25,
-                     trailing_type: str = "CHANDELIER") -> Dict[str, Any]:
+                     trailing_type: str = "CHANDELIER",
+                     catalyst_polarity: Optional[float] = None) -> Dict[str, Any]:
         """
         Executes an algorithmic backtest over historical metrics with advanced institutional upgrades:
           - Adaptive Volatility ATR Stops: dynamic cushion to prevent premature stop-outs
@@ -199,6 +200,12 @@ class AlphaBacktestingEngine:
                     if pos.get("trailing_active", False):
                         t_type = (trailing_type or "CHANDELIER").upper().strip()
                         k_trail = float(trailing_stop_atr)
+                        pol = pos.get("catalyst_polarity")
+                        if pol is not None:
+                            if pol >= 0.60:
+                                k_trail = k_trail * 1.25  # expand trailing cushion for confirmed catalyst
+                            elif pol <= -0.60:
+                                k_trail = k_trail * 0.75  # tighten trailing cushion to lock profits quickly
                         step_damper = max(0.01, float(trailing_step_atr) * current_atr)
 
                         if t_type == "PARABOLIC":
@@ -331,6 +338,17 @@ class AlphaBacktestingEngine:
 
                     is_bullish = current_close > current_sma
                     direction = "BUY" if is_bullish else "SELL"
+
+                    # Gate 5 NLP Dual Veto: Reject Long on strongly negative catalyst, Short on positive
+                    if catalyst_polarity is not None:
+                        if is_bullish and catalyst_polarity <= -0.60:
+                            gate5_blackout_count += 1
+                            rejected_trades_count += 1
+                            continue
+                        elif not is_bullish and catalyst_polarity >= 0.60:
+                            gate5_blackout_count += 1
+                            rejected_trades_count += 1
+                            continue
                     
                     # OFI Level 2 Book Imbalance confirmation filter
                     if ofi_filter:
@@ -401,7 +419,8 @@ class AlphaBacktestingEngine:
                         "highest_high": bar["high"],
                         "lowest_low": bar["low"],
                         "trailing_active": False,
-                        "is_trailing_stop": False
+                        "is_trailing_stop": False,
+                        "catalyst_polarity": catalyst_polarity
                     }
 
         # Handle formatting metrics
@@ -506,6 +525,7 @@ class AlphaBacktestingEngine:
             "trailingStepAtr": float(trailing_step_atr) if trailing_stop_atr and float(trailing_step_atr) > 0 else None,
             "trailingType": trailing_type if trailing_stop_atr and float(trailing_stop_atr) > 0 else None,
             "maxHoldApplied": max_hold,
+            "catalystPolarity": catalyst_polarity,
             "gateAttribution": {
                 "gate1CapitalClamped": gate1_capital_clamped_count,
                 "gate2FrictionRejected": gate2_friction_count,

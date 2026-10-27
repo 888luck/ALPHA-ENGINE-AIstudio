@@ -32,7 +32,7 @@ REPO_ID = "Xenova/finbert"
 BASE_MODEL = "ProsusAI/finbert"
 REVISION = "8f269abebfdd9009d7d9b5e96af7e5c6bfe50b20"
 
-DEFAULT_DEST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "finbert-int8")
+DEFAULT_DEST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "tier0-encoder")
 
 # Digests sourced from the Hugging Face tree API at REVISION.
 #   sha256        -> Git LFS object id (content SHA256)
@@ -112,8 +112,17 @@ def _download_verified(spec: Dict, dest_dir: str, timeout: float) -> None:
 def provision(dest_dir: str = DEFAULT_DEST, timeout: float = 120.0, verify_only: bool = False) -> bool:
     os.makedirs(dest_dir, exist_ok=True)
     all_ok = True
+    legacy_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "finbert-int8")
+
     for spec in ARTIFACTS:
         path = os.path.join(dest_dir, spec["local"])
+        if not os.path.isfile(path) and os.path.isdir(legacy_dir):
+            legacy_path = os.path.join(legacy_dir, spec["local"])
+            if os.path.isfile(legacy_path) and _file_matches(legacy_path, spec):
+                import shutil
+                shutil.copy2(legacy_path, path)
+                print(f"[tier0] MIGRATED {spec['local']} from legacy directory ({spec['size']:,} bytes)")
+
         if _file_matches(path, spec):
             print(f"[tier0] OK      {spec['local']} ({spec['size']:,} bytes, {spec['algo']} verified)")
             continue

@@ -28,7 +28,7 @@ Alpha Engine is an institutional two-tier algorithmic execution, quantitative re
 |  - SEC Rule 15c3-5 Pre-Trade Risk Engine: dynamic_risk_manager.py                 |
 |  - Alpha Strategy & Order Flow Imbalance (OFI) Engine: alpha_strategy.py          |
 |  - Pluggable Strategy Hot-Reload Engine: custom_strategy_loader.py                |
-|  - Offline NLP Encoders: INT8 ONNX FinBERT & ModernBERT (CPU $0 cost)             |
+|  - Offline Tier 0 Encoders: Dual-Head INT8 ONNX & 8,192-token embedder at models/tier0-encoder/ (CPU $0 cost) |
 |  - Local Atomic Persistence: ha_leader_lock.json, tca_executions.json             |
 +-----------------------------------------------------------------------------------+
                                         |

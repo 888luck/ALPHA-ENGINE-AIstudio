@@ -83,8 +83,8 @@ import { getAdminHeaders } from "../utils/auth";
 
 // Offline default model (local CPU ONNX embedded in container)
 const TIER0_OFFLINE_MODEL: ModelItem = {
-  id: "local/finbert-int8",
-  name: "INT8 ONNX FinBERT (CPU Offline)",
+  id: "local/tier0-encoder",
+  name: "Tier 0 Institutional Encoder (CPU Offline)",
   provider: "Local Tier 0",
   tier: "Tier 0 Offline",
   badge: "$0 Cost / <15ms",
@@ -176,7 +176,7 @@ Welcome to your standalone conversational trading co-pilot. I am connected direc
 - 📋 **SEC EDGAR Submissions API** for real-time 8-K, 10-Q, 10-K, and Form 4 regulatory filings.
 - 🧬 **ClinicalTrials.gov (API v2) & OpenFDA** for Phase II/III trial readouts and drug safety alerts.
 - ⚡ **U.S. EIA Energy Telemetry** for real-time natural gas underground storage & petroleum prints.
-- 🛡️ **Local Tier 0 INT8 ONNX FinBERT** for zero-cost, instant offline sentiment inference.
+- 🛡️ **Local Tier 0 Institutional Encoder** for zero-cost, instant offline sentiment inference.
 
 Click any quick query below or type your request:`,
         timestamp: new Date().toLocaleTimeString()
@@ -187,10 +187,10 @@ Click any quick query below or type your request:`,
   const [input, setInput] = useState("");
   const [selectedModel, setSelectedModel] = useState<string>(() => {
     const saved = localStorage.getItem("alpha_copilot_model");
-    if (saved) {
+    if (saved && saved !== "local/finbert-int8") {
       return saved;
     }
-    return "local/finbert-int8";
+    return "local/tier0-encoder";
   });
   const activeModelObj = availableModels.find((m) => m.id === selectedModel) || availableModels[0] || TIER0_OFFLINE_MODEL;
   const [isGenerating, setIsGenerating] = useState(false);
@@ -258,8 +258,8 @@ Click any quick query below or type your request:`,
           // If online models were discovered, auto-select the best one if currently on offline fallback
           if (cleanCatalog.length > 1) {
             setSelectedModel((prev) => {
-              if (prev === "local/finbert-int8" || !cleanCatalog.some((m: any) => m.id === prev)) {
-                const online = cleanCatalog.find((m: any) => m.id !== "local/finbert-int8");
+              if (prev === "local/tier0-encoder" || prev === "local/finbert-int8" || !cleanCatalog.some((m: any) => m.id === prev)) {
+                const online = cleanCatalog.find((m: any) => m.id !== "local/tier0-encoder" && m.id !== "local/finbert-int8");
                 return online ? online.id : prev;
               }
               return prev;
@@ -488,7 +488,7 @@ Click any quick query below or type your request:`,
             msg.id === assistantMsgId && !msg.content
               ? {
                   ...msg,
-                  content: `> ⚠️ **Provider Notice**: The selected model (\`${selectedModel}\`) returned no output. Please verify that the provider API key is active in the **4-Pillar Vault**, or select a verified active model like **Local Tier 0 FinBERT** or **NVIDIA Llama-3.2-11B**.`
+                  content: `> ⚠️ **Provider Notice**: The selected model (\`${selectedModel}\`) returned no output. Please verify that the provider API key is active in the **4-Pillar Vault**, or select a verified active model like **Local Tier 0 Encoder** or **NVIDIA Llama-3.2-11B**.`
                 }
               : msg
           )

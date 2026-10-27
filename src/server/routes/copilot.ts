@@ -53,11 +53,11 @@ export async function discoverActiveModels(forceRefresh = false, incomingKeys?: 
 
   const models: DiscoveredModel[] = [];
 
-  // 1. Local Tier 0 INT8 FinBERT (Always available offline, $0 cost)
+  // 1. Local Tier 0 Institutional Encoder (Always available offline, $0 cost)
   models.push({
-    id: "local/finbert-int8",
-    rawId: "finbert-int8",
-    name: "INT8 ONNX FinBERT (CPU Offline)",
+    id: "local/tier0-encoder",
+    rawId: "tier0-encoder",
+    name: "Tier 0 Institutional Encoder (CPU Offline)",
     provider: "Local Tier 0",
     tier: "Tier 0 Offline",
     badge: "$0 Cost / <15ms",

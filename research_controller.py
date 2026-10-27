@@ -101,13 +101,28 @@ def handle_analyze(args) -> Dict[str, Any]:
         sigma_threshold=1.5
     )
 
+    # 6. Information Coefficient (IC) Rank Correlation Analysis
+    sentiment_series = []
+    return_series = []
+    for anom in news_correlation.get("anomaly_event_timeline", []):
+        t0_sc = anom.get("tier0_score")
+        if t0_sc and "polarity" in t0_sc and "return_pct" in anom:
+            sentiment_series.append(float(t0_sc["polarity"]))
+            return_series.append(float(anom["return_pct"]))
+
+    ic_analysis = QuantDiscoveryEngine.compute_information_coefficient(
+        sentiment_series, return_series
+    )
+    news_correlation["information_coefficient"] = ic_analysis
+
     return {
         "symbol": symbol.upper(),
         "quant_discovery": {
             "runs_test": runs_test,
             "hurst_exponent": hurst,
             "markov_transitions": markov,
-            "friction_hurdle": friction
+            "friction_hurdle": friction,
+            "information_coefficient": ic_analysis
         },
         "news_event_correlation": news_correlation
     }

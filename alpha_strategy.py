@@ -112,12 +112,22 @@ class AlphaStrategy:
 
         return ofi
 
-    def screen_macro_driver_congruence(self, macro_asset_symbol: str, target_asset_symbol: str, ofi_value: float, macro_bullish: bool = None) -> bool:
+    def screen_macro_driver_congruence(self, macro_asset_symbol: str, target_asset_symbol: str, ofi_value: float, macro_bullish: bool = None, catalyst_polarity: float = None) -> bool:
         """
         Pre-Trade Filter: Verifies structural alignment between Macro-Driver trends
         (e.g. SPY, XLE, or commodity future) and target equity order flow dynamics.
         Checks SMA-20 congruence with in-memory caching to prevent network latency.
+        Applies Gate 5 NLP Dual Veto when catalyst_polarity is provided.
         """
+        # Gate 5 NLP Dual Veto: Reject Long on strongly negative sentiment, Short on positive
+        if catalyst_polarity is not None:
+            if ofi_value > 250 and catalyst_polarity <= -0.60:
+                print(f"[GATE 5 NLP VETO] Long setup rejected: {target_asset_symbol} OFI is Bullish (+{ofi_value}) but Catalyst Polarity is strongly negative ({catalyst_polarity:.2f}).")
+                return False
+            elif ofi_value < -250 and catalyst_polarity >= 0.60:
+                print(f"[GATE 5 NLP VETO] Short setup rejected: {target_asset_symbol} OFI is Bearish ({ofi_value}) but Catalyst Polarity is strongly positive (+{catalyst_polarity:.2f}).")
+                return False
+
         now_ts = time.time()
         if macro_bullish is None:
             # Check 60-second in-memory cache first

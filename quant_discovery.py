@@ -272,6 +272,121 @@ class QuantDiscoveryEngine:
         }
 
     @staticmethod
+    def compute_information_coefficient(sentiment_scores: List[float], forward_returns: List[float]) -> Dict[str, Any]:
+        """
+        Calculates the Spearman Rank Information Coefficient (IC) between NLP catalyst polarity
+        and forward price returns according to institutional factor research standards (Grinold & Kahn).
+        Tests whether the sentiment signal exhibits statistically significant predictive rank power.
+        Null Hypothesis (H0): IC = 0 (rank of sentiment has no correlation with forward return ranks).
+        Alternative Hypothesis (H1): IC != 0 (systematic predictive alpha).
+        """
+        if len(sentiment_scores) != len(forward_returns):
+            return {
+                "valid": False,
+                "reason": f"Mismatched array lengths: {len(sentiment_scores)} sentiment scores vs {len(forward_returns)} returns.",
+                "sample_size": 0,
+                "ic": 0.0,
+                "t_stat": 0.0,
+                "p_value": 1.0,
+                "is_significant": False,
+                "signal_strength": "INVALID_INPUT",
+                "institutional_verdict": "REJECT_MISMATCHED_DIMENSIONS"
+            }
+
+        n = len(sentiment_scores)
+        if n < 5:
+            return {
+                "valid": False,
+                "reason": f"Insufficient sample size (N={n} < 5) to compute statistical Information Coefficient.",
+                "sample_size": n,
+                "ic": 0.0,
+                "t_stat": 0.0,
+                "p_value": 1.0,
+                "is_significant": False,
+                "signal_strength": "INSUFFICIENT_SAMPLE",
+                "institutional_verdict": "REJECT_INSUFFICIENT_DATA"
+            }
+
+        def rank_array(arr: List[float]) -> List[float]:
+            indexed = sorted(enumerate(arr), key=lambda x: x[1])
+            ranks = [0.0] * len(arr)
+            i = 0
+            while i < len(indexed):
+                j = i
+                while j < len(indexed) - 1 and indexed[j + 1][1] == indexed[j][1]:
+                    j += 1
+                avg_rank = (i + j + 2.0) / 2.0
+                for k in range(i, j + 1):
+                    ranks[indexed[k][0]] = avg_rank
+                i = j + 1
+            return ranks
+
+        rx = rank_array(sentiment_scores)
+        ry = rank_array(forward_returns)
+
+        mean_rx = sum(rx) / n
+        mean_ry = sum(ry) / n
+
+        cov_xy = sum((rx[i] - mean_rx) * (ry[i] - mean_ry) for i in range(n))
+        var_x = sum((rx[i] - mean_rx) ** 2 for i in range(n))
+        var_y = sum((ry[i] - mean_ry) ** 2 for i in range(n))
+
+        denom = math.sqrt(var_x * var_y)
+        if denom <= 1e-12:
+            return {
+                "valid": True,
+                "sample_size": n,
+                "ic": 0.0,
+                "t_stat": 0.0,
+                "p_value": 1.0,
+                "is_significant": False,
+                "signal_strength": "ZERO_VARIANCE",
+                "institutional_verdict": "NO_VARIANCE_IN_RANKS"
+            }
+
+        ic = max(-1.0, min(1.0, cov_xy / denom))
+
+        # Student's t-statistic for rank correlation with degrees of freedom df = n - 2
+        df = n - 2
+        if abs(ic) >= 0.999999:
+            t_stat = 999.0 if ic > 0 else -999.0
+            p_value = 0.0
+        else:
+            t_stat = ic * math.sqrt(df / max(1e-12, 1.0 - (ic ** 2)))
+            p_value = 2.0 * (1.0 - QuantDiscoveryEngine._norm_cdf(abs(t_stat)))
+            p_value = max(0.0, min(1.0, p_value))
+
+        is_sig = (p_value < 0.05)
+        abs_ic = abs(ic)
+        if abs_ic >= 0.15 and is_sig:
+            signal_strength = "STRONG_ALPHA_SIGNAL"
+        elif abs_ic >= 0.05 and is_sig:
+            signal_strength = "MODERATE_ALPHA_SIGNAL"
+        elif is_sig:
+            signal_strength = "WEAK_SIGNIFICANT_SIGNAL"
+        else:
+            signal_strength = "NOISE_OR_SPURIOUS"
+
+        if is_sig and ic > 0:
+            verdict = "CONFIRMED_PREDICTIVE_CATALYST"
+        elif is_sig and ic < 0:
+            verdict = "CONFIRMED_CONTRARIAN_CATALYST"
+        else:
+            verdict = "REJECT_UNPROVEN_CORRELATION"
+
+        return {
+            "valid": True,
+            "sample_size": n,
+            "ic": round(ic, 4),
+            "t_stat": round(t_stat, 3),
+            "p_value": round(p_value, 4),
+            "degrees_of_freedom": df,
+            "is_significant": is_sig,
+            "signal_strength": signal_strength,
+            "institutional_verdict": verdict
+        }
+
+    @staticmethod
     def _norm_cdf(x: float) -> float:
         """Approximation of the cumulative standard normal distribution function."""
         # Hastings approximation

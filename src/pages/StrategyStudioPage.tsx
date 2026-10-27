@@ -120,8 +120,8 @@ interface ModelItem {
 }
 
 const TIER0_OFFLINE_MODEL: ModelItem = {
-  id: "local/finbert-int8",
-  name: "INT8 ONNX FinBERT (CPU Offline)",
+  id: "local/tier0-encoder",
+  name: "Tier 0 Institutional Encoder (CPU Offline)",
   provider: "Local Tier 0",
   tier: "Tier 0 Offline",
   badge: "$0 Cost / <15ms",
@@ -140,7 +140,11 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
   // =========================================================================
   const [availableModels, setAvailableModels] = useState<ModelItem[]>([TIER0_OFFLINE_MODEL]);
   const [selectedModel, setSelectedModel] = useState<string>(() => {
-    return localStorage.getItem("alpha_copilot_model") || "local/finbert-int8";
+    const saved = localStorage.getItem("alpha_copilot_model");
+    if (saved && saved !== "local/finbert-int8") {
+      return saved;
+    }
+    return "local/tier0-encoder";
   });
   const [isVaultOpen, setIsVaultOpen] = useState(false);
   const [vaultSettings, setVaultSettings] = useState<any>(() => getAllStoredVaultSettings());
@@ -240,8 +244,8 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
           setAvailableModels(cleanCatalog);
           if (cleanCatalog.length > 1) {
             setSelectedModel((prev) => {
-              if (prev === "local/finbert-int8" || !cleanCatalog.some((m: any) => m.id === prev)) {
-                const online = cleanCatalog.find((m: any) => m.id !== "local/finbert-int8");
+              if (prev === "local/tier0-encoder" || prev === "local/finbert-int8" || !cleanCatalog.some((m: any) => m.id === prev)) {
+                const online = cleanCatalog.find((m: any) => m.id !== "local/tier0-encoder" && m.id !== "local/finbert-int8");
                 return online ? online.id : prev;
               }
               return prev;
@@ -1070,7 +1074,7 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
             msg.id === assistantMsgId && !msg.content
               ? {
                   ...msg,
-                  content: `> ⚠️ **Provider Notice**: The selected model (\`${selectedModel}\`) returned no output. Please ensure the provider API key is active in the **4-Pillar Vault**, or select **Local Tier 0 FinBERT**.`
+                  content: `> ⚠️ **Provider Notice**: The selected model (\`${selectedModel}\`) returned no output. Please ensure the provider API key is active in the **4-Pillar Vault**, or select **Local Tier 0 Encoder**.`
                 }
               : msg
           )
