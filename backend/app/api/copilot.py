@@ -9,11 +9,13 @@ import os
 import sys
 import time
 import json
+import re
+import uuid
 import logging
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any, Optional, AsyncGenerator
+from typing import Dict, List, Any, Optional, AsyncGenerator, Tuple
 
 try:
     from pydantic import BaseModel, Field
@@ -918,6 +920,13 @@ class CopilotTools:
                 args_payload["symbol"],
                 sec_type=args_payload.get("secType") or args_payload.get("sec_type")
             )
+        # Unpack nested scanner or subscription arguments if models wrap them
+        if method in ["reqScannerSubscription", "reqScannerParameters"]:
+            sub_dict = args_payload.get("subscription") or args_payload.get("scannerSubscriptionOptions")
+            if isinstance(sub_dict, dict):
+                for k, v in sub_dict.items():
+                    if k not in args_payload:
+                        args_payload[k] = v
         bridge_resp = query_edge_tcp_bridge({
             "action": "DISPATCH_IBKR",
             "method": method,
@@ -932,11 +941,20 @@ class CopilotTools:
                 return cm.dispatch_tool_call(method, args_payload)
         except Exception:
             pass
+        if isinstance(bridge_resp, dict) and bridge_resp.get("status") in ["OFFLINE", "GATEWAY_OFFLINE"]:
+            return {
+                "status": "GATEWAY_OFFLINE",
+                "code": 504,
+                "method": method,
+                "notice": "Interactive Brokers Gateway edge bridge is offline on port 4005/4001/4002. Under the Zero Synthetic Policy, simulated fills and mock pricing are strictly prohibited.",
+                "message": bridge_resp.get("message", "Edge TCP Bridge offline."),
+                "source": "Interactive Brokers Official API (ibapi.client.EClient)"
+            }
         return bridge_resp or {
             "status": "GATEWAY_OFFLINE",
             "code": 504,
             "method": method,
-            "error": "Interactive Brokers Gateway is offline or unreachable on port 4001/4002.",
+            "notice": "Interactive Brokers Gateway is offline or unreachable on port 4001/4002. Under the Zero Synthetic Policy, simulated fills and mock pricing are strictly prohibited.",
             "source": "Interactive Brokers Official API (ibapi.client.EClient)"
         }
 
@@ -1031,6 +1049,9 @@ def execute_tool_call(tool_name: str, tool_args: Dict[str, Any]) -> Dict[str, An
             args = tool_args.get("args") or tool_args.get("arguments") or tool_args.get("parameters") or {}
             if not args:
                 args = {k: v for k, v in tool_args.items() if k not in ["method", "endpoint"]}
+            if isinstance(args, dict) and "args" in args and isinstance(args["args"], dict):
+                nested = args.pop("args")
+                args.update(nested)
             return CopilotTools.query_ibkr_broker(method, args)
         else:
             # Full Reflection Dispatcher: Query Edge TCP Bridge on port 4005
@@ -1062,6 +1083,102 @@ def execute_tool_call(tool_name: str, tool_args: Dict[str, Any]) -> Dict[str, An
     except Exception as e:
         logger.error("Error executing tool %s: %s", tool_name, e)
         return {"status": "ERROR", "tool": tool_name, "error": str(e)}
+
+def extract_text_tool_calls(content: str) -> Tuple[str, List[Dict[str, Any]]]:
+    """
+    Parses and extracts inline tool calls from text emitted by models that do not
+    use native OpenAI choice.message.tool_calls (e.g. NVIDIA Nemotron, Qwen, DeepSeek, Hermes).
+    Returns (cleaned_content, extracted_tool_calls).
+    """
+    if not content or not isinstance(content, str):
+        return content, []
+
+    tool_calls: List[Dict[str, Any]] = []
+    cleaned_content = content
+
+    # 1. Pattern: <tool_call>...</tool_call> (XML or pseudo-XML)
+    xml_tool_pattern = re.compile(r"<tool_call>(.*?)</tool_call>", re.DOTALL | re.IGNORECASE)
+    matches = list(xml_tool_pattern.finditer(content))
+
+    for m in matches:
+        raw_block = m.group(0)
+        inner = m.group(1).strip()
+        fn_name = ""
+        fn_args: Dict[str, Any] = {}
+
+        # Sub-case 1A: <function=name> ... </function> or <function name="name"> ... </function>
+        fn_tag_match = re.search(r"<function(?:=|\s+name=[\"']?)([\w\.:-]+)[\"']?>([\s\S]*?)</function>", inner, re.IGNORECASE)
+        if fn_tag_match:
+            fn_name = fn_tag_match.group(1).strip()
+            param_block = fn_tag_match.group(2).strip()
+            # Parse parameters: <parameter=key>val</parameter> or <parameter name="key">val</parameter>
+            param_pattern = re.compile(r"<parameter(?:=|\s+name=[\"']?)([\w\.:-]+)[\"']?>([\s\S]*?)</parameter>", re.IGNORECASE)
+            p_matches = list(param_pattern.finditer(param_block))
+            for pm in p_matches:
+                p_key = pm.group(1).strip()
+                p_raw_val = pm.group(2).strip()
+                try:
+                    p_val = json.loads(p_raw_val)
+                except Exception:
+                    p_val = p_raw_val
+                fn_args[p_key] = p_val
+        else:
+            # Sub-case 1B: JSON directly inside <tool_call>{...}</tool_call>
+            try:
+                json_start = inner.find("{")
+                json_end = inner.rfind("}")
+                if json_start != -1 and json_end != -1 and json_end > json_start:
+                    parsed = json.loads(inner[json_start:json_end + 1])
+                    if isinstance(parsed, dict):
+                        fn_name = parsed.get("name") or parsed.get("function") or parsed.get("tool") or ""
+                        fn_args = parsed.get("arguments") or parsed.get("args") or parsed.get("parameters") or {}
+                        if not fn_args and fn_name:
+                            fn_args = {k: v for k, v in parsed.items() if k not in ["name", "function", "tool", "type"]}
+            except Exception:
+                pass
+
+        if fn_name:
+            if isinstance(fn_args, str):
+                try:
+                    fn_args = json.loads(fn_args)
+                except Exception:
+                    pass
+            tool_calls.append({
+                "id": f"call_{uuid.uuid4().hex[:12]}",
+                "type": "function",
+                "function": {
+                    "name": fn_name,
+                    "arguments": json.dumps(fn_args) if isinstance(fn_args, dict) else str(fn_args)
+                }
+            })
+            cleaned_content = cleaned_content.replace(raw_block, "").strip()
+
+    # 2. Pattern: ```tool_call ... ``` or ```json with "name" and "arguments"
+    codeblock_pattern = re.compile(r"```(?:tool_call|json)?\s*(\{\s*[\"'](?:name|function|tool)[\"']\s*:[\s\S]*?\})\s*```", re.IGNORECASE)
+    for m in codeblock_pattern.finditer(cleaned_content):
+        raw_block = m.group(0)
+        json_str = m.group(1).strip()
+        try:
+            parsed = json.loads(json_str)
+            if isinstance(parsed, dict):
+                fn_name = parsed.get("name") or parsed.get("function") or parsed.get("tool") or ""
+                fn_args = parsed.get("arguments") or parsed.get("args") or parsed.get("parameters") or {}
+                if not fn_args and fn_name:
+                    fn_args = {k: v for k, v in parsed.items() if k not in ["name", "function", "tool", "type"]}
+                if fn_name:
+                    tool_calls.append({
+                        "id": f"call_{uuid.uuid4().hex[:12]}",
+                        "type": "function",
+                        "function": {
+                            "name": fn_name,
+                            "arguments": json.dumps(fn_args) if isinstance(fn_args, dict) else str(fn_args)
+                        }
+                    })
+                    cleaned_content = cleaned_content.replace(raw_block, "").strip()
+        except Exception:
+            pass
+
+    return cleaned_content, tool_calls
 
 # =============================================================================
 # CHAT COMPLETION & REAL AGENTIC FUNCTION CALLING ENGINE
@@ -1319,7 +1436,7 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
                 f"| **Take-Profit Target** | `2.0 × Stop Distance` | Positive Expectancy Model (2:1 R/R) |\n"
                 f"| **Transaction Friction Filter** | `< 15.0%` | Spread + commissions vs. profit target |\n\n"
                 f"#### Capital Sizing & Execution Feasibility\n"
-                f"- **Position Sizing Formula**: $\\text{{Shares}} = \\lfloor \\frac{{\\text{{Max Risk (\$}}{max_risk_usd:.2f})}}{{1.8 \\times \\text{{ATR}}}} \\rfloor$\n"
+                f"- **Position Sizing Formula**: $\\text{{Shares}} = \\lfloor \\frac{{\\text{{Max Risk (\\$}}{max_risk_usd:.2f})}}{{1.8 \\times \\text{{ATR}}}} \\rfloor$\n"
                 f"- **Fractional Shares**: Supported via Interactive Brokers Europe (`fractionalTradingEnabled: true`), allowing exact 1% risk allocation even for high-priced equities (e.g. {recent_sym}).\n"
                 f"- **Commission Overhead**: Under IBKR Europe fixed/tiered pricing (~$1.00 - $1.50 per order), friction on a ${max_risk_usd:.2f} risk trade is ~2.5% of projected profit, comfortably below the 15% institutional friction threshold.\n\n"
                 f"> 💡 **Action**: You can execute the full multi-trial backtest with this capital tier by requesting *\"run strategy sweep for {recent_sym} with {int(extracted_capital)} capital\"*."
@@ -1819,6 +1936,16 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
             if not content_res and choice.get("text"):
                 content_res = choice.get("text")
 
+            # Fallback tool-call extraction for models emitting text-based tool calls (Nemotron, Qwen, DeepSeek, etc.)
+            if not tool_calls and content_res:
+                cleaned_content, extracted_calls = extract_text_tool_calls(str(content_res))
+                if extracted_calls:
+                    tool_calls = extracted_calls
+                    content_res = cleaned_content
+                    message_obj["tool_calls"] = tool_calls
+                    if cleaned_content.strip():
+                        message_obj["content"] = cleaned_content
+
             # If tool calls were requested, execute each tool
             if tool_calls:
                 api_messages.append(message_obj)
@@ -1863,36 +1990,55 @@ async def generate_copilot_stream(request: ChatRequest, client_headers: Dict[str
                     "stream": True
                 }
                 
-                req2 = urllib.request.Request(
-                    cur_endpoint,
-                    headers=cur_headers,
-                    data=json.dumps(payload_turn2).encode("utf-8"),
-                    method="POST"
-                )
-                
-                with urllib.request.urlopen(req2, timeout=60) as resp2:
-                    for raw_line in resp2:
-                        line = raw_line.decode("utf-8").strip()
-                        if not line or not line.startswith("data:"):
-                            continue
-                        chunk_str = line[5:].strip()
-                        if chunk_str == "[DONE]":
-                            break
-                        try:
-                            chunk_json = json.loads(chunk_str)
-                            choice_obj = chunk_json.get("choices", [{}])[0]
-                            delta_obj = choice_obj.get("delta", {})
-                            finish_reason = choice_obj.get("finish_reason")
-                            delta_content = delta_obj.get("content") or delta_obj.get("reasoning") or delta_obj.get("reasoning_content") or ""
-                            if delta_content:
-                                yield emit_sse("delta", {"content": delta_content})
-                            if finish_reason == "length":
-                                yield emit_sse("truncated", {
-                                    "reason": "length",
-                                    "message": "Response reached token ceiling. Click Continue to complete."
-                                })
-                        except Exception:
-                            continue
+                try:
+                    req2 = urllib.request.Request(
+                        cur_endpoint,
+                        headers=cur_headers,
+                        data=json.dumps(payload_turn2).encode("utf-8"),
+                        method="POST"
+                    )
+                    
+                    with urllib.request.urlopen(req2, timeout=60) as resp2:
+                        for raw_line in resp2:
+                            line = raw_line.decode("utf-8").strip()
+                            if not line or not line.startswith("data:"):
+                                continue
+                            chunk_str = line[5:].strip()
+                            if chunk_str == "[DONE]":
+                                break
+                            try:
+                                chunk_json = json.loads(chunk_str)
+                                choice_obj = chunk_json.get("choices", [{}])[0]
+                                delta_obj = choice_obj.get("delta", {})
+                                finish_reason = choice_obj.get("finish_reason")
+                                delta_content = delta_obj.get("content") or delta_obj.get("reasoning") or delta_obj.get("reasoning_content") or ""
+                                if delta_content:
+                                    yield emit_sse("delta", {"content": delta_content})
+                                if finish_reason == "length":
+                                    yield emit_sse("truncated", {
+                                        "reason": "length",
+                                        "message": "Response reached token ceiling. Click Continue to complete."
+                                    })
+                            except Exception:
+                                continue
+                except Exception as stream_err:
+                    logger.warning("Turn 2 stream failed (%s), falling back to non-streaming synthesis", stream_err)
+                    payload_turn2["stream"] = False
+                    req2_sync = urllib.request.Request(
+                        cur_endpoint,
+                        headers=cur_headers,
+                        data=json.dumps(payload_turn2).encode("utf-8"),
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req2_sync, timeout=60) as resp2_sync:
+                        res2_data = json.loads(resp2_sync.read().decode("utf-8"))
+                        choice2 = (res2_data.get("choices") or [{}])[0]
+                        c2_text = choice2.get("message", {}).get("content") or choice2.get("text") or ""
+                        if c2_text:
+                            words = str(c2_text).split(" ")
+                            for i, w in enumerate(words):
+                                yield emit_sse("delta", {"content": w + (" " if i < len(words) - 1 else "")})
+                                time.sleep(0.008)
                 execution_success = True
             else:
                 # No tool call made - check if model gave a deferral placeholder without executing

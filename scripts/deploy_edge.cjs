@@ -112,11 +112,16 @@ async function main() {
     // ------------------------------------------------------------------------
     // Step 1: Pre-flight Compilation & Lint Check
     // ------------------------------------------------------------------------
-    console.log(`${c.bold}[1/5] Pre-flight TypeScript & Workspace Verification${c.reset}`);
+    console.log(`${c.bold}[1/5] Pre-flight TypeScript, Unit Tests & Workspace Verification${c.reset}`);
     if (!skipLint) {
       runLocal('npm run lint', 'Verifying TypeScript type safety (tsc --noEmit)');
+      const fs = require('fs');
+      const pyExe = process.platform === 'win32' && fs.existsSync('C:\\Users\\Misha\\AppData\\Local\\Programs\\Python\\Python312\\python.exe')
+        ? '"C:\\Users\\Misha\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"'
+        : 'python3';
+      runLocal(`${pyExe} -m pytest tests/test_copilot_tool_dispatch.py`, 'Verifying Copilot tool-calling & dispatch test suite');
     } else {
-      console.log(`  ${c.yellow}[SKIP]${c.reset} TypeScript lint check skipped via --skip-lint`);
+      console.log(`  ${c.yellow}[SKIP]${c.reset} TypeScript & test checks skipped via --skip-lint`);
     }
 
     // Check git status

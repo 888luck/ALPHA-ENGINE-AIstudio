@@ -583,6 +583,33 @@ class ConnectionManager(EWrapper, EClient):
         if self.on_historical_data_complete_callback:
             self.on_historical_data_complete_callback(reqId, self.historical_data_buffer.get(reqId, []))
 
+    def scannerData(self, reqId: int, rank: int, contractDetails, distance: str, benchmark: str, projection: str, legsStr: str):
+        """Callback receiving scanner results from IBKR Gateway."""
+        if not hasattr(self, "_scanner_results"):
+            self._scanner_results = {}
+        if reqId not in self._scanner_results:
+            self._scanner_results[reqId] = []
+        c = getattr(contractDetails, "contract", contractDetails)
+        self._scanner_results[reqId].append({
+            "rank": rank,
+            "symbol": getattr(c, "symbol", ""),
+            "secType": getattr(c, "secType", ""),
+            "exchange": getattr(c, "exchange", ""),
+            "currency": getattr(c, "currency", ""),
+            "marketName": getattr(contractDetails, "marketName", ""),
+            "longName": getattr(contractDetails, "longName", "")
+        })
+
+    def scannerDataEnd(self, reqId: int):
+        """Signals completion of scanner subscription batch."""
+        if hasattr(self, "_request_events") and reqId in self._request_events:
+            self._request_results[reqId] = getattr(self, "_scanner_results", {}).get(reqId, [])
+            self._request_events[reqId].set()
+
+    def scannerParameters(self, xml: str):
+        """Receives scanner XML parameter configuration."""
+        self._scanner_parameters_xml = xml
+
     def execute_synchronous_request(self, method_name: str, arguments: Dict[str, Any], timeout: float = 4.0) -> Dict[str, Any]:
         """
         Universal Synchronous Dispatcher for Interactive Brokers Pro API.
@@ -751,6 +778,58 @@ class ConnectionManager(EWrapper, EClient):
                     "account_summary": self.account_summary,
                     "accounts": self.accounts_list,
                     "source": "Interactive Brokers Account Registry"
+                }
+
+            # 7. Market Scanner Subscriptions
+            elif method_name in ["reqScannerSubscription", "get_scanner_data"]:
+                try:
+                    from ibapi.scanner import ScannerSubscription
+                except ImportError:
+                    ScannerSubscription = None
+
+                sub = ScannerSubscription() if ScannerSubscription else None
+                if sub:
+                    sub_data = arguments.get("subscription") or arguments.get("scannerSubscriptionOptions") or arguments
+                    if isinstance(sub_data, dict):
+                        for attr in ["numberOfRows", "instrument", "locationCode", "scanCode", "abovePrice", "belowPrice",
+                                     "aboveVolume", "marketCapAbove", "marketCapBelow", "stockTypeFilter"]:
+                            if attr in sub_data:
+                                val = sub_data[attr]
+                                if attr == "numberOfRows":
+                                    val = int(val)
+                                setattr(sub, attr, val)
+
+                if not hasattr(self, "_scanner_results"):
+                    self._scanner_results = {}
+                self._scanner_results[req_id] = []
+                if sub and callable(getattr(self, "reqScannerSubscription", None)):
+                    self.reqScannerSubscription(req_id, sub, [], [])
+                    event.wait(min(timeout, 8.0))
+                    try:
+                        self.cancelScannerSubscription(req_id)
+                    except Exception:
+                        pass
+                items = self._scanner_results.pop(req_id, [])
+                return {
+                    "status": "SUCCESS" if items else ("NO_DATA" if self.is_connected else "GATEWAY_OFFLINE"),
+                    "method": "reqScannerSubscription",
+                    "total_items": len(items),
+                    "items": items,
+                    "source": "Interactive Brokers Scanner Engine",
+                    "verified_at": datetime.datetime.now(timezone.utc).isoformat()
+                }
+
+            # 8. Scanner Parameters (XML)
+            elif method_name in ["reqScannerParameters", "get_scanner_parameters"]:
+                self._scanner_parameters_xml = ""
+                if callable(getattr(self, "reqScannerParameters", None)):
+                    self.reqScannerParameters()
+                    event.wait(min(timeout, 4.0))
+                return {
+                    "status": "SUCCESS" if getattr(self, "_scanner_parameters_xml", "") else "NO_DATA",
+                    "method": "reqScannerParameters",
+                    "xml": getattr(self, "_scanner_parameters_xml", ""),
+                    "source": "Interactive Brokers Scanner Engine"
                 }
 
             # Generic method execution on EClient
