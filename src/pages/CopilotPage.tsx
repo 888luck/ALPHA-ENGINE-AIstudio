@@ -24,7 +24,10 @@ import {
   AlertTriangle,
   Search,
   SlidersHorizontal,
-  X
+  X,
+  ArrowDown,
+  Maximize2,
+  Minimize2
 } from "lucide-react";
 
 export interface CopilotMessage {
@@ -71,7 +74,7 @@ interface CopilotStats {
 }
 
 import { ApiVaultModal } from "../components/ApiVaultModal";
-import { InstitutionalModelSelector } from "../components/InstitutionalModelSelector";
+import { InstitutionalModelSelector, getProviderIcon, isModelConfiguredDefault } from "../components/InstitutionalModelSelector";
 import {
   getAllStoredVaultSettings,
   persistVaultItem,
@@ -206,22 +209,89 @@ Click any quick query below or type your request:`,
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Sync messages with localStorage
+  const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
+  const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
+  const [isExpandedInput, setIsExpandedInput] = useState(false);
+
+  // Sync messages with localStorage (debounced during active generation to prevent I/O blocking)
   useEffect(() => {
-    localStorage.setItem("alpha_copilot_messages", JSON.stringify(messages));
-  }, [messages]);
+    if (isGenerating) {
+      const timer = setTimeout(() => {
+        localStorage.setItem("alpha_copilot_messages", JSON.stringify(messages));
+      }, 800);
+      return () => clearTimeout(timer);
+    } else {
+      localStorage.setItem("alpha_copilot_messages", JSON.stringify(messages));
+    }
+  }, [messages, isGenerating]);
 
   // Sync selected model
   useEffect(() => {
     localStorage.setItem("alpha_copilot_model", selectedModel);
   }, [selectedModel]);
 
-  // Auto scroll
+  // Dynamic auto-expanding height for textarea based on user typing
+  const adjustTextareaHeight = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+    if (isExpandedInput) {
+      el.style.height = "220px";
+      return;
+    }
+    el.style.height = "auto";
+    const minHeight = 44;
+    const maxHeight = 200; // up to ~8-9 lines before enabling internal scroll
+    const newHeight = Math.min(Math.max(el.scrollHeight, minHeight), maxHeight);
+    el.style.height = `${newHeight}px`;
+  };
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, activeTools]);
+    adjustTextareaHeight();
+  }, [input, isExpandedInput]);
+
+  // Scroll to bottom helper
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    if (behavior === "auto") {
+      container.scrollTop = container.scrollHeight;
+    } else {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth"
+      });
+    }
+  };
+
+  // User scroll listener to detect if they intentionally scrolled up
+  const handleScroll = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+    const isUp = distanceFromBottom > 70;
+    setIsUserScrolledUp(isUp);
+    setShowScrollBottomBtn(isUp);
+  };
+
+  // Auto-scroll: only when user has NOT scrolled up intentionally
+  useEffect(() => {
+    if (isUserScrolledUp) return;
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    if (isGenerating) {
+      // Instant scrollTop during streaming SSE eliminates animation frame collision & page stutter
+      container.scrollTop = container.scrollHeight;
+    } else {
+      // Smooth scroll on turn completion / new message creation
+      scrollToBottom("smooth");
+    }
+  }, [messages, activeTools, isGenerating, isUserScrolledUp]);
 
   // Fetch telemetry stats & dynamic model discovery
   const fetchStatsAndModels = async (force = false) => {
@@ -335,6 +405,12 @@ Click any quick query below or type your request:`,
     if (!textToSend || isGenerating) return;
 
     setInput("");
+    setIsUserScrolledUp(false);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "44px";
+    }
+    setTimeout(() => scrollToBottom("smooth"), 40);
+
     const userMsgId = `user-${Date.now()}`;
     const assistantMsgId = `assistant-${Date.now()}`;
 
@@ -786,14 +862,19 @@ Click any quick query below or type your request:`,
               localStorage.setItem("alpha_copilot_model", id);
             }}
             onOpenVault={() => setIsVaultOpen(true)}
+            vaultSettings={vaultSettings}
           />
         </div>
       </div>
 
-      {/* Main Chat Workspace */}
-      <div className="terminal-card border terminal-border rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col justify-between max-w-5xl mx-auto w-full">
-        {/* Messages Feed */}
-        <div className="space-y-4 mb-4">
+      {/* Main Chat Workspace (Contained Viewport - Prevents Page-Level Jumping) */}
+      <div className="terminal-card border terminal-border rounded-2xl shadow-xl flex flex-col max-w-5xl mx-auto w-full h-[calc(100vh-10rem)] min-h-[640px] overflow-hidden">
+        {/* Messages Feed (Scrollable Viewport Container) */}
+        <div
+          ref={messagesContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4 relative overscroll-contain"
+        >
           {messages.map((msg) => (
             <div
               key={msg.id}
@@ -808,7 +889,7 @@ Click any quick query below or type your request:`,
                   </>
                 ) : (
                   <>
-                    <span className="text-[#00ff88] font-bold">ALPHA COPILOT</span>
+                    <span className="text-emerald-500 dark:text-[#00ff88] font-bold">ALPHA COPILOT</span>
                     <span>•</span>
                     <span>{msg.timestamp}</span>
                   </>
@@ -921,14 +1002,33 @@ Click any quick query below or type your request:`,
           )}
 
           <div ref={messagesEndRef} />
+
+          {/* Floating Jump to Latest Button */}
+          {showScrollBottomBtn && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsUserScrolledUp(false);
+                scrollToBottom("smooth");
+              }}
+              className="sticky bottom-2 ml-auto p-2 rounded-full terminal-card border terminal-border hover:border-accent text-secondary hover:text-primary shadow-xl flex items-center gap-1.5 text-xs font-mono transition cursor-pointer z-20 animate-in fade-in"
+              title="Jump to latest response"
+            >
+              <ArrowDown className="w-3.5 h-3.5 text-emerald-500 dark:text-[#00ff88]" />
+              <span className="font-bold">Latest</span>
+              {isGenerating && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />}
+            </button>
+          )}
         </div>
 
-        {/* Quick Query Recommendation Pills */}
-        <div className="pt-2 pb-3">
-          <div className="text-[10px] font-mono text-secondary mb-2 uppercase tracking-wider font-semibold">
-            Institutional Tool Presets
-          </div>
-          <div className="flex flex-wrap gap-2">
+        {/* Bottom Pinned Controls (Presets + Dynamic Textarea Console) */}
+        <div className="border-t terminal-border p-3 sm:p-4 bg-inherit shrink-0 space-y-2.5">
+          {/* Quick Query Recommendation Presets (Scrollable Ribbon) */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-[11px] font-mono">
+            <span className="text-[10px] text-secondary uppercase tracking-wider font-semibold shrink-0 pr-1 flex items-center gap-1">
+              <Terminal className="w-3 h-3 text-emerald-500 dark:text-[#00ff88]" />
+              PRESETS:
+            </span>
             {[
               "What is my ibkr cash balance?",
               "What are my current IBKR positions and cash balance?",
@@ -943,53 +1043,109 @@ Click any quick query below or type your request:`,
                 type="button"
                 onClick={() => handleSend(preset)}
                 disabled={isGenerating}
-                className="px-3 py-1.5 rounded-lg terminal-card hover:border-accent text-xs font-mono text-secondary hover:text-primary transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                className="px-2.5 py-1 rounded-lg terminal-elevated hover:border-accent text-[11px] font-mono text-secondary hover:text-primary transition cursor-pointer whitespace-nowrap shrink-0 disabled:opacity-50"
               >
-                <Terminal className="w-3 h-3 text-emerald-500 dark:text-[#00ff88]" />
-                <span>{preset}</span>
+                {preset}
               </button>
             ))}
           </div>
-        </div>
 
-        {/* Chat Input Console */}
-        <div className="sticky bottom-4 terminal-card border terminal-border rounded-2xl p-2.5 shadow-xl flex flex-col gap-2">
-          <div className="flex items-center justify-between px-2 text-[10px] font-mono text-secondary">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>ACTIVE: <strong className="text-primary">{activeModelObj.name}</strong></span>
+          {/* Active Model Status & Action Bar */}
+          <div className="flex items-center justify-between px-1 text-[10px] font-mono text-secondary">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="shrink-0 p-0.5 rounded bg-black/40 border border-white/5">
+                {getProviderIcon(activeModelObj.provider, activeModelObj.tier)}
+              </span>
+              <span>
+                ACTIVE: <strong className="text-primary">{activeModelObj.name}</strong>
+              </span>
+              <span className="text-muted">•</span>
+              <span className="text-secondary">{activeModelObj.costStr}</span>
+              {Boolean(activeModelObj.isFree || activeModelObj.id.includes(":free")) ? (
+                <span className="px-1.5 py-0.2 rounded text-[9px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold">
+                  UNMETERED
+                </span>
+              ) : isModelConfiguredDefault(activeModelObj, vaultSettings) ? (
+                <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-400 dark:text-[#00ff88] border border-emerald-500/40 font-bold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 dark:bg-[#00ff88]" /> READY
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsVaultOpen(true)}
+                  className="px-1.5 py-0.2 rounded text-[9px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold flex items-center gap-1 cursor-pointer transition"
+                  title="Configure provider key in 4-Pillar Vault"
+                >
+                  <AlertTriangle className="w-2.5 h-2.5" />
+                  <span>KEY REQUIRED • CONFIGURE</span>
+                </button>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={handleClearHistory}
-              className="hover:text-rose-500 transition cursor-pointer flex items-center gap-1"
-              title="Clear conversational memory"
-            >
-              <Trash2 className="w-3 h-3" />
-              <span>Reset Context</span>
-            </button>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsExpandedInput((prev) => !prev)}
+                className="text-secondary hover:text-primary transition cursor-pointer flex items-center gap-1 font-semibold"
+                title={isExpandedInput ? "Collapse to auto-sizing input" : "Expand to multi-line prompt editor"}
+              >
+                {isExpandedInput ? (
+                  <>
+                    <Minimize2 className="w-3 h-3 text-cyan-400" />
+                    <span>Compact Input</span>
+                  </>
+                ) : (
+                  <>
+                    <Maximize2 className="w-3 h-3 text-slate-400 hover:text-cyan-400" />
+                    <span>Expand Input</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handleClearHistory}
+                className="text-secondary hover:text-rose-500 transition cursor-pointer flex items-center gap-1"
+                title="Clear conversational memory"
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>Reset Context</span>
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder="Ask an ad-hoc portfolio question, SEC filing check, or clinical trial query..."
-              rows={1}
-              className="flex-1 terminal-elevated rounded-xl px-4 py-3 text-xs sm:text-sm font-sans text-primary placeholder:text-muted focus:outline-none focus:border-cyan resize-none"
-            />
+          {/* Multi-line User Input Console */}
+          <div className="flex items-end gap-2">
+            <div className="flex-1 relative flex flex-col">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder="Ask an ad-hoc portfolio question, SEC filing check, or clinical trial query... (Shift + Enter for new line)"
+                rows={1}
+                className={`w-full terminal-elevated rounded-xl px-4 py-3 text-xs sm:text-sm font-sans text-primary placeholder:text-muted focus:outline-none focus:border-cyan resize-none transition-[height] duration-75 leading-relaxed ${
+                  isExpandedInput ? "h-[220px] overflow-y-auto" : "overflow-y-auto"
+                }`}
+              />
+              {/* Multi-line Hint & Length counter */}
+              <div className="flex items-center justify-between px-2 pt-1 text-[10px] font-mono text-secondary">
+                <span className="opacity-80">Shift + Enter for new line • Enter to send</span>
+                {input.length > 0 && (
+                  <span className="opacity-75">{input.length} chars</span>
+                )}
+              </div>
+            </div>
 
             {isGenerating ? (
               <button
                 type="button"
                 onClick={handleStop}
-                className="p-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white transition cursor-pointer shadow-md flex items-center justify-center"
+                className="p-3 mb-5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white transition cursor-pointer shadow-md flex items-center justify-center shrink-0"
                 title="Stop generation"
               >
                 <Square className="w-4 h-4 fill-current" />
@@ -999,7 +1155,7 @@ Click any quick query below or type your request:`,
                 type="button"
                 onClick={() => handleSend()}
                 disabled={!input.trim()}
-                className="p-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white dark:bg-emerald-400 dark:hover:bg-emerald-300 dark:text-slate-950 transition cursor-pointer shadow-md flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+                className="p-3 mb-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white dark:bg-emerald-400 dark:hover:bg-emerald-300 dark:text-slate-950 transition cursor-pointer shadow-md flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed font-bold shrink-0"
                 title="Send query"
               >
                 <Send className="w-4 h-4" />

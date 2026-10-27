@@ -33,7 +33,8 @@ import {
   AlertTriangle,
   AlertCircle,
   BarChart2,
-  Rocket
+  Rocket,
+  ArrowDown
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -509,6 +510,10 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
     }
   ]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatLogContainerRef = useRef<HTMLDivElement>(null);
+  const chatTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isChatScrolledUp, setIsChatScrolledUp] = useState(false);
+  const [showChatScrollBottomBtn, setShowChatScrollBottomBtn] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // =========================================================================
@@ -602,9 +607,55 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
     loadUniverse();
   }, []);
 
+  // User scroll listener inside Strategy Optimizer Agent chat log
+  const handleChatScroll = () => {
+    const container = chatLogContainerRef.current;
+    if (!container) return;
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+    const isUp = distanceFromBottom > 60;
+    setIsChatScrolledUp(isUp);
+    setShowChatScrollBottomBtn(isUp);
+  };
+
+  const scrollChatToBottom = (behavior: ScrollBehavior = "smooth") => {
+    const container = chatLogContainerRef.current;
+    if (!container) return;
+    if (behavior === "auto") {
+      container.scrollTop = container.scrollHeight;
+    } else {
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    }
+  };
+
+  // Internal auto-scroll only inside chatLogContainerRef (Prevents scrolling the entire page)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, sweeping, discovering, isGenerating]);
+    if (isChatScrolledUp) return;
+    const container = chatLogContainerRef.current;
+    if (!container) return;
+
+    if (isGenerating || sweeping || discovering) {
+      // Instant scrollTop during streaming eliminates page jumping
+      container.scrollTop = container.scrollHeight;
+    } else {
+      scrollChatToBottom("smooth");
+    }
+  }, [messages, sweeping, discovering, isGenerating, isChatScrolledUp]);
+
+  // Dynamic auto-expanding height for chatInput textarea
+  const adjustChatTextareaHeight = () => {
+    const el = chatTextareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const minHeight = 40;
+    const maxHeight = 160;
+    const newHeight = Math.min(Math.max(el.scrollHeight, minHeight), maxHeight);
+    el.style.height = `${newHeight}px`;
+  };
+
+  useEffect(() => {
+    adjustChatTextareaHeight();
+  }, [chatInput]);
 
   // =========================================================================
   // 5. Execution Core: Single Simulation
@@ -881,7 +932,12 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
 
     if (overrideText === undefined) {
       setChatInput("");
+      if (chatTextareaRef.current) {
+        chatTextareaRef.current.style.height = "40px";
+      }
     }
+    setIsChatScrolledUp(false);
+    setTimeout(() => scrollChatToBottom("smooth"), 40);
     const userMsgId = "msg_user_" + Date.now();
     const assistantMsgId = "msg_agent_" + Date.now();
 
@@ -1348,6 +1404,7 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
             }}
             isModelConfigured={isModelConfigured}
             onOpenVault={() => setIsVaultOpen(true)}
+            vaultSettings={vaultSettings}
           />
 
           {/* 4-Pillar Vault Button */}
@@ -1549,7 +1606,11 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
           )}
 
           {/* Chat Messages Log */}
-          <div className="flex-1 p-4 overflow-y-auto space-y-4 font-mono text-xs">
+          <div
+            ref={chatLogContainerRef}
+            onScroll={handleChatScroll}
+            className="flex-1 p-4 overflow-y-auto space-y-4 font-mono text-xs relative overscroll-contain"
+          >
             {messages.map((m) => {
               const isAgent = m.role === "assistant";
               return (
@@ -1662,6 +1723,21 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
               </div>
             )}
             <div ref={messagesEndRef} />
+            {showChatScrollBottomBtn && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsChatScrolledUp(false);
+                  scrollChatToBottom("smooth");
+                }}
+                className="sticky bottom-2 ml-auto p-1.5 rounded-full terminal-card border terminal-border hover:border-accent text-secondary hover:text-primary shadow-lg flex items-center gap-1 text-[11px] font-mono transition cursor-pointer z-10 animate-in fade-in"
+                title="Jump to latest"
+              >
+                <ArrowDown className="w-3 h-3 text-emerald-400" />
+                <span className="font-bold">Latest</span>
+                {isGenerating && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />}
+              </button>
+            )}
           </div>
 
           {/* Quick Action Chips */}
@@ -1681,23 +1757,37 @@ export function StrategyStudioPage({ onNavigate }: StrategyStudioPageProps = {})
             ))}
           </div>
 
-          {/* Chat Input Bar */}
-          <form onSubmit={handleSendChat} className="p-3 terminal-card border-t terminal-border flex gap-2">
-            <input
-              type="text"
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder={symbol ? `Direct agent (e.g. Run 16-parameter sweep on ${symbol})...` : "Direct agent (e.g. Run 16-parameter sweep, test Hurst exponent)..."}
-              disabled={isGenerating}
-              className="flex-1 terminal-elevated rounded-xl px-3.5 py-2.5 text-xs text-primary font-mono placeholder:text-muted focus:outline-none focus:border-cyan"
-            />
-            <button
-              type="submit"
-              disabled={isGenerating || !chatInput.trim()}
-              className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl transition cursor-pointer flex items-center justify-center shadow-md"
-            >
-              <Send className="w-4 h-4" />
-            </button>
+          {/* Chat Input Bar (Auto-Expanding Multi-line Textarea) */}
+          <form onSubmit={handleSendChat} className="p-3 terminal-card border-t terminal-border flex flex-col gap-1.5">
+            <div className="flex items-end gap-2">
+              <textarea
+                ref={chatTextareaRef}
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendChat();
+                  }
+                }}
+                placeholder={symbol ? `Direct agent (e.g. Run 16-parameter sweep on ${symbol})... (Shift + Enter for newline)` : "Direct agent (e.g. Run 16-parameter sweep, test Hurst exponent)... (Shift + Enter for newline)"}
+                rows={1}
+                disabled={isGenerating}
+                className="flex-1 terminal-elevated rounded-xl px-3.5 py-2.5 text-xs text-primary font-mono placeholder:text-muted focus:outline-none focus:border-cyan resize-none transition-[height] duration-75 overflow-y-auto leading-relaxed"
+              />
+              <button
+                type="submit"
+                disabled={isGenerating || !chatInput.trim()}
+                className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white p-2.5 rounded-xl transition cursor-pointer flex items-center justify-center shadow-md shrink-0 mb-0.5"
+                title="Send query"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex items-center justify-between px-1 text-[9px] font-mono text-secondary">
+              <span>Shift + Enter for newline • Enter to send</span>
+              {chatInput.length > 0 && <span>{chatInput.length} chars</span>}
+            </div>
           </form>
         </div>
 
