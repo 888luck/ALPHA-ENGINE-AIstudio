@@ -150,7 +150,7 @@ async function main() {
     if (dryRun) {
       console.log(`  ${c.yellow}[DRY RUN]${c.reset} Would execute git pull, npm run build, and service restart on ${VM_NAME}`);
     } else {
-      const remoteCommand = 'bash /opt/alpha-engine/scripts/vm_sync_and_rebuild.sh 2>/dev/null || bash /tmp/vm_sync_and_rebuild.sh';
+      const remoteCommand = 'bash /opt/alpha-engine/scripts/vm_sync_and_rebuild.sh';
       const t0 = performance.now();
       process.stdout.write(`  ${c.dim}[SSH CONNECTING]${c.reset} Executing remote update pipeline on Frankfurt VM... \n`);
 
