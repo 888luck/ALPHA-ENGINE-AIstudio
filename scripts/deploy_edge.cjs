@@ -156,7 +156,7 @@ async function main() {
 
       const sshResult = spawnSync(
         'gcloud',
-        ['compute', 'ssh', VM_NAME, `--zone=${ZONE}`, `--command=${remoteCommand}`],
+        ['compute', 'ssh', VM_NAME, `--zone=${ZONE}`, `--command="${remoteCommand}"`],
         { stdio: 'inherit', shell: true }
       );
 
