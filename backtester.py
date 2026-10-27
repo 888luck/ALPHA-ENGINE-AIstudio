@@ -51,6 +51,23 @@ class AlphaBacktestingEngine:
         else:
             base_comm = quantity * 0.005
             return max(1.00, base_comm)
+
+    @staticmethod
+    def modulate_trailing_for_catalyst(trailing_stop_atr: float, catalyst_polarity: Optional[float] = None) -> float:
+        """
+        Modulates dynamic trailing stop distance based on catalyst sentiment polarity.
+        PEAD catalyst (>= +0.60): expands trailing cushion by 1.25x to avoid shakeout.
+        Adverse catalyst (<= -0.60): tightens trailing cushion by 0.75x to lock in profit quickly.
+        """
+        k = float(trailing_stop_atr)
+        if catalyst_polarity is not None:
+            if catalyst_polarity >= 0.60:
+                return k * 1.25
+            elif catalyst_polarity <= -0.60:
+                return k * 0.75
+        return k
+
+    _modulate_trailing_for_catalyst = modulate_trailing_for_catalyst
             
     def run_backtest(self, symbol: str, timeframe: str, start_date: str, end_date: str,
                      stop_atr: float = 1.8, partial_profit: bool = True, breakeven_lock: bool = True,
@@ -199,13 +216,7 @@ class AlphaBacktestingEngine:
 
                     if pos.get("trailing_active", False):
                         t_type = (trailing_type or "CHANDELIER").upper().strip()
-                        k_trail = float(trailing_stop_atr)
-                        pol = pos.get("catalyst_polarity")
-                        if pol is not None:
-                            if pol >= 0.60:
-                                k_trail = k_trail * 1.25  # expand trailing cushion for confirmed catalyst
-                            elif pol <= -0.60:
-                                k_trail = k_trail * 0.75  # tighten trailing cushion to lock profits quickly
+                        k_trail = self.modulate_trailing_for_catalyst(trailing_stop_atr, pos.get("catalyst_polarity"))
                         step_damper = max(0.01, float(trailing_step_atr) * current_atr)
 
                         if t_type == "PARABOLIC":
