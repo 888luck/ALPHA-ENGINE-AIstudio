@@ -297,6 +297,15 @@ def main_loop():
         except Exception as e:
             print(f"[TCP BRIDGE WARN] Error persisting secrets to vault: {e}")
 
+        # Synchronize dynamic universe rotation to dynamic_baskets.json
+        baskets = settings_dict.get("dynamicBaskets") or settings_dict.get("baskets")
+        if baskets is not None:
+            try:
+                atomic_write_json("dynamic_baskets.json", {"baskets": baskets})
+                print(f"[TCP BRIDGE] Synchronized dynamic universe baskets to dynamic_baskets.json ({len(baskets)} baskets).")
+            except Exception as e:
+                print(f"[TCP BRIDGE WARN] Failed to atomically persist dynamic_baskets.json: {e}")
+
         if "routerLocked" in settings_dict:
             drm.router_locked = bool(settings_dict["routerLocked"])
             print(f"[TCP BRIDGE] Updated router_locked = {drm.router_locked}")

@@ -1,11 +1,15 @@
 {
-  "generatedAt": "2026-10-24T02:52:11.439926+00:00",
-  "maxActiveInstruments": 3,
-  "macroContext": "Dynamic multi-exchange universe calibrated from overnight news and event flow.",
-  "sourceEvents": [
-    "TEST_002"
-  ],
   "baskets": [
+    {
+      "sector": "PEAD Post-Earnings Drift (Proven Anomaly)",
+      "tickers": [
+        "NVDA"
+      ],
+      "impliedOfiTrend": "BUY (PEAD Volume Surge >2.0x ADV)",
+      "winRate": 68,
+      "profitFactor": 1.72,
+      "avgFrictionConsumed": 4.2
+    },
     {
       "rank": 1,
       "sector": "Energy (Oil & Gas)",
@@ -47,7 +51,7 @@
       "primaryExchange": "NYSE",
       "currency": "USD",
       "isEuropean": false,
-      "expectedMovePct": 2.0,
+      "expectedMovePct": 2,
       "isRecursiveSwap": false,
       "invalidationReason": "",
       "challengeStatus": "PENDING_OPEN",

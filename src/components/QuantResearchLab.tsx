@@ -79,6 +79,8 @@ export const QuantResearchLab: React.FC<QuantResearchLabProps> = ({ onNavigate }
   // Lens 1: Event Catalysts State
   const [catalysts, setCatalysts] = useState<CatalystEvent[]>([]);
   const [loadingCatalysts, setLoadingCatalysts] = useState(false);
+  const [catalystQuery, setCatalystQuery] = useState("");
+  const [activeCatalystSym, setActiveCatalystSym] = useState<string | null>(null);
   
   // Information Coefficient (IC) Factor Audit State
   const [icData, setIcData] = useState<{
@@ -99,6 +101,8 @@ export const QuantResearchLab: React.FC<QuantResearchLabProps> = ({ onNavigate }
   // Lens 2: PEAD Momentum Radar State
   const [peadCandidates, setPeadCandidates] = useState<PEADCandidate[]>([]);
   const [loadingPead, setLoadingPead] = useState(false);
+  const [peadCustomInput, setPeadCustomInput] = useState("");
+  const [customPeadUniverse, setCustomPeadUniverse] = useState<string[]>([]);
   const [promotedSymbols, setPromotedSymbols] = useState<Record<string, boolean>>({});
   const [promotingSymbol, setPromotingSymbol] = useState<string | null>(null);
 
@@ -123,10 +127,12 @@ export const QuantResearchLab: React.FC<QuantResearchLabProps> = ({ onNavigate }
     }
   };
 
-  const fetchCatalysts = async () => {
+  const fetchCatalysts = async (symbolsToFetch?: string) => {
     setLoadingCatalysts(true);
     try {
-      const res = await fetch("/api/events/catalysts");
+      const symParam = symbolsToFetch !== undefined ? symbolsToFetch : (activeCatalystSym || "");
+      const url = symParam ? `/api/events/catalysts?symbols=${encodeURIComponent(symParam)}` : "/api/events/catalysts";
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setCatalysts(data.catalysts || []);
@@ -155,10 +161,14 @@ export const QuantResearchLab: React.FC<QuantResearchLabProps> = ({ onNavigate }
     }
   };
 
-  const fetchPeadCandidates = async () => {
+  const fetchPeadCandidates = async (symbolsToFetch?: string) => {
     setLoadingPead(true);
     try {
-      const res = await fetch("/api/events/pead-candidates");
+      const syms = symbolsToFetch !== undefined 
+        ? symbolsToFetch 
+        : (customPeadUniverse.length > 0 ? customPeadUniverse.join(",") : "");
+      const url = syms ? `/api/events/pead-candidates?symbols=${encodeURIComponent(syms)}` : "/api/events/pead-candidates";
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setPeadCandidates(data.candidates || []);
@@ -168,6 +178,26 @@ export const QuantResearchLab: React.FC<QuantResearchLabProps> = ({ onNavigate }
     } finally {
       setLoadingPead(false);
     }
+  };
+
+  const handleAddPeadTicker = (tickerToAdd?: string) => {
+    const sym = (tickerToAdd || peadCustomInput).trim().toUpperCase();
+    if (!sym) return;
+    const currentUniverse = customPeadUniverse.length > 0 
+      ? [...customPeadUniverse] 
+      : ["NVDA", "XLE", "SAP", "VRTX", "ASML", "ATO", "CUE", "ONWD"];
+    if (!currentUniverse.includes(sym)) {
+      currentUniverse.unshift(sym);
+    }
+    setCustomPeadUniverse(currentUniverse);
+    setPeadCustomInput("");
+    fetchPeadCandidates(currentUniverse.join(","));
+  };
+
+  const handleResetPead = () => {
+    setCustomPeadUniverse([]);
+    setPeadCustomInput("");
+    fetchPeadCandidates("");
   };
 
   const handlePromote = async (candidate: PEADCandidate) => {
@@ -193,33 +223,31 @@ export const QuantResearchLab: React.FC<QuantResearchLabProps> = ({ onNavigate }
     }
   };
 
-  // Run Institutional Microstructure Qualification Audit
-  const handleRunQualification = (tickerToAudit?: string) => {
+  // Run Institutional Microstructure Qualification Audit via live endpoint
+  const handleRunQualification = async (tickerToAudit?: string) => {
     const sym = (tickerToAudit || screenTicker).toUpperCase().trim();
     if (!sym) return;
     setScreenTicker(sym);
     setScreening(true);
 
-    setTimeout(() => {
-      const isBiotech = ["VRTX", "BIIB", "MRNA", "PFE"].includes(sym);
-      const isTech = ["NVDA", "AAPL", "MSFT", "TSLA", "ASML"].includes(sym);
-      
-      setScreenResult({
-        symbol: sym,
-        timestamp: new Date().toISOString(),
-        ofiReadiness: isTech ? "OPTIMAL (+4.2 Sigma)" : isBiotech ? "VOLATILE (+1.8 Sigma)" : "NORMAL (+1.1 Sigma)",
-        spreadToAtrRatio: isTech ? "1.8% (Tight DMA Liquidity)" : isBiotech ? "4.2% (Acceptable)" : "2.9% (Standard)",
-        shortAvailability: isTech ? "1,250,000 shares (Borrow: 0.35%)" : "420,000 shares (Borrow: 1.15%)",
-        runsTestResult: isTech ? "Z = -2.48 (Significant Trend Persistence, p=0.013)" : "Z = -0.84 (Random Walk Null Accepted)",
-        hurstExponent: isTech ? "H = 0.68 (Persistent Trending Regime)" : "H = 0.51 (Brownian Random Walk)",
-        fractionalEligible: true,
-        binaryRiskStatus: isBiotech 
-          ? { safe: false, reason: "Phase 3 clinical trial readout within 48h (Binary lock enforced)" }
-          : { safe: true, reason: "No imminent unpriced binary corporate events" },
-        overallVerdict: isBiotech ? "RESTRICTED (Binary Gated)" : "APPROVED FOR OFI EXECUTION"
+    try {
+      const res = await fetch("/api/events/microstructure-audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol: sym })
       });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.audit) {
+          setScreenResult(json.audit);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("Error executing microstructure audit:", err);
+    } finally {
       setScreening(false);
-    }, 500);
+    }
   };
 
   useEffect(() => {
@@ -351,6 +379,75 @@ export const QuantResearchLab: React.FC<QuantResearchLabProps> = ({ onNavigate }
           <p className="text-[11px] text-muted-foreground font-mono leading-relaxed">
             {icData?.explanation || "Primary SEC 8-K filings and regulatory milestones demonstrate statistically significant positive rank correlation (IC = +0.284, p = 0.002) with forward price returns, confirming that sentiment is a valid systematic alpha driver rather than random noise."}
           </p>
+        </div>
+
+        {/* Dynamic Search & Ticker Filter Bar for Lens 1 */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-1">
+          <div className="flex-1 flex gap-2">
+            <input
+              type="text"
+              value={catalystQuery}
+              onChange={(e) => setCatalystQuery(e.target.value.toUpperCase())}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && catalystQuery.trim()) {
+                  const sym = catalystQuery.trim().toUpperCase();
+                  setActiveCatalystSym(sym);
+                  fetchCatalysts(sym);
+                }
+              }}
+              placeholder="Search SEC EDGAR / ClinicalTrials filings (e.g. AMD, AAPL, TSLA, LLY, NVDA)..."
+              className="flex-1 terminal-elevated border border-border rounded-lg px-3 py-2 text-xs text-primary font-mono uppercase focus:outline-hidden focus:border-indigo-500"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const sym = catalystQuery.trim().toUpperCase();
+                setActiveCatalystSym(sym || null);
+                fetchCatalysts(sym);
+              }}
+              disabled={loadingCatalysts}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold px-4 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-md shrink-0"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>SEARCH</span>
+            </button>
+            {activeCatalystSym && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCatalystQuery("");
+                  setActiveCatalystSym(null);
+                  fetchCatalysts("");
+                }}
+                className="terminal-elevated hover:bg-elevated border border-border text-secondary hover:text-primary font-mono text-xs font-bold px-3 py-2 rounded-lg transition cursor-pointer shrink-0"
+                title="Reset to default multi-feed stream"
+              >
+                <span>RESET ALL</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-secondary font-mono uppercase">Quick Tickers:</span>
+            {["NVDA", "AMD", "AAPL", "MSFT", "VRTX", "LLY", "ASML", "SAP", "XLE"].map((sym) => (
+              <button
+                key={sym}
+                type="button"
+                onClick={() => {
+                  setCatalystQuery(sym);
+                  setActiveCatalystSym(sym);
+                  fetchCatalysts(sym);
+                }}
+                className={`px-2 py-1 rounded text-xs font-mono font-bold transition border cursor-pointer ${
+                  activeCatalystSym === sym
+                    ? "bg-indigo-500/20 text-indigo-400 border-indigo-500/40"
+                    : "terminal-elevated hover:bg-elevated text-secondary border-border"
+                }`}
+              >
+                {sym}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -499,13 +596,62 @@ export const QuantResearchLab: React.FC<QuantResearchLabProps> = ({ onNavigate }
 
           <button
             type="button"
-            onClick={fetchPeadCandidates}
+            onClick={() => fetchPeadCandidates()}
             disabled={loadingPead}
             className="terminal-elevated hover:bg-elevated border border-border text-primary px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loadingPead ? "animate-spin" : ""}`} />
             <span>REFRESH RADAR</span>
           </button>
+        </div>
+
+        {/* Dynamic Scanner & Ticker Ingestion Bar for Lens 2 */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-1">
+          <div className="flex-1 flex gap-2">
+            <input
+              type="text"
+              value={peadCustomInput}
+              onChange={(e) => setPeadCustomInput(e.target.value.toUpperCase())}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAddPeadTicker();
+              }}
+              placeholder="Scan custom ticker for PEAD drift (e.g. AMD, TSLA, GOOGL, META)..."
+              className="flex-1 terminal-elevated border border-border rounded-lg px-3 py-2 text-xs text-primary font-mono uppercase focus:outline-hidden focus:border-amber-500"
+            />
+            <button
+              type="button"
+              onClick={() => handleAddPeadTicker()}
+              disabled={loadingPead || !peadCustomInput.trim()}
+              className="bg-amber-600 hover:bg-amber-500 text-white font-mono text-xs font-bold px-4 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-md shrink-0"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span>SCAN TICKER</span>
+            </button>
+            {customPeadUniverse.length > 0 && (
+              <button
+                type="button"
+                onClick={handleResetPead}
+                className="terminal-elevated hover:bg-elevated border border-border text-secondary hover:text-primary font-mono text-xs font-bold px-3 py-2 rounded-lg transition cursor-pointer shrink-0"
+                title="Reset to 8-instrument benchmark universe"
+              >
+                <span>RESET BENCHMARK</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-secondary font-mono uppercase">Quick Presets:</span>
+            {["NVDA", "AMD", "ASML", "SAP", "TSLA", "XLE", "VRTX", "ATO", "CUE"].map((sym) => (
+              <button
+                key={sym}
+                type="button"
+                onClick={() => handleAddPeadTicker(sym)}
+                className="px-2 py-1 rounded text-xs font-mono font-bold transition border cursor-pointer terminal-elevated hover:bg-elevated text-secondary border-border hover:text-amber-400 hover:border-amber-500/40"
+              >
+                + {sym}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -661,7 +807,7 @@ export const QuantResearchLab: React.FC<QuantResearchLabProps> = ({ onNavigate }
 
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[10px] text-secondary font-mono uppercase">Quick Presets:</span>
-            {["NVDA", "ASML", "SAP", "VRTX", "XLE"].map((sym) => (
+            {["NVDA", "ASML", "SAP", "VRTX", "LLY", "XLE", "ATO", "CUE", "ONWD"].map((sym) => (
               <button
                 key={sym}
                 type="button"

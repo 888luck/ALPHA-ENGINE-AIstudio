@@ -132,7 +132,8 @@ class EdgeTcpBridgeServer:
         elif action == "UPDATE_SETTINGS":
             if self.settings_handler:
                 try:
-                    res = self.settings_handler(cmd.get("settings", {}))
+                    payload = cmd.get("settings") or cmd.get("args") or {}
+                    res = self.settings_handler(payload)
                     return {"status": "ACK", "result": res, "timestamp": timestamp}
                 except Exception as ex:
                     return {"status": "ERROR", "message": str(ex), "timestamp": timestamp}
