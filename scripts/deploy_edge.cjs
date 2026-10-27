@@ -150,34 +150,13 @@ async function main() {
     if (dryRun) {
       console.log(`  ${c.yellow}[DRY RUN]${c.reset} Would execute git pull, npm run build, and service restart on ${VM_NAME}`);
     } else {
-      const remoteCommands = [
-        'set -e',
-        `cd ${REMOTE_DIR}`,
-        'sudo git config core.fileMode false',
-        'echo "[VM 1/5] Preserving active live runtime state files..."',
-        'for f in dynamic_baskets.json risk_limits.json backend/app/api/copilot_quota_state.json; do if [ -f "$f" ]; then cp "$f" "/tmp/$(basename $f).live"; sudo git checkout -- "$f" 2>/dev/null || true; fi; done',
-        'echo "[VM 2/5] Pulling latest commits from origin main..."',
-        'sudo git fetch origin main',
-        'sudo git reset --hard origin/main',
-        'echo "[VM 3/5] Restoring live runtime state files..."',
-        'for f in dynamic_baskets.json risk_limits.json backend/app/api/copilot_quota_state.json; do if [ -f "/tmp/$(basename $f).live" ]; then cp "/tmp/$(basename $f).live" "$f"; rm -f "/tmp/$(basename $f).live"; fi; done',
-        'echo "[VM 4/5] Compiling frontend & Express server bundle..."',
-        'sudo npm run build',
-        'echo "[VM 5/5] Restarting Alpha Engine services..."',
-        'sudo systemctl restart alpha-ui.service alpha-engine.service',
-        'sudo systemctl is-active alpha-ui alpha-engine ibgateway nginx'
-      ].join(' && ');
-
+      const remoteCommand = 'bash /opt/alpha-engine/scripts/vm_sync_and_rebuild.sh 2>/dev/null || bash /tmp/vm_sync_and_rebuild.sh';
       const t0 = performance.now();
       process.stdout.write(`  ${c.dim}[SSH CONNECTING]${c.reset} Executing remote update pipeline on Frankfurt VM... \n`);
 
-      const b64Payload = Buffer.from(remoteCommands).toString('base64');
-      const pipeChar = process.platform === 'win32' ? '^|' : '|';
-      const encodedCommand = `echo ${b64Payload} ${pipeChar} base64 -d ${pipeChar} bash`;
-
       const sshResult = spawnSync(
         'gcloud',
-        ['compute', 'ssh', VM_NAME, `--zone=${ZONE}`, `--command=${encodedCommand}`],
+        ['compute', 'ssh', VM_NAME, `--zone=${ZONE}`, `--command=${remoteCommand}`],
         { stdio: 'inherit', shell: true }
       );
 
