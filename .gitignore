@@ -58,3 +58,8 @@ system_risk_state.json
 active_trades_sandbox.json
 tca_executions.json
 audit_history.json
+*.bak*
+dist.bak/
+vm_backups/
+historical_bars_*.json
+historical_logs.json

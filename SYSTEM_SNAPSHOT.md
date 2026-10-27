@@ -9,12 +9,14 @@ This document is the authoritative institutional blueprint of the Alpha Engine H
 ```
 +-----------------------------------------------------------------------------------+
 |                        TIER 1: WEB CONTROL PLANE & API                            |
-|             Google Cloud Run (Frankfurt europe-west3) | Port 3000                |
+|        Frankfurt Edge VM (Primary Domain) & Google Cloud Run (Standby Mirror)     |
 |                                                                                   |
 |  - 7 Institutional Control Tabs (Vite + React SPA)                                |
 |  - Modular Express API Server (dist/server.cjs)                                   |
 |  - Dynamic 12-Factor Vault Engine (/api/vault)                                    |
-|  - Live Endpoint: https://alpha-engine-aistudio-138990607360.europe-west3.run.app |
+|  - Primary Production Domain: https://misha-vm-gcp.duckdns.org (Port 443 SSL)     |
+|  - Standby Mirror Endpoint: https://alpha-engine-aistudio-138990607360.europe-west3.run.app |
+|  - Remote IBKR Gateway noVNC GUI: https://misha-vm-gcp.duckdns.org:8443           |
 +-----------------------------------------------------------------------------------+
                                         |
        Encrypted Low-Latency TCP Socket Streaming (<5ms, token-authenticated)
@@ -159,7 +161,11 @@ The Copilot (`CopilotPage.tsx`, `src/server/routes/copilot.ts`, `backend/app/api
 | **`tca_engine.py`** | Transaction Cost Analysis engine; benchmarks arrival prices, slippage, and MiFID II efficiency into `tca_executions.json`. |
 | **`switch_gateway_mode.py`** | Orchestrates paper/live gateway switching, updates `jts.ini`, and triggers `ibgateway.service` restarts. |
 | **`tools_reflector.py`** | Dynamic reflection engine; inspects `ibapi.client.EClient` to build `tools_registry.json` with normalized parameters. |
-| **`tools_registry.json`** | Unified catalog containing 78 callable tools across 10 categories cached with a 24-hour TTL. |
+| **`tools_registry.json`** | Unified catalog containing 83 callable tools across 11 categories cached with a 24-hour TTL. |
+| **`scripts/deploy_edge.cjs`** | Primary edge deployment pipeline targeting Frankfurt Edge VM (<35s turnaround) with state preservation. |
+| **`scripts/deploy_cloudrun.cjs`** | Optional secondary standby mirror deployment pipeline to Google Cloud Run. |
+| **`scripts/vm_sync_and_rebuild.sh`** | Remote VM sync daemon preserving runtime risk/basket state, compiling bundle, and restarting daemons. |
+| **`scripts/deploy_edge.ps1` / `.sh`** | Cross-platform shell wrappers for single-command Edge VM deployment. |
 | **`server.ts`** | Production Express + Vite server on port `3000`; mounts modular routers (`/api/diagnostics`, `/api/copilot`, `/api/universe`, etc.). |
 | **`src/components/LiveCockpit.tsx`** | Executive control plane (`CONTROL` & `RISK` tabs); hosts KPI ribbon, L2 order depth, OFI accumulation, node telemetry, and SEC 15c3-5 risk gates. |
 | **`src/components/ActiveHoldingsTable.tsx`** | Blotter active holdings ledger; real-time marks, trailing stops, unrealized P&L, and MiFID II shortcodes. |

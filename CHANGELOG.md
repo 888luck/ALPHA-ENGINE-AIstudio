@@ -4,6 +4,35 @@ All notable changes, architectural evolutions, and institutional fixes to the Al
 
 ---
 
+## [v2.7.0] - 2026-10-27: Single-Command Primary Edge Deployment & Standby Cloud Run Architecture
+
+### 🌟 Major Evolutions & Enhancements
+
+#### 1. High-Speed Edge VM Deployment Pipeline (`scripts/deploy_edge.cjs`, `scripts/vm_sync_and_rebuild.sh`)
+- **Direct Edge VM Targeting**:
+  - Re-architected deployment to prioritize the Frankfurt Edge Node VM (`https://misha-vm-gcp.duckdns.org`, `europe-west3-a`) as the primary execution and control plane, reducing deployment latency from ~4 minutes to ~33 seconds.
+- **Dynamic Runtime Risk State Preservation**:
+  - Automatically snapshots active live state (`dynamic_baskets.json`, `risk_limits.json`, `copilot_quota_state.json`) to `/tmp/` before Git operations, preventing active trader limits or discovered candidate pools from being wiped out or reverted to repository defaults during updates.
+- **Dynamic POSIX Ownership Reconciliation**:
+  - Embedded `sudo chown -R $(id -un):$(id -gn) /opt/alpha-engine` directly into the rebuild cycle, eliminating permission conflicts between Git resets and non-root execution daemons (`alpha-ui.service`, `alpha-engine.service`).
+- **Cross-Platform Argument Protection**:
+  - Resolved Windows CMD concatenation and shell escaping quirks using explicit double-quote preservation for `gcloud compute ssh --command`.
+- **Automated Health Telemetry**:
+  - Automatically executes end-to-end HTTP health probes against Lens 1 Information Coefficient (`/api/events/information-coefficient`) and Catalyst Radar (`/api/events/catalysts`) upon service restarts.
+
+#### 2. Standby Mirror Architecture & Dual Deployment Workflow (`scripts/deploy_cloudrun.cjs`)
+- **Optional Standby Mirroring**:
+  - De-coupled Google Cloud Run (`alpha-engine-aistudio-138990607360.europe-west3.run.app`) from daily development friction, maintaining it strictly as a scale-to-zero standby mirror ($0 standby cost) runnable on demand via `npm run deploy:standby`.
+- **Unified Dual Deployment**:
+  - Added `npm run deploy:all` to deploy to the primary Frankfurt Edge VM first, followed by Cloud Run standby rollout.
+
+#### 3. Repository & Workspace Hygiene
+- **Surgical Stumps Purge**:
+  - Purged all legacy `.bak` files, orphaned `dist.bak/`, and backup dumps on both host and Frankfurt Edge VM.
+  - Hardened `.gitignore` to prevent cached bar dumps (`historical_bars_*.json`), backups, and build artifacts from cluttering working trees.
+
+---
+
 ## [v2.6.0] - 2026-10-27: Tier 0 Frontier Dual-Head Encoder Architecture & Information Coefficient Factor Engine
 
 ### 🌟 Major Evolutions & Enhancements
