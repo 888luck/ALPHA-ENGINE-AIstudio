@@ -171,9 +171,12 @@ async function main() {
       const t0 = performance.now();
       process.stdout.write(`  ${c.dim}[SSH CONNECTING]${c.reset} Executing remote update pipeline on Frankfurt VM... \n`);
 
+      const b64Payload = Buffer.from(remoteCommands).toString('base64');
+      const encodedCommand = `echo ${b64Payload} | base64 -d | bash`;
+
       const sshResult = spawnSync(
         'gcloud',
-        ['compute', 'ssh', VM_NAME, `--zone=${ZONE}`, `--command=${remoteCommands}`],
+        ['compute', 'ssh', VM_NAME, `--zone=${ZONE}`, `--command=${encodedCommand}`],
         { stdio: 'inherit', shell: true }
       );
 
