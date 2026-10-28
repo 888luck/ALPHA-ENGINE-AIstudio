@@ -29,14 +29,11 @@ ln -sfn /opt/ibgateway /root/Jts/1050
 echo "/opt/ibgateway/jre" > /opt/ibgateway/.install4j/pref_jre.cfg
 
 # Sync IBC config credentials and mode dynamically from /etc/alpha-engine/secrets.env or /opt/alpha-engine/.env
-TARGET_MODE="paper"
 echo "[IBGATEWAY-DAEMON] Syncing IBC credentials & lane from 12-factor vault..."
-python3 -c "
+TARGET_MODE=$(python3 -c "
 import os, json
-env_vars = {}
 
-# Priority 1: /etc/alpha-engine/secrets.env
-# Priority 2: /opt/alpha-engine/.env
+env_vars = {}
 for env_path in ['/etc/alpha-engine/secrets.env', '/opt/alpha-engine/.env']:
     if os.path.exists(env_path):
         try:
@@ -46,41 +43,43 @@ for env_path in ['/etc/alpha-engine/secrets.env', '/opt/alpha-engine/.env']:
                     if '=' in line and not line.startswith('#'):
                         k, v = line.split('=', 1)
                         k_clean = k.strip()
-                        if k_clean not in env_vars:
-                            env_vars[k_clean] = v.strip().strip('\"').strip(\"'\")
+                        v_clean = v.strip().strip('\"').strip(\"'\")
+                        if v_clean:
+                            env_vars[k_clean] = v_clean
+                            env_vars[k_clean.upper()] = v_clean
+                            env_vars[k_clean.lower()] = v_clean
         except Exception as e:
-            print(f'[IBGATEWAY-DAEMON] Notice reading {env_path}: {e}')
+            print(f'[IBGATEWAY-DAEMON] Notice reading {env_path}: {e}', file=sys.stderr)
 
-# Fallback: check system_settings.json for tradingMode
 settings_path = '/opt/alpha-engine/system_settings.json'
-if 'TRADING_MODE' not in env_vars and os.path.exists(settings_path):
+if os.path.exists(settings_path):
     try:
         with open(settings_path, 'r') as f:
             d = json.load(f)
-            if 'tradingMode' in d:
-                env_vars['TRADING_MODE'] = d['tradingMode']
+            if 'tradingMode' in d and 'TRADING_MODE' not in env_vars:
+                env_vars['TRADING_MODE'] = str(d['tradingMode']).upper()
     except Exception:
         pass
 
-trading_mode = env_vars.get('TRADING_MODE', 'PAPER').upper()
+def get_val(*keys):
+    for k in keys:
+        if k in env_vars and env_vars[k]:
+            return env_vars[k]
+    return None
+
+trading_mode = (get_val('TRADING_MODE', 'tradingMode') or 'PAPER').upper()
 is_live = (trading_mode == 'LIVE')
 
-target_mode = 'live' if is_live else 'paper'
-target_port = 4001 if is_live else 4002
-
 if is_live:
-    user = env_vars.get('IBKR_LIVE_USERNAME') or env_vars.get('IBKR_USERNAME', '')
-    passwd = env_vars.get('IBKR_LIVE_PASSWORD') or env_vars.get('IBKR_PASSWORD', '')
-    if not user or not passwd:
-        print('[IBGATEWAY-DAEMON] WARNING: TRADING_MODE=LIVE requested, but IBKR_LIVE_USERNAME/PASSWORD are not configured. Falling back to PAPER simulation on port 4002.')
-        is_live = False
-        target_mode = 'paper'
-        target_port = 4002
-        user = env_vars.get('IBKR_PAPER_USERNAME') or env_vars.get('IBKR_USERNAME', 'mstouff17')
-        passwd = env_vars.get('IBKR_PAPER_PASSWORD') or env_vars.get('IBKR_PASSWORD', '')
+    user = get_val('IBKR_LIVE_USERNAME', 'ibkrLiveUsername', 'IBKR_USERNAME', 'ibkrUsername', 'IBKR_PAPER_USERNAME', 'ibkrPaperUsername') or 'mstouff17'
+    passwd = get_val('IBKR_LIVE_PASSWORD', 'ibkrLivePassword', 'IBKR_PASSWORD', 'ibkrPassword', 'IBKR_PAPER_PASSWORD', 'ibkrPaperPassword') or ''
+    target_mode = 'live'
+    target_port = 4001
 else:
-    user = env_vars.get('IBKR_PAPER_USERNAME') or env_vars.get('IBKR_USERNAME', 'mstouff17')
-    passwd = env_vars.get('IBKR_PAPER_PASSWORD') or env_vars.get('IBKR_PASSWORD', '')
+    user = get_val('IBKR_PAPER_USERNAME', 'ibkrPaperUsername', 'IBKR_USERNAME', 'ibkrUsername', 'IBKR_LIVE_USERNAME', 'ibkrLiveUsername') or 'mstouff17'
+    passwd = get_val('IBKR_PAPER_PASSWORD', 'ibkrPaperPassword', 'IBKR_PASSWORD', 'ibkrPassword', 'IBKR_LIVE_PASSWORD', 'ibkrLivePassword') or ''
+    target_mode = 'paper'
+    target_port = 4002
 
 ibc_ini = '/opt/ibc/config.ini'
 if os.path.exists(ibc_ini):
@@ -104,16 +103,11 @@ if os.path.exists(ibc_ini):
             f.write('\n'.join(new_lines) + '\n')
         os.replace(tmp_ini, ibc_ini)
         os.chmod(ibc_ini, 0o600)
-        print(f'[IBGATEWAY-DAEMON] IBC config updated: mode={target_mode}, port={target_port}, user={user}')
     except Exception as e:
-        print(f'[IBGATEWAY-DAEMON] Warning updating IBC config: {e}')
-"
-# Only launch live if both TRADING_MODE=LIVE and live credentials exist
-if grep -qi '^TRADING_MODE=["'"'"']*LIVE' /etc/alpha-engine/secrets.env 2>/dev/null && grep -qi '^IBKR_LIVE_USERNAME=["'"'"']*[a-zA-Z0-9]' /etc/alpha-engine/secrets.env 2>/dev/null; then
-  TARGET_MODE="live"
-else
-  TARGET_MODE="paper"
-fi
+        pass
+
+print(target_mode)
+")
 
 echo "[IBGATEWAY-DAEMON] Launching official IB Gateway via IBC standard (mode: ${TARGET_MODE})..."
 export DISPLAY=:1
@@ -124,3 +118,4 @@ exec /opt/ibc/scripts/ibcstart.sh 1050 --gateway \
   --ibc-ini=/opt/ibc/config.ini \
   --java-path=/opt/ibgateway/jre/bin \
   --mode="${TARGET_MODE}"
+

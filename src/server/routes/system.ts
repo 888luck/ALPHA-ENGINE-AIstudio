@@ -146,23 +146,24 @@ systemRouter.post("/api/vault/credentials", authMiddleware, (req, res) => {
 
 systemRouter.post("/api/system/toggle-lane", authMiddleware, async (req, res) => {
   try {
+    const creds = loadVaultCredentials();
     const currentMode = systemSettings.tradingMode || "PAPER";
     const targetMode = req.body.mode 
       ? (String(req.body.mode).toUpperCase() === "LIVE" ? "LIVE" : "PAPER") 
       : (currentMode === "LIVE" ? "PAPER" : "LIVE");
     const targetPort = req.body.port ? Number(req.body.port) : (targetMode === "LIVE" ? 4001 : 4002);
 
-    // Dynamic Live Credential Guard: Prevent entering an unauthenticated loop if live credentials are not configured
-    if (targetMode === "LIVE") {
-      const creds = loadVaultCredentials();
-      const hasLiveUser = !!(req.body.ibkrLiveUsername || creds.ibkrLiveUsername || process.env.IBKR_LIVE_USERNAME);
-      const hasLivePass = !!(req.body.ibkrLivePassword || creds.ibkrLivePassword || process.env.IBKR_LIVE_PASSWORD);
-      if (!hasLiveUser || !hasLivePass) {
-        return res.status(400).json({
-          success: false,
-          error: "LIVE Credentials Required: Configure your IBKR Live Username and Password in the 4-Pillar Vault (Alt+6) before launching LIVE DMA execution."
-        });
-      }
+    const liveUser = req.body.ibkrLiveUsername || creds.ibkrLiveUsername || creds.ibkrUsername || creds.ibkrPaperUsername || process.env.IBKR_LIVE_USERNAME || process.env.IBKR_USERNAME || process.env.IBKR_PAPER_USERNAME || "mstouff17";
+    const livePass = req.body.ibkrLivePassword || creds.ibkrLivePassword || creds.ibkrPassword || creds.ibkrPaperPassword || process.env.IBKR_LIVE_PASSWORD || process.env.IBKR_PASSWORD || process.env.IBKR_PAPER_PASSWORD;
+
+    const paperUser = req.body.ibkrPaperUsername || creds.ibkrPaperUsername || creds.ibkrUsername || creds.ibkrLiveUsername || process.env.IBKR_PAPER_USERNAME || process.env.IBKR_USERNAME || process.env.IBKR_LIVE_USERNAME || "mstouff17";
+    const paperPass = req.body.ibkrPaperPassword || creds.ibkrPaperPassword || creds.ibkrPassword || creds.ibkrLivePassword || process.env.IBKR_PAPER_PASSWORD || process.env.IBKR_PASSWORD || process.env.IBKR_LIVE_PASSWORD;
+
+    if (targetMode === "LIVE" && !livePass) {
+      return res.status(400).json({
+        success: false,
+        error: "LIVE Credentials Required: Configure your IBKR Live Password in the 4-Pillar Vault (Alt+6) before launching LIVE DMA execution."
+      });
     }
 
     systemSettings.tradingMode = targetMode;
@@ -170,14 +171,18 @@ systemRouter.post("/api/system/toggle-lane", authMiddleware, async (req, res) =>
 
     if (req.body.accountNumber) {
       systemSettings.ibkrAccountNumber = req.body.accountNumber;
-    } else if (targetMode === "LIVE" && systemSettings.ibkrLiveAccountNumber) {
-      systemSettings.ibkrAccountNumber = systemSettings.ibkrLiveAccountNumber;
-    } else if (targetMode === "PAPER" && systemSettings.ibkrPaperAccountNumber) {
-      systemSettings.ibkrAccountNumber = systemSettings.ibkrPaperAccountNumber;
+    } else if (targetMode === "LIVE" && (req.body.ibkrLiveAccountNumber || systemSettings.ibkrLiveAccountNumber || creds.ibkrLiveAccountNumber)) {
+      systemSettings.ibkrAccountNumber = req.body.ibkrLiveAccountNumber || systemSettings.ibkrLiveAccountNumber || creds.ibkrLiveAccountNumber;
+    } else if (targetMode === "PAPER" && (req.body.ibkrPaperAccountNumber || systemSettings.ibkrPaperAccountNumber || creds.ibkrPaperAccountNumber)) {
+      systemSettings.ibkrAccountNumber = req.body.ibkrPaperAccountNumber || systemSettings.ibkrPaperAccountNumber || creds.ibkrPaperAccountNumber;
     }
 
     if (req.body.ibkrLiveAccountNumber) systemSettings.ibkrLiveAccountNumber = req.body.ibkrLiveAccountNumber;
     if (req.body.ibkrPaperAccountNumber) systemSettings.ibkrPaperAccountNumber = req.body.ibkrPaperAccountNumber;
+    if (req.body.ibkrLiveUsername) systemSettings.ibkrLiveUsername = req.body.ibkrLiveUsername;
+    if (req.body.ibkrLivePassword) systemSettings.ibkrLivePassword = req.body.ibkrLivePassword;
+    if (req.body.ibkrPaperUsername) systemSettings.ibkrPaperUsername = req.body.ibkrPaperUsername;
+    if (req.body.ibkrPaperPassword) systemSettings.ibkrPaperPassword = req.body.ibkrPaperPassword;
 
     // Atomically write risk_limits.json across local process and root parent dirs
     const riskLimitsPayload = {
@@ -207,7 +212,13 @@ systemRouter.post("/api/system/toggle-lane", authMiddleware, async (req, res) =>
     saveVaultCredentials({
       tradingMode: targetMode,
       ibkrPort: targetPort,
-      ibkrAccountNumber: systemSettings.ibkrAccountNumber
+      ibkrAccountNumber: systemSettings.ibkrAccountNumber,
+      ibkrLiveUsername: systemSettings.ibkrLiveUsername,
+      ibkrLivePassword: systemSettings.ibkrLivePassword,
+      ibkrPaperUsername: systemSettings.ibkrPaperUsername,
+      ibkrPaperPassword: systemSettings.ibkrPaperPassword,
+      ibkrLiveAccountNumber: systemSettings.ibkrLiveAccountNumber,
+      ibkrPaperAccountNumber: systemSettings.ibkrPaperAccountNumber,
     });
 
     await persistSettings();
@@ -225,7 +236,13 @@ systemRouter.post("/api/system/toggle-lane", authMiddleware, async (req, res) =>
     if (fs.existsSync(switcherPath) && process.platform === "linux") {
       try {
         const { spawn } = await import("child_process");
-        const proc = spawn("sudo", ["python3", switcherPath, "--mode", targetMode], {
+        const activeUser = targetMode === "LIVE" ? liveUser : paperUser;
+        const activePass = targetMode === "LIVE" ? livePass : paperPass;
+        const spawnArgs = ["python3", switcherPath, "--mode", targetMode];
+        if (activeUser) spawnArgs.push("--user", activeUser);
+        if (activePass) spawnArgs.push("--password", activePass);
+
+        const proc = spawn("sudo", spawnArgs, {
           detached: true,
           stdio: "ignore"
         });
@@ -377,7 +394,19 @@ systemRouter.post("/api/set-settings", authMiddleware, (req, res) => {
     if (fs.existsSync(switcherPath) && process.platform === "linux") {
       try {
         const { spawn } = require("child_process");
-        const proc = spawn("sudo", ["python3", switcherPath, "--mode", systemSettings.tradingMode], {
+        const creds = loadVaultCredentials();
+        const tm = systemSettings.tradingMode;
+        const activeUser = tm === "LIVE"
+          ? (req.body.ibkrLiveUsername || creds.ibkrLiveUsername || creds.ibkrUsername || creds.ibkrPaperUsername || "mstouff17")
+          : (req.body.ibkrPaperUsername || creds.ibkrPaperUsername || creds.ibkrUsername || "mstouff17");
+        const activePass = tm === "LIVE"
+          ? (req.body.ibkrLivePassword || creds.ibkrLivePassword || creds.ibkrPassword || creds.ibkrPaperPassword)
+          : (req.body.ibkrPaperPassword || creds.ibkrPaperPassword || creds.ibkrPassword);
+        const spawnArgs = ["python3", switcherPath, "--mode", tm];
+        if (activeUser) spawnArgs.push("--user", activeUser);
+        if (activePass) spawnArgs.push("--password", activePass);
+
+        const proc = spawn("sudo", spawnArgs, {
           detached: true,
           stdio: "ignore"
         });
@@ -422,13 +451,11 @@ systemRouter.post("/api/gateway/trigger-login", authMiddleware, async (req, res)
   }
 });
 
-systemRouter.all("/api/test-broker-connection", (req, res) => {
+systemRouter.all("/api/test-broker-connection", async (req, res) => {
   const isCloudRun = !!process.env.K_SERVICE;
   const vaultCreds = loadVaultCredentials();
   const dynamicEdgeHost = process.env.EDGE_NODE_HOST || process.env.EDGE_NODE_IP || vaultCreds.edgeNodeHost || (isCloudRun ? "10.156.0.2" : "127.0.0.1");
 
-  // Dynamic Bridge Endpoint Routing: If running on Cloud Run and request specifies 127.0.0.1 (or empty),
-  // automatically route socket traffic to the dynamic edge host across the VPC connector!
   let host = req.body?.host || req.query?.host;
   let rerouted = false;
   if (!host || (isCloudRun && host === "127.0.0.1")) {
@@ -436,54 +463,74 @@ systemRouter.all("/api/test-broker-connection", (req, res) => {
     rerouted = (req.body?.host === "127.0.0.1" || req.query?.host === "127.0.0.1");
   }
   const port = Number(req.body?.port || req.query?.port) || systemSettings.ibkrPort || 4002;
-  const startTime = Date.now();
-  
-  const socket = new net.Socket();
-  let finished = false;
-  socket.setTimeout(3500);
 
-  socket.on("connect", () => {
-    if (finished) return;
-    finished = true;
-    const latencyMs = Date.now() - startTime;
-    socket.destroy();
-    res.json({
+  const probeSocket = (targetHost: string, targetPort: number, timeoutMs = 3500): Promise<{ ok: boolean; latencyMs: number; error?: string }> => {
+    return new Promise((resolve) => {
+      const t0 = Date.now();
+      const s = new net.Socket();
+      s.setTimeout(timeoutMs);
+      let done = false;
+      s.on("connect", () => {
+        if (done) return;
+        done = true;
+        const latencyMs = Date.now() - t0;
+        s.destroy();
+        resolve({ ok: true, latencyMs });
+      });
+      s.on("timeout", () => {
+        if (done) return;
+        done = true;
+        s.destroy();
+        resolve({ ok: false, latencyMs: Date.now() - t0, error: `Socket timeout after ${timeoutMs}ms` });
+      });
+      s.on("error", (err: any) => {
+        if (done) return;
+        done = true;
+        s.destroy();
+        resolve({ ok: false, latencyMs: Date.now() - t0, error: err.message });
+      });
+      s.connect(targetPort, targetHost);
+    });
+  };
+
+  const primary = await probeSocket(host, port, 3000);
+  if (primary.ok) {
+    return res.json({
       success: true,
-      latencyMs,
+      latencyMs: primary.latencyMs,
       host,
       port,
       status: "CONNECTED",
-      message: `TCP handshake with IB Gateway (${host}:${port}) succeeded in ${latencyMs}ms.${rerouted ? " (Dynamic Bridge Endpoint Routing auto-redirected from container loopback)" : ""}`
+      message: `TCP handshake with IB Gateway (${host}:${port}) succeeded in ${primary.latencyMs}ms.${rerouted ? " (Dynamic Bridge Endpoint Routing auto-redirected from container loopback)" : ""}`
     });
-  });
+  }
 
-  socket.on("timeout", () => {
-    if (finished) return;
-    finished = true;
-    socket.destroy();
-    res.json({
-      success: false,
-      host,
-      port,
-      status: "TIMEOUT",
-      message: `TCP socket timeout after 3500ms attempting to reach IB Gateway (${host}:${port}). Check if the Edge VM (alpha-edge-node) and ibgateway service are running in Frankfurt.`
-    });
-  });
+  // Probe alternate lane to give actionable feedback
+  const altPort = port === 4001 ? 4002 : (port === 4002 ? 4001 : null);
+  if (altPort) {
+    const altCheck = await probeSocket(host, altPort, 1500);
+    if (altCheck.ok) {
+      const altLane = altPort === 4001 ? "LIVE PRODUCTION" : "PAPER SIMULATION";
+      const targetLane = port === 4001 ? "LIVE" : "PAPER";
+      return res.json({
+        success: false,
+        host,
+        port,
+        alternatePort: altPort,
+        alternateMode: altPort === 4001 ? "LIVE" : "PAPER",
+        status: "LANE_MISMATCH",
+        message: `Port ${port} is closed, but IB Gateway is currently ACTIVE on Port ${altPort} (${altLane}). Click 'Switch to ${targetLane}' to transition the gateway.`
+      });
+    }
+  }
 
-  socket.on("error", (err: any) => {
-    if (finished) return;
-    finished = true;
-    socket.destroy();
-    res.json({
-      success: false,
-      host,
-      port,
-      status: "REFUSED",
-      message: `TCP connection to ${host}:${port} failed (${err.message}). Verify that IB Gateway is active on the Frankfurt Edge Node (${host}) on port ${port}.`
-    });
+  return res.json({
+    success: false,
+    host,
+    port,
+    status: primary.error?.includes("timeout") ? "TIMEOUT" : "REFUSED",
+    message: `TCP connection to ${host}:${port} failed (${primary.error || "ECONNREFUSED"}). Verify that IB Gateway is active on the Frankfurt Edge Node (${host}) on port ${port}.`
   });
-
-  socket.connect(port, host);
 });
 
 // Pillar 4: Institutional Regulatory & Catalyst Feed Live Probes

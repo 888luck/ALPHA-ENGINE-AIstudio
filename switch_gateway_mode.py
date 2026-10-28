@@ -198,7 +198,7 @@ def switch_lane(mode: str, password: Optional[str] = None, username: Optional[st
     print(f"  ALPHAENGINE MODE SWITCH: -> {mode} (PORT {target_port})")
     print(f"==================================================")
 
-    # Resolve credentials from 12-factor secrets hierarchy (/etc/alpha-engine/secrets.env first, then .env)
+    # Resolve credentials from 12-factor secrets hierarchy (/etc/alpha-engine/secrets.env first, then .env, then system_settings.json)
     env_vars = {}
     for env_candidate in ["/etc/alpha-engine/secrets.env", ENV_PATH]:
         if os.path.exists(env_candidate):
@@ -210,20 +210,58 @@ def switch_lane(mode: str, password: Optional[str] = None, username: Optional[st
                             k, v = line.split("=", 1)
                             clean_k = k.strip()
                             clean_v = v.strip().strip('"').strip("'")
-                            if clean_k not in env_vars and clean_v:
+                            if clean_v:
                                 env_vars[clean_k] = clean_v
+                                env_vars[clean_k.upper()] = clean_v
+                                env_vars[clean_k.lower()] = clean_v
             except Exception as e:
                 print(f"[SWITCHER] Notice reading {env_candidate}: {e}")
 
+    settings_path = "/opt/alpha-engine/system_settings.json"
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, "r") as f:
+                sdata = json.load(f)
+                for k, v in sdata.items():
+                    if v and isinstance(v, str):
+                        clean_k = str(k).strip()
+                        env_vars[clean_k] = v
+                        env_vars[clean_k.upper()] = v
+                        env_vars[clean_k.lower()] = v
+        except Exception:
+            pass
+
+    def get_val(*keys):
+        for k in keys:
+            if k in env_vars and env_vars[k]:
+                return env_vars[k]
+        return None
+
     if mode == "LIVE":
-        resolved_user = username or env_vars.get("IBKR_LIVE_USERNAME") or env_vars.get("IBKR_USERNAME")
-        resolved_pass = password or env_vars.get("IBKR_LIVE_PASSWORD") or env_vars.get("IBKR_PASSWORD")
+        resolved_user = username or get_val(
+            "IBKR_LIVE_USERNAME", "ibkrLiveUsername", 
+            "IBKR_USERNAME", "ibkrUsername",
+            "IBKR_PAPER_USERNAME", "ibkrPaperUsername"
+        ) or "mstouff17"
+        resolved_pass = password or get_val(
+            "IBKR_LIVE_PASSWORD", "ibkrLivePassword",
+            "IBKR_PASSWORD", "ibkrPassword",
+            "IBKR_PAPER_PASSWORD", "ibkrPaperPassword"
+        )
         if not resolved_user or not resolved_pass:
-            print(f"[SWITCHER] ABORT: Cannot switch to LIVE production mode. IBKR_LIVE_USERNAME and IBKR_LIVE_PASSWORD are not configured in /etc/alpha-engine/secrets.env.")
+            print(f"[SWITCHER] ABORT: Cannot switch to LIVE production mode. Neither live credentials nor paper fallback credentials found.")
             return False
     else:
-        resolved_user = username or env_vars.get("IBKR_PAPER_USERNAME") or env_vars.get("IBKR_USERNAME") or "mstouff17"
-        resolved_pass = password or env_vars.get("IBKR_PAPER_PASSWORD") or env_vars.get("IBKR_PASSWORD")
+        resolved_user = username or get_val(
+            "IBKR_PAPER_USERNAME", "ibkrPaperUsername",
+            "IBKR_USERNAME", "ibkrUsername",
+            "IBKR_LIVE_USERNAME", "ibkrLiveUsername"
+        ) or "mstouff17"
+        resolved_pass = password or get_val(
+            "IBKR_PAPER_PASSWORD", "ibkrPaperPassword",
+            "IBKR_PASSWORD", "ibkrPassword",
+            "IBKR_LIVE_PASSWORD", "ibkrLivePassword"
+        )
 
     # 1. Update engine config and .env FIRST so any downstream service reads correct lane
     update_engine_config(target_port, mode)

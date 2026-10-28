@@ -95,8 +95,15 @@ export const VaultConsole: React.FC<VaultConsoleProps> = ({
   const [ibkrClientId, setIbkrClientId] = useState(() => Number(getStoredVaultValue("ibkrClientId", String(settings?.ibkrClientId || 1))));
   const [mifidMaker, setMifidMaker] = useState(() => getStoredVaultValue("mifid2DecisionMaker", settings?.mifid2DecisionMaker || "ALGO_DEC_992"));
   const [mifidTrader, setMifidTrader] = useState(() => getStoredVaultValue("mifid2ExecutionTrader", settings?.mifid2ExecutionTrader || "ALGO_EXE_554"));
-  const [ibkrUsername, setIbkrUsername] = useState(() => getStoredVaultValue("ibkrPaperUsername", settings?.ibkrPaperUsername || ""));
-  const [ibkrPassword, setIbkrPassword] = useState(() => getStoredVaultValue("ibkrPaperPassword", settings?.ibkrPaperPassword || ""));
+  const [paperAccountNumber, setPaperAccountNumber] = useState(() => getStoredVaultValue("ibkrPaperAccountNumber", settings?.ibkrPaperAccountNumber || "DU1234567"));
+  const [paperUsername, setPaperUsername] = useState(() => getStoredVaultValue("ibkrPaperUsername", settings?.ibkrPaperUsername || "mstouff17"));
+  const [paperPassword, setPaperPassword] = useState(() => getStoredVaultValue("ibkrPaperPassword", settings?.ibkrPaperPassword || ""));
+  const [liveAccountNumber, setLiveAccountNumber] = useState(() => getStoredVaultValue("ibkrLiveAccountNumber", settings?.ibkrLiveAccountNumber || ""));
+  const [liveUsername, setLiveUsername] = useState(() => getStoredVaultValue("ibkrLiveUsername", settings?.ibkrLiveUsername || ""));
+  const [livePassword, setLivePassword] = useState(() => getStoredVaultValue("ibkrLivePassword", settings?.ibkrLivePassword || ""));
+  const [unifiedCredentials, setUnifiedCredentials] = useState<boolean>(true);
+  const [isSwitchingLane, setIsSwitchingLane] = useState(false);
+  const [laneSwitchToast, setLaneSwitchToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   // Form State for Cloud & Edge Node
   const [edgeNodeStatus, setEdgeNodeStatus] = useState<string>("Frankfurt Edge Node (10.156.0.2:4005)");
@@ -132,6 +139,12 @@ export const VaultConsole: React.FC<VaultConsoleProps> = ({
         if (creds && typeof creds === "object") {
           const isCloudRun = typeof window !== "undefined" && window.location.hostname.includes("run.app");
           if (!dirtyFieldsRef.current.has("accountNumber") && creds.ibkrAccountNumber) setAccountNumber(creds.ibkrAccountNumber);
+          if (!dirtyFieldsRef.current.has("paperAccountNumber") && creds.ibkrPaperAccountNumber) setPaperAccountNumber(creds.ibkrPaperAccountNumber);
+          if (!dirtyFieldsRef.current.has("paperUsername") && creds.ibkrPaperUsername) setPaperUsername(creds.ibkrPaperUsername);
+          if (!dirtyFieldsRef.current.has("paperPassword") && creds.ibkrPaperPassword) setPaperPassword(creds.ibkrPaperPassword);
+          if (!dirtyFieldsRef.current.has("liveAccountNumber") && creds.ibkrLiveAccountNumber) setLiveAccountNumber(creds.ibkrLiveAccountNumber);
+          if (!dirtyFieldsRef.current.has("liveUsername") && creds.ibkrLiveUsername) setLiveUsername(creds.ibkrLiveUsername);
+          if (!dirtyFieldsRef.current.has("livePassword") && creds.ibkrLivePassword) setLivePassword(creds.ibkrLivePassword);
           if (!dirtyFieldsRef.current.has("ibkrHost")) {
             if (creds.ibkrHost) {
               setIbkrHost(isCloudRun && creds.ibkrHost === "127.0.0.1" ? "10.156.0.2" : creds.ibkrHost);
@@ -143,7 +156,6 @@ export const VaultConsole: React.FC<VaultConsoleProps> = ({
           if (!dirtyFieldsRef.current.has("ibkrClientId") && creds.ibkrClientId) setIbkrClientId(Number(creds.ibkrClientId));
           if (!dirtyFieldsRef.current.has("mifidMaker") && creds.mifid2DecisionMaker) setMifidMaker(creds.mifid2DecisionMaker);
           if (!dirtyFieldsRef.current.has("mifidTrader") && creds.mifid2ExecutionTrader) setMifidTrader(creds.mifid2ExecutionTrader);
-          if (!dirtyFieldsRef.current.has("ibkrUsername") && creds.ibkrPaperUsername) setIbkrUsername(creds.ibkrPaperUsername);
           if (creds.edgeNodeHost) setEdgeNodeStatus(creds.edgeNodeHost);
 
           if (!dirtyFieldsRef.current.has("geminiKey") && creds.geminiApiKey) setGeminiKey(creds.geminiApiKey);
@@ -249,6 +261,9 @@ export const VaultConsole: React.FC<VaultConsoleProps> = ({
           message: successMsg,
           sample: data.sample || data.reply,
           models: data.models || [],
+          isLaneMismatch: data.status === "LANE_MISMATCH",
+          alternatePort: data.alternatePort,
+          alternateMode: data.alternateMode,
         },
       }));
     } catch (err: any) {
@@ -315,6 +330,86 @@ export const VaultConsole: React.FC<VaultConsoleProps> = ({
     setTimeout(() => setAiSavedMsg(null), 4000);
   };
 
+  // Switch Execution Lane (Paper <-> Live)
+  const handleSwitchLane = async (targetMode: "LIVE" | "PAPER") => {
+    setIsSwitchingLane(true);
+    setLaneSwitchToast(null);
+    const targetPort = targetMode === "LIVE" ? 4001 : 4002;
+    try {
+      const activeAccount = targetMode === "LIVE" ? (liveAccountNumber || accountNumber) : (paperAccountNumber || accountNumber);
+
+      const res = await fetch("/api/system/toggle-lane", {
+        method: "POST",
+        headers: getAdminHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          mode: targetMode,
+          port: targetPort,
+          accountNumber: activeAccount,
+          ibkrLiveUsername: liveUsername || (unifiedCredentials ? paperUsername : ""),
+          ibkrLivePassword: livePassword || (unifiedCredentials ? paperPassword : ""),
+          ibkrPaperUsername: paperUsername,
+          ibkrPaperPassword: paperPassword,
+          ibkrLiveAccountNumber: liveAccountNumber,
+          ibkrPaperAccountNumber: paperAccountNumber,
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `Switch request failed with HTTP ${res.status}`);
+      }
+      setIbkrPort(targetPort);
+      dirtyFieldsRef.current.add("ibkrPort");
+      persistVaultItem("ibkrPort", targetPort);
+      persistVaultItem("tradingMode", targetMode);
+      if (onSaveSetting) onSaveSetting("tradingMode", targetMode).catch(() => {});
+      if (onSaveSetting) onSaveSetting("ibkrPort", targetPort).catch(() => {});
+
+      setLaneSwitchToast({
+        type: "success",
+        message: `Lane switch to ${targetMode} dispatched. Awaiting Gateway on Port ${targetPort}...`
+      });
+
+      // Quick polling loop up to 30s
+      let connected = false;
+      for (let i = 0; i < 15; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        try {
+          const probe = await fetch("/api/test-broker-connection", {
+            method: "POST",
+            headers: getAdminHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ port: targetPort })
+          });
+          const pdata = await probe.json();
+          if (pdata.success) {
+            connected = true;
+            break;
+          }
+        } catch (_) {}
+      }
+
+      if (connected) {
+        setLaneSwitchToast({
+          type: "success",
+          message: `✓ Successfully switched to ${targetMode} DMA (Port ${targetPort} connected)!`
+        });
+        runTestProbe("ibkr", "/api/test-broker-connection", { port: targetPort });
+      } else {
+        setLaneSwitchToast({
+          type: "success",
+          message: `Switched lane to ${targetMode}. IBC is authenticating on Port ${targetPort}.`
+        });
+      }
+    } catch (err: any) {
+      setLaneSwitchToast({
+        type: "error",
+        message: `Failed to switch to ${targetMode}: ${err.message}`
+      });
+    } finally {
+      setIsSwitchingLane(false);
+      setTimeout(() => setLaneSwitchToast(null), 8000);
+    }
+  };
+
   // Probe all active pillars
   const [isProbingAll, setIsProbingAll] = useState(false);
   const handleProbeAll = async () => {
@@ -342,11 +437,15 @@ export const VaultConsole: React.FC<VaultConsoleProps> = ({
         ibkrHost: ibkrHost,
         ibkrPort: Number(ibkrPort),
         ibkrClientId: Number(ibkrClientId),
+        ibkrPaperAccountNumber: paperAccountNumber,
+        ibkrPaperUsername: paperUsername,
+        ibkrPaperPassword: paperPassword,
+        ibkrLiveAccountNumber: liveAccountNumber,
+        ibkrLiveUsername: liveUsername || (unifiedCredentials ? paperUsername : ""),
+        ibkrLivePassword: livePassword || (unifiedCredentials ? paperPassword : ""),
         mifid2DecisionMaker: mifidMaker,
         mifid2ExecutionTrader: mifidTrader,
       };
-      if (ibkrUsername) updates.ibkrPaperUsername = ibkrUsername;
-      if (ibkrPassword) updates.ibkrPaperPassword = ibkrPassword;
 
       persistVaultBatch(updates);
 
@@ -359,7 +458,7 @@ export const VaultConsole: React.FC<VaultConsoleProps> = ({
       }
       await syncVaultToServer(updates);
 
-      setBrokerSavedMsg("Broker settings synchronized successfully & locked into secure vault.");
+      setBrokerSavedMsg("Broker settings & DMA credentials synchronized successfully & locked into secure vault.");
       setTimeout(() => setBrokerSavedMsg(null), 3500);
     } catch (e: any) {
       setBrokerSavedMsg(`Error saving broker settings: ${e.message}`);
@@ -536,28 +635,61 @@ export const VaultConsole: React.FC<VaultConsoleProps> = ({
       {/* ============================================================== */}
       {activeTab === "broker" && (
         <div className="space-y-6">
-          <div className="terminal-elevated border border-amber-500/30 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          {/* Active Lane & Quick Switch Ribbon */}
+          <div className="terminal-elevated border border-amber-500/30 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-primary font-bold text-sm">
                 <Coins className="w-4 h-4 text-amber-500" />
-                <span>Interactive Brokers DMA Gateway TCP Socket</span>
-                <span className="text-[10px] terminal-badge-warn px-2 py-0.5 rounded font-mono font-bold uppercase">
-                  Direct Market Access
+                <span>Interactive Brokers Direct Market Access (DMA)</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase ${
+                  ibkrPort === 4001
+                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                    : "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                }`}>
+                  {ibkrPort === 4001 ? "🟢 LIVE PRODUCTION DMA (Port 4001)" : "🟡 PAPER SIMULATION (Port 4002)"}
                 </span>
               </div>
               <p className="text-xs text-secondary leading-relaxed font-mono">
-                AlphaEngine communicates with IBKR through native binary sockets on the Frankfurt Edge Node. Authorized via local IB Gateway with sub-3ms co-located latency to IBKR Europe Hub.
+                Frankfurt Edge Node low-latency socket connection. Co-located adjacent to IBKR Europe Hub (sub-3ms execution).
               </p>
             </div>
-            <span className="text-xs font-mono font-bold text-amber-500 border border-amber-500/30 px-2.5 py-1 rounded bg-amber-500/10 shrink-0">
-              CBI MiFID II RTS-22 Armed
-            </span>
+            
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 shrink-0">
+              {laneSwitchToast && (
+                <span className={`text-[11px] font-mono font-bold px-2.5 py-1 rounded ${
+                  laneSwitchToast.type === "success" ? "terminal-badge-bid" : "terminal-badge-ask"
+                }`}>
+                  {laneSwitchToast.message}
+                </span>
+              )}
+              {ibkrPort === 4001 ? (
+                <button
+                  type="button"
+                  onClick={() => handleSwitchLane("PAPER")}
+                  disabled={isSwitchingLane}
+                  className="px-3.5 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border border-amber-500/50 rounded-lg text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition shadow-xs"
+                >
+                  {isSwitchingLane ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  Switch to PAPER Simulation (Port 4002)
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleSwitchLane("LIVE")}
+                  disabled={isSwitchingLane}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition shadow-xs"
+                >
+                  {isSwitchingLane ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 text-yellow-300" />}
+                  Switch to LIVE Production DMA (Port 4001)
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Form Grid */}
+          {/* Connection Parameters Grid */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-mono font-bold text-secondary uppercase">Account Number:</label>
+              <label className="text-[10px] font-mono font-bold text-secondary uppercase">Active Account Number:</label>
               <input
                 type="text"
                 value={accountNumber}
@@ -663,6 +795,175 @@ export const VaultConsole: React.FC<VaultConsoleProps> = ({
             </div>
           </div>
 
+          {/* Institutional Credentials Vault (Paper vs Live) */}
+          <div className="terminal-elevated border border-border rounded-xl p-4 space-y-4 font-mono">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-border gap-2">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-500" />
+                <span className="text-xs font-bold text-primary uppercase">Institutional DMA Credentials Vault</span>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-secondary hover:text-primary">
+                <input
+                  type="checkbox"
+                  checked={unifiedCredentials}
+                  onChange={(e) => setUnifiedCredentials(e.target.checked)}
+                  className="rounded border-border text-amber-500 focus:ring-0"
+                />
+                <span>Use single login credentials for both Paper & Live</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Paper Credentials Card */}
+              <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3 space-y-3">
+                <div className="flex items-center justify-between border-b border-amber-500/20 pb-1.5">
+                  <span className="text-xs font-bold text-amber-400 uppercase flex items-center gap-1.5">
+                    🟡 Paper Simulation Lane (Port 4002)
+                  </span>
+                  <span className="text-[9px] text-muted">Safe sandbox testing</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-secondary font-bold uppercase block">Paper Account:</label>
+                    <input
+                      type="text"
+                      value={paperAccountNumber}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        dirtyFieldsRef.current.add("paperAccountNumber");
+                        setPaperAccountNumber(val);
+                        persistVaultItem("ibkrPaperAccountNumber", val);
+                      }}
+                      placeholder="DU1234567"
+                      className="w-full terminal-card border border-border rounded-lg px-2.5 py-1.5 text-xs text-primary font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-secondary font-bold uppercase block">Paper Username:</label>
+                    <input
+                      type="text"
+                      value={paperUsername}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        dirtyFieldsRef.current.add("paperUsername");
+                        setPaperUsername(val);
+                        persistVaultItem("ibkrPaperUsername", val);
+                        if (unifiedCredentials) {
+                          dirtyFieldsRef.current.add("liveUsername");
+                          setLiveUsername(val);
+                          persistVaultItem("ibkrLiveUsername", val);
+                        }
+                      }}
+                      placeholder="mstouff17"
+                      className="w-full terminal-card border border-border rounded-lg px-2.5 py-1.5 text-xs text-primary font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-secondary font-bold uppercase block">Paper Password:</label>
+                      <button
+                        type="button"
+                        onClick={() => toggleShowKey("paperPass")}
+                        className="text-muted hover:text-primary transition"
+                      >
+                        {showKeys["paperPass"] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      </button>
+                    </div>
+                    <input
+                      type={showKeys["paperPass"] ? "text" : "password"}
+                      value={paperPassword}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        dirtyFieldsRef.current.add("paperPassword");
+                        setPaperPassword(val);
+                        persistVaultItem("ibkrPaperPassword", val);
+                        if (unifiedCredentials) {
+                          dirtyFieldsRef.current.add("livePassword");
+                          setLivePassword(val);
+                          persistVaultItem("ibkrLivePassword", val);
+                        }
+                      }}
+                      placeholder="••••••••"
+                      className="w-full terminal-card border border-border rounded-lg px-2.5 py-1.5 text-xs text-primary font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Credentials Card */}
+              <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3 space-y-3">
+                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-1.5">
+                  <span className="text-xs font-bold text-emerald-400 uppercase flex items-center gap-1.5">
+                    🟢 Live Production DMA Lane (Port 4001)
+                  </span>
+                  <span className="text-[9px] text-muted">Capital deployment</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-secondary font-bold uppercase block">Live Account:</label>
+                    <input
+                      type="text"
+                      value={liveAccountNumber}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        dirtyFieldsRef.current.add("liveAccountNumber");
+                        setLiveAccountNumber(val);
+                        persistVaultItem("ibkrLiveAccountNumber", val);
+                      }}
+                      placeholder="U1234567"
+                      className="w-full terminal-card border border-border rounded-lg px-2.5 py-1.5 text-xs text-primary font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-secondary font-bold uppercase block">Live Username:</label>
+                    <input
+                      type="text"
+                      value={unifiedCredentials ? (paperUsername || liveUsername) : liveUsername}
+                      disabled={unifiedCredentials}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        dirtyFieldsRef.current.add("liveUsername");
+                        setLiveUsername(val);
+                        persistVaultItem("ibkrLiveUsername", val);
+                      }}
+                      placeholder={unifiedCredentials ? "(synced from Paper)" : "mstouff17"}
+                      className={`w-full terminal-card border border-border rounded-lg px-2.5 py-1.5 text-xs text-primary font-mono ${
+                        unifiedCredentials ? "opacity-60 cursor-not-allowed" : ""
+                      }`}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-secondary font-bold uppercase block">Live Password:</label>
+                      <button
+                        type="button"
+                        onClick={() => toggleShowKey("livePass")}
+                        className="text-muted hover:text-primary transition"
+                      >
+                        {showKeys["livePass"] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      </button>
+                    </div>
+                    <input
+                      type={showKeys["livePass"] ? "text" : "password"}
+                      value={unifiedCredentials ? (paperPassword || livePassword) : livePassword}
+                      disabled={unifiedCredentials}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        dirtyFieldsRef.current.add("livePassword");
+                        setLivePassword(val);
+                        persistVaultItem("ibkrLivePassword", val);
+                      }}
+                      placeholder={unifiedCredentials ? "(synced from Paper)" : "••••••••"}
+                      className={`w-full terminal-card border border-border rounded-lg px-2.5 py-1.5 text-xs text-primary font-mono ${
+                        unifiedCredentials ? "opacity-60 cursor-not-allowed" : ""
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* MiFID II Compliance Audit Details */}
           <div className="terminal-elevated border border-border rounded-xl p-4 space-y-3 font-mono">
             <div className="flex items-center justify-between border-b border-border pb-2">
@@ -708,7 +1009,7 @@ export const VaultConsole: React.FC<VaultConsoleProps> = ({
 
           {/* Actions & Live Probe */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => runTestProbe("ibkr", "/api/test-broker-connection", { port: ibkrPort })}
@@ -720,11 +1021,27 @@ export const VaultConsole: React.FC<VaultConsoleProps> = ({
               </button>
 
               {testResults["ibkr"] && (
-                <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded ${
-                  testResults["ibkr"].success ? "terminal-badge-bid" : "terminal-badge-ask"
-                }`}>
-                  {testResults["ibkr"].message}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded ${
+                    testResults["ibkr"].success
+                      ? "terminal-badge-bid"
+                      : testResults["ibkr"].isLaneMismatch
+                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                      : "terminal-badge-ask"
+                  }`}>
+                    {testResults["ibkr"].message}
+                  </span>
+                  {testResults["ibkr"].isLaneMismatch && (
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchLane(ibkrPort === 4001 ? "LIVE" : "PAPER")}
+                      disabled={isSwitchingLane}
+                      className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black font-mono font-black text-[11px] rounded transition cursor-pointer shadow-xs"
+                    >
+                      {isSwitchingLane ? "Transitioning..." : `Switch to Port ${ibkrPort} Now`}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
 

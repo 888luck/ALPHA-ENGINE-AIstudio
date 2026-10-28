@@ -24,6 +24,8 @@ export interface VaultCredentials {
   ibkrPaperPassword?: string;
   ibkrLiveUsername?: string;
   ibkrLivePassword?: string;
+  ibkrUsername?: string;
+  ibkrPassword?: string;
   mifid2DecisionMaker: string;
   mifid2ExecutionTrader: string;
 
